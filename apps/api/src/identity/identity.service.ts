@@ -1,0 +1,176 @@
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../prisma/prisma.service';
+import { SmsService } from './sms/sms.service';
+import { RequestOtpDto } from './dto/request-otp.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
+
+// Dev/staging-only universal OTP, gated behind nodeEnv below — same
+// approach as the original auth.service.js, so any phone can be tested
+// locally without SMS ever sending, but this is never accepted in production.
+const DEV_OTP = '123456';
+
+function generateOtp(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+@Injectable()
+export class IdentityService {
+  private readonly logger = new Logger(IdentityService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+    private readonly jwt: JwtService,
+    private readonly sms: SmsService,
+  ) {}
+
+  private get isProduction(): boolean {
+    return this.config.get<string>('nodeEnv') === 'production';
+  }
+
+  async requestOtp({ phone, role }: RequestOtpDto) {
+    let user = await this.prisma.user.findUnique({ where: { phone } });
+
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: { phone, status: 'PENDING' },
+      });
+    }
+
+    // Assign the requested role if the user doesn't already have it.
+    // Registration is additive: requesting OTP as BUYER after already
+    // being a FARMER adds the BUYER role rather than replacing anything.
+    const roleRow = await this.prisma.role.findUnique({ where: { code: role } });
+    if (!roleRow) {
+      throw new NotFoundException(
+        `Role "${role}" is not seeded yet — run migration 012_identity_seed_core_roles.sql`,
+      );
+    }
+    await this.prisma.userRole.upsert({
+      where: { userId_roleId: { userId: user.id, roleId: roleRow.id } },
+      create: { userId: user.id, roleId: roleRow.id },
+      update: {},
+    });
+
+    // Invalidate any previously-issued, still-unused codes for this phone.
+    await this.prisma.otpCode.updateMany({
+      where: { phone, used: false },
+      data: { used: true },
+    });
+
+    const code = generateOtp();
+    const otpExpiresMinutes = this.config.get<number>('otp.expiresMinutes') ?? 10;
+    const expiresAt = new Date(Date.now() + otpExpiresMinutes * 60 * 1000);
+
+    await this.prisma.otpCode.create({
+      data: { phone, code, expiresAt },
+    });
+
+    try {
+      await this.sms.sendOtpSms(phone, code);
+    } catch (smsErr) {
+      // In production, a failed send means the user has no way to get
+      // their code -- surface it as a real error. In dev, keep going: the
+      // DEV_OTP fallback below covers it, so a missing/invalid AT sandbox
+      // key doesn't block local testing.
+      this.logger.error(`SMS send failed for ${phone}: ${(smsErr as Error).message}`);
+      if (this.isProduction) {
+        throw new ForbiddenException(
+          'Could not send verification code. Please try again shortly.',
+        );
+      }
+    }
+
+    if (!this.isProduction) {
+      this.logger.debug(`[DEV] OTP for ${phone}: ${code}`);
+      return { message: 'OTP sent', dev_otp: code };
+    }
+
+    return { message: 'OTP sent' };
+  }
+
+  async verifyOtp({ phone, otp }: VerifyOtpDto) {
+    if (!this.isProduction && otp === DEV_OTP) {
+      const user = await this.prisma.user.findUnique({ where: { phone } });
+      if (!user) {
+        throw new UnauthorizedException('Phone number not registered. Request OTP first.');
+      }
+      this.logger.debug(`[DEV] Universal OTP used for ${phone}`);
+      return this.issueSession(user.id, phone);
+    }
+
+    const record = await this.prisma.otpCode.findFirst({
+      where: { phone, code: otp, used: false, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!record) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    await this.prisma.otpCode.update({ where: { id: record.id }, data: { used: true } });
+
+    const user = await this.prisma.user.findUnique({ where: { phone } });
+    if (!user) {
+      // Shouldn't happen — requestOtp always creates the user row first —
+      // but fail loudly rather than issuing a token for a phantom account.
+      throw new UnauthorizedException('Phone number not registered. Request OTP first.');
+    }
+
+    if (!user.phoneVerified) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { phoneVerified: true, status: 'ACTIVE' },
+      });
+    }
+
+    return this.issueSession(user.id, phone);
+  }
+
+  async me(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { userRoles: { include: { role: true } } },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return {
+      id: user.id,
+      phone: user.phone,
+      firstName: user.firstName,
+      middleName: user.middleName,
+      lastName: user.lastName,
+      email: user.email,
+      preferredLanguage: user.preferredLanguage,
+      status: user.status,
+      phoneVerified: user.phoneVerified,
+      roles: user.userRoles.map((ur: { role: { code: string } }) => ur.role.code),
+    };
+  }
+
+  /** Signs a JWT and returns it with a minimal user summary — shared by both DEV_OTP and normal verify paths. */
+  private async issueSession(userId: string, phone: string) {
+    const primaryRole = await this.prisma.userRole.findFirst({
+      where: { userId },
+      include: { role: true },
+      orderBy: { assignedAt: 'asc' },
+    });
+    const roleCode = primaryRole?.role.code ?? null;
+
+    const token = this.jwt.sign({ userId, phone, role: roleCode });
+
+    return {
+      token,
+      user: { id: userId, phone, role: roleCode },
+    };
+  }
+}

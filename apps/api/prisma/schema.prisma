@@ -1,0 +1,369 @@
+// Nahu Platform — Prisma schema for the Identity module
+// This maps 1:1 onto database/migrations/001..009_identity_*.sql
+// Do not run `prisma migrate dev` against a database that already has these
+// tables created by the raw SQL migrations — use `prisma db pull` to confirm
+// drift, or `prisma migrate resolve` to mark them as applied.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["identity", "marketplace", "orders"]
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  LOCKED
+  DEACTIVATED
+
+  @@schema("identity")
+  @@map("user_status")
+}
+
+model User {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  firstName          String?   @map("first_name") @db.VarChar(100)
+  middleName         String?   @map("middle_name") @db.VarChar(100)
+  lastName           String?   @map("last_name") @db.VarChar(100)
+  phone              String    @unique @db.VarChar(25)
+  email              String?   @unique @db.VarChar(255)
+  preferredLanguage  String    @default("en") @map("preferred_language") @db.Char(2)
+  status             UserStatus @default(PENDING)
+  phoneVerified      Boolean   @default(false) @map("phone_verified")
+  emailVerified      Boolean   @default(false) @map("email_verified")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+
+  credential         Credential?
+  userRoles          UserRole[]
+  userOrganizations  UserOrganization[]
+  rolesAssigned      UserRole[]        @relation("AssignedByUser")
+  permissionsGranted RolePermission[] @relation("GrantedByUser")
+  farmerProfile      FarmerProfile?
+  buyerOrders        Order[]           @relation("BuyerOrders")
+
+  @@map("users")
+  @@schema("identity")
+}
+
+model Credential {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId               String    @unique @map("user_id") @db.Uuid
+  passwordHash         String?   @map("password_hash")
+  passwordChangedAt    DateTime? @map("password_changed_at") @db.Timestamptz
+  lastLoginAt          DateTime? @map("last_login_at") @db.Timestamptz
+  failedLoginAttempts  Int       @default(0) @map("failed_login_attempts") @db.SmallInt
+  lockedUntil          DateTime? @map("locked_until") @db.Timestamptz
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("credentials")
+  @@schema("identity")
+}
+
+model Role {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code             String   @unique @db.VarChar(50)
+  displayName      String   @map("display_name") @db.VarChar(100)
+  description      String?
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  userRoles        UserRole[]
+  rolePermissions  RolePermission[]
+
+  @@map("roles")
+  @@schema("identity")
+}
+
+model Permission {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code             String   @unique @db.VarChar(100)
+  displayName      String   @map("display_name") @db.VarChar(150)
+  description      String?
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  rolePermissions  RolePermission[]
+
+  @@map("permissions")
+  @@schema("identity")
+}
+
+model UserRole {
+  userId      String   @map("user_id") @db.Uuid
+  roleId      String   @map("role_id") @db.Uuid
+  assignedAt  DateTime @default(now()) @map("assigned_at") @db.Timestamptz
+  assignedBy  String?  @map("assigned_by") @db.Uuid
+
+  user            User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role            Role  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assignedByUser  User? @relation("AssignedByUser", fields: [assignedBy], references: [id], onDelete: SetNull)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+  @@schema("identity")
+}
+
+model RolePermission {
+  roleId        String   @map("role_id") @db.Uuid
+  permissionId  String   @map("permission_id") @db.Uuid
+  grantedAt     DateTime @default(now()) @map("granted_at") @db.Timestamptz
+  grantedBy     String?  @map("granted_by") @db.Uuid
+
+  role            Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission      Permission  @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  grantedByUser   User?       @relation("GrantedByUser", fields: [grantedBy], references: [id], onDelete: SetNull)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+  @@schema("identity")
+}
+
+model Organization {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code               String    @unique @db.VarChar(50)
+  name               String    @db.VarChar(255)
+  description        String?
+  isActive           Boolean   @default(true) @map("is_active")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+
+  userOrganizations  UserOrganization[]
+
+  @@map("organizations")
+  @@schema("identity")
+}
+
+model UserOrganization {
+  userId          String   @map("user_id") @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  positionTitle   String?  @map("position_title") @db.VarChar(100)
+  joinedAt        DateTime @default(now()) @map("joined_at") @db.Timestamptz
+  isPrimary       Boolean  @default(false) @map("is_primary")
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([userId, organizationId])
+  @@map("user_organizations")
+  @@schema("identity")
+}
+
+model OtpCode {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  phone      String   @db.VarChar(25)
+  code       String   @db.VarChar(6)
+  used       Boolean  @default(false)
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([phone])
+  @@map("otp_codes")
+  @@schema("identity")
+}
+
+// ============================================================================
+// Marketplace module (Package 003)
+// Maps database/migrations/marketplace/001..004_marketplace_*.sql
+// ============================================================================
+
+enum ProcessMethod {
+  WASHED
+  NATURAL
+  HONEY
+  SEMI_WASHED
+  HULLED
+  ANAEROBIC
+  CARBONIC_MACERATION
+
+  @@schema("marketplace")
+  @@map("process_method")
+}
+
+enum CoffeeGrade {
+  GRADE_1
+  GRADE_2
+  GRADE_3
+  GRADE_4
+  GRADE_5
+  GRADE_6
+  GRADE_7
+  GRADE_8
+  GRADE_9
+
+  @@schema("marketplace")
+  @@map("coffee_grade")
+}
+
+enum ListingStatus {
+  ACTIVE
+  RESERVED
+  SOLD
+  CANCELLED
+
+  @@schema("marketplace")
+  @@map("listing_status")
+}
+
+model Cooperative {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String    @db.VarChar(200)
+  unionName      String?   @map("union_name") @db.VarChar(200)
+  region         String    @db.VarChar(100)
+  zone           String?   @db.VarChar(100)
+  licenseNumber  String?   @map("license_number") @db.VarChar(50)
+  verified       Boolean   @default(false)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  farmerProfiles FarmerProfile[]
+
+  @@map("cooperatives")
+  @@schema("marketplace")
+}
+
+model FarmerProfile {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String    @unique @map("user_id") @db.Uuid
+  cooperativeId      String?   @map("cooperative_id") @db.Uuid
+  region             String    @db.VarChar(100)
+  zone               String?   @db.VarChar(100)
+  woreda             String?   @db.VarChar(100)
+  altitudeM          Decimal?  @map("altitude_m") @db.Decimal(6, 1)
+  farmSizeHa         Decimal?  @map("farm_size_ha") @db.Decimal(6, 2)
+  primaryLanguage    String    @default("am") @map("primary_language") @db.Char(2)
+  verified           Boolean   @default(false)
+  verificationNotes  String?   @map("verification_notes") @db.VarChar(500)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cooperative        Cooperative?  @relation(fields: [cooperativeId], references: [id], onDelete: SetNull)
+  listings           Listing[]
+  orders             Order[]       @relation("FarmerOrders")
+
+  @@map("farmer_profiles")
+  @@schema("marketplace")
+}
+
+model Listing {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  farmerId       String        @map("farmer_id") @db.Uuid
+  region         String        @db.VarChar(100)
+  regionEn       String?       @map("region_en") @db.VarChar(100)
+  woreda         String?       @db.VarChar(100)
+  washingStation String?       @map("washing_station") @db.VarChar(150)
+  cooperative    String?       @db.VarChar(200)
+  processMethod  ProcessMethod @map("process_method")
+  grade          CoffeeGrade
+  variety        String?       @db.VarChar(100)
+  quantityKg     Decimal       @map("quantity_kg") @db.Decimal(8, 2)
+  pricePerKg     Decimal       @map("price_per_kg") @db.Decimal(8, 2)
+  harvestDate    DateTime      @map("harvest_date") @db.Date
+  altitudeM      Decimal?      @map("altitude_m") @db.Decimal(6, 1)
+  cupScore       Decimal?      @map("cup_score") @db.Decimal(4, 1)
+  photoUrls      String[]      @default([]) @map("photo_urls")
+  status         ListingStatus @default(ACTIVE)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime      @default(now()) @map("updated_at") @db.Timestamptz
+
+  farmer         FarmerProfile @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  orders         Order[]
+
+  @@index([region])
+  @@index([grade])
+  @@index([status])
+  @@map("listings")
+  @@schema("marketplace")
+}
+
+// ============================================================================
+// Orders module (Package 004)
+// Maps database/migrations/orders/001..003_orders_*.sql
+// ============================================================================
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID_ESCROW
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  DISPUTED
+  COMPLETED
+  CANCELLED
+
+  @@schema("orders")
+  @@map("order_status")
+}
+
+enum PaymentMethod {
+  TELEBIRR
+  CBE_BIRR
+
+  @@schema("orders")
+  @@map("payment_method")
+}
+
+model Order {
+  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  listingId         String        @map("listing_id") @db.Uuid
+  buyerId           String        @map("buyer_id") @db.Uuid
+  farmerId          String        @map("farmer_id") @db.Uuid
+  quantityKg        Decimal       @map("quantity_kg") @db.Decimal(10, 2)
+  totalEtb          Decimal       @map("total_etb") @db.Decimal(12, 2)
+  commissionEtb     Decimal       @map("commission_etb") @db.Decimal(12, 2)
+  farmerPayoutEtb   Decimal       @map("farmer_payout_etb") @db.Decimal(12, 2)
+  status            OrderStatus   @default(PENDING_PAYMENT)
+  paymentMethod     PaymentMethod @map("payment_method")
+  paymentReference  String?       @map("payment_reference") @db.VarChar(100)
+  deliveryAddress   String        @map("delivery_address") @db.VarChar(500)
+  paidAt            DateTime?     @map("paid_at") @db.Timestamptz
+  deliveredAt       DateTime?     @map("delivered_at") @db.Timestamptz
+  completedAt       DateTime?     @map("completed_at") @db.Timestamptz
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime      @default(now()) @map("updated_at") @db.Timestamptz
+
+  listing           Listing            @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  buyer             User               @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Restrict)
+  farmer            FarmerProfile      @relation("FarmerOrders", fields: [farmerId], references: [id], onDelete: Restrict)
+  certificate       OriginCertificate?
+
+  @@index([buyerId])
+  @@index([farmerId])
+  @@index([status])
+  @@map("orders")
+  @@schema("orders")
+}
+
+model OriginCertificate {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId        String   @unique @map("order_id") @db.Uuid
+  certNumber     String   @unique @map("cert_number") @db.VarChar(30)
+  farmerName     String   @map("farmer_name") @db.VarChar(100)
+  farmLocation   String   @map("farm_location") @db.VarChar(200)
+  cooperative    String?  @db.VarChar(200)
+  region         String?  @db.VarChar(100)
+  grade          String   @db.VarChar(20)
+  processMethod  String   @map("process_method") @db.VarChar(20)
+  harvestDate    DateTime @map("harvest_date") @db.Date
+  altitudeM      Decimal? @map("altitude_m") @db.Decimal(6, 1)
+  quantityKg     Decimal? @map("quantity_kg") @db.Decimal(8, 2)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  order          Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("origin_certificates")
+  @@schema("orders")
+}
