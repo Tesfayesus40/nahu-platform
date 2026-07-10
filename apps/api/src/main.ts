@@ -4,7 +4,6 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { join } from 'path';
-import * as express from 'express';
 import { AppModule } from './app.module';
 import { MobileCompatExceptionFilter } from './common/filters/mobile-compat-exception.filter';
 
@@ -24,7 +23,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   const uploadDir = process.env.UPLOAD_DIR ?? join(process.cwd(), 'uploads');
-  app.use('/uploads/files', express.static(uploadDir));
+  app.useStaticAssets(uploadDir, { prefix: '/uploads/files' });
 
   app.use(
     helmet({
