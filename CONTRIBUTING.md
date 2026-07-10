@@ -1,34 +1,41 @@
 # Contributing to Nahu Platform
 
-Thank you for contributing to Ethiopia's digital agricultural marketplace. This guide walks you through setting up the project and submitting changes.
+Thank you for contributing to Ethiopia's digital agriculture platform. This guide covers setup, workflow, and expectations for pull requests.
 
-For engineering conventions and patterns, see [docs/engineering-playbook.md](docs/engineering-playbook.md).  
-For a high-level overview, see [README.md](README.md).
+For conventions and architecture rules, see the [Engineering Playbook](docs/engineering-playbook.md).
 
 ---
 
-## Before you start
+## Getting started
 
 ### Prerequisites
 
 - Node.js 20+
-- pnpm 9 (`corepack enable`)
+- pnpm 9.x
 - PostgreSQL 14+
 - Git
 
-### Clone and install
+### 1. Fork and clone
 
 ```bash
-git clone <repository-url>
+git clone <your-fork-url>
 cd nahu-platform
 pnpm install
 ```
 
----
+### 2. Set up the database
 
-## Development setup
+Create a PostgreSQL database and apply migrations in numeric order from `database/migrations/`:
 
-### 1. Configure environment
+```bash
+export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/nahu_platform"
+
+# Apply identity migrations (001–012), then marketplace/, then orders/
+psql $DATABASE_URL -f database/migrations/001_identity_schema.sql
+# Continue through all files — see apps/api/README.md for migration notes
+```
+
+### 3. Configure environment
 
 ```bash
 cp apps/api/.env.example apps/api/.env
@@ -36,86 +43,18 @@ cp apps/api/.env.example apps/api/.env
 
 Edit `apps/api/.env`:
 
-```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/nahu_platform"
-JWT_SECRET="your-local-dev-secret-at-least-32-chars"
-NODE_ENV=development
-```
+- Set `DATABASE_URL` to your local database
+- Set `JWT_SECRET` to a long random string
+- Leave `AT_API_KEY` blank for local dev (OTP `123456` works)
 
-For local development, SMS and AI keys are optional. OTP `123456` works as a dev bypass after calling `request-otp`.
-
-### 2. Create the database
-
-```bash
-createdb nahu_platform
-```
-
-Or use your preferred PostgreSQL tooling.
-
-### 3. Apply migrations
-
-Migrations are SQL files applied **manually in order**. Use `psql`, pgAdmin, or any PostgreSQL client.
-
-**Identity** (`database/migrations/`):
-
-```
-001_identity_schema.sql
-002_identity_users.sql
-003_identity_credentials.sql
-004_identity_roles.sql
-005_identity_permissions.sql
-006_identity_user_roles.sql
-007_identity_role_permissions.sql
-008_identity_organizations.sql
-009_identity_user_organizations.sql
-010_identity_relax_registration_constraints.sql
-011_identity_otp_codes.sql
-012_identity_seed_core_roles.sql
-```
-
-**Marketplace** (`database/migrations/marketplace/`):
-
-```
-001_marketplace_schema.sql
-002_marketplace_cooperatives.sql
-003_marketplace_farmer_profiles.sql
-004_marketplace_listings.sql
-005_marketplace_expand_taxonomy.sql
-006_marketplace_widen_primary_language.sql
-```
-
-**Orders** (`database/migrations/orders/`):
-
-```
-001_orders_schema.sql
-002_orders_orders.sql
-003_orders_origin_certificates.sql
-```
-
-Example with `psql`:
-
-```bash
-psql "$DATABASE_URL" -f database/migrations/001_identity_schema.sql
-# … continue in order for all files
-```
-
-Do **not** run `prisma migrate dev` on databases that have been set up with these SQL files.
-
-### 4. Generate Prisma client
+### 4. Generate Prisma client and run
 
 ```bash
 pnpm --filter @nahu-platform/api prisma:generate
-```
-
-Run this again whenever `apps/api/prisma/schema.prisma` changes.
-
-### 5. Start the API
-
-```bash
 pnpm --filter @nahu-platform/api dev
 ```
 
-Verify:
+### 5. Verify
 
 ```bash
 curl http://localhost:3000/health
@@ -123,198 +62,173 @@ curl http://localhost:3000/health
 
 ---
 
-## Making changes
-
-### Branch naming
-
-| Prefix | Use for |
-|--------|---------|
-| `feature/` | New features |
-| `fix/` | Bug fixes |
-| `docs/` | Documentation only |
-| `chore/` | Tooling, dependencies |
-
-Example: `feature/listing-edit-endpoint`
-
-### Code organization
-
-| Change type | Where |
-|-------------|-------|
-| New API endpoint | `apps/api/src/<module>/` |
-| Database table/column | `database/migrations/<module>/` + `prisma/schema.prisma` |
-| Business docs | `docs/business/` |
-| Architecture docs | `docs/02-architecture/` |
-| Engineering conventions | `docs/engineering-playbook.md` |
-
-Follow existing patterns. Read the surrounding module before adding code.
-
-### Database changes
-
-1. Create a new numbered SQL migration file with a header comment explaining **why**
-2. Update `apps/api/prisma/schema.prisma` to match
-3. Run `pnpm --filter @nahu-platform/api prisma:generate`
-4. Document the migration in your PR description
-5. Never modify migrations that have already been applied to shared environments
-
-### API changes
-
-- Preserve backward compatibility with `/api/v1` mobile clients
-- Use camelCase in JSON request and response bodies
-- Validate all inputs with `class-validator` DTOs
-- Return errors as `{ error: "message" }` (handled by `MobileCompatExceptionFilter`)
-- Document new routes in `apps/api/README.md`
-
-### Major changes
-
-For architectural changes, new database modules, or breaking API changes:
-
-1. **Explain** the proposed change and rationale
-2. **Wait for approval** before implementing
-3. Implement in a focused PR
-
-This applies especially to schema redesigns, auth model changes, and error format changes.
-
----
-
-## Testing your changes
-
-### Build
-
-```bash
-pnpm --filter @nahu-platform/api build
-```
-
-### Manual smoke test
-
-After API changes, verify at minimum:
-
-```bash
-# Health
-curl http://localhost:3000/health
-
-# Auth
-curl -X POST http://localhost:3000/api/v1/auth/request-otp \
-  -H "Content-Type: application/json" \
-  -d '{"phone":"+251911223344","role":"FARMER"}'
-
-curl -X POST http://localhost:3000/api/v1/auth/verify-otp \
-  -H "Content-Type: application/json" \
-  -d '{"phone":"+251911223344","otp":"123456"}'
-```
-
-Use the returned token for authenticated endpoints. See [apps/api/README.md](apps/api/README.md) for the full endpoint list and lifecycle tests.
-
-### Mobile impact
-
-If your change affects request/response shapes, error messages, or auth:
-
-- Test against the Farmer or Buyer Expo app in `nahu-buna-gebaya`
-- Point the app's API URL at your local or staging server
-- Verify bilingual error messages still display correctly
-
----
-
-## Pull request process
+## Development workflow
 
 ### 1. Create a branch
 
 ```bash
-git checkout -b feature/your-change
+git checkout -b feature/short-description
+# or
+git checkout -b fix/short-description
 ```
 
-### 2. Make focused changes
+### 2. Make changes
 
-Keep PRs small and reviewable. One feature or fix per PR when possible.
+Follow the [Engineering Playbook](docs/engineering-playbook.md):
 
-### 3. Write a clear PR description
+- Put business logic in services, not controllers
+- Validate all inputs with DTOs
+- Use SQL migrations for schema changes
+- Preserve mobile API compatibility (`{ error: "..." }`, camelCase, uppercase roles)
 
-Include:
+### 3. Test locally
 
-- **What** changed
-- **Why** it was needed
-- **How** to test it
-- Migration notes (if any)
-- Mobile compatibility notes (if any)
-- Breaking changes (if any)
+```bash
+pnpm build
+pnpm lint    # when lint is configured for your package
+pnpm test    # when tests exist for your change
+```
 
-### 4. Pre-submit checklist
+### 4. Commit
 
-- [ ] `pnpm --filter @nahu-platform/api build` passes
-- [ ] No `.env` or secrets committed
-- [ ] Migrations are numbered and documented
-- [ ] API routes documented in `apps/api/README.md` (if applicable)
-- [ ] Error format remains `{ error: "..." }` for mobile clients
+Write clear, imperative commit messages:
 
-### 5. Request review
+```
+docs: add root README with quick start
+fix: use camelCase field names in earnings screen
+feat: add PATCH /listings/:id endpoint
+```
 
-Wait for review before merging to `main`.
+Match the style of existing commits in the repository.
+
+### 5. Push and open a pull request
+
+- Describe **what** changed and **why**
+- Include a test plan (commands run, endpoints tested)
+- Link related issues if applicable
+- Note any database migrations that need applying
+- Note any mobile app impact
 
 ---
 
-## Commit messages
+## Database changes
 
-Use clear, imperative commit messages. Match the existing repository style:
+Schema changes require **both**:
 
+1. A new SQL file in `database/migrations/` (with a header comment explaining why)
+2. An update to `apps/api/prisma/schema.prisma` matching the new tables/columns
+
+**Do not** run `prisma migrate dev` on a database that already has SQL migrations applied.
+
+After your migration:
+
+```bash
+psql $DATABASE_URL -f database/migrations/<your-new-file>.sql
+pnpm --filter @nahu-platform/api prisma:generate
+pnpm --filter @nahu-platform/api build
 ```
-docs: add root README with quick start and repo map
 
-feat: add PATCH /listings/:id endpoint for farmer edits
+Document the migration in your PR description so reviewers can apply it.
 
-fix: use camelCase farmerPayoutEtb in EarningsScreen totals
+---
 
-chore: add Docker Compose for local Postgres
-```
+## API changes
 
-Format: `<type>: <short summary>` with an optional body paragraph for context.
+### Backward compatibility
 
-Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `ci`.
+The mobile apps (`nahu-buna-farmer`, `nahu-buna-buyer`) depend on the v1 API contract:
+
+- URL prefix `/api/v1`
+- Error body `{ error: "message" }`
+- camelCase JSON fields
+- Uppercase role and enum codes
+
+Do not break these without coordinating a mobile app release.
+
+### Adding an endpoint
+
+1. Create or extend a DTO in `dto/`
+2. Add service method with business logic
+3. Add controller route with appropriate guards (`JwtAuthGuard`, `RolesGuard`)
+4. Document in `apps/api/README.md`
+5. Test with `curl` or integration tests
+
+---
+
+## Major changes
+
+For architectural changes, new database schemas, or breaking API changes:
+
+1. Explain the proposed change in an issue or PR draft
+2. Wait for approval from a maintainer
+3. Implement in focused, reviewable commits
+4. Update documentation
+
+See [Major changes protocol](docs/engineering-playbook.md#major-changes-protocol) in the playbook.
 
 ---
 
 ## What not to commit
 
-| File / pattern | Reason |
-|----------------|--------|
-| `apps/api/.env` | Contains secrets |
+| Item | Reason |
+|------|--------|
+| `.env` files | Contain secrets |
+| `node_modules/` | Installed via pnpm |
+| Compiled `.js` / `.js.map` in `src/` | Build artifacts |
+| `apps/api/api/` duplicate folder | Stale nested copy — canonical source is `apps/api/` |
 | API keys, passwords, tokens | Security |
-| `apps/api/api/` compiled duplicate | Not canonical source |
-| `node_modules/`, `dist/` | Build artifacts (should be gitignored) |
-| Large binary files | Use external storage |
 
 ---
 
 ## Code style
 
-- **TypeScript** for all API code
-- **Prettier** for formatting: `pnpm format`
-- **NestJS conventions**: modules, controllers, services, DTOs
-- **Thin controllers**, business logic in services
-- **Comments** only for non-obvious business logic
+| Area | Convention |
+|------|------------|
+| Language | TypeScript for backend (`apps/api/src/`) |
+| Formatting | Prettier (`pnpm format` from root) |
+| Controllers | Thin — delegate to services |
+| Services | Business logic, database access via PrismaService |
+| DTOs | `class-validator` decorators on all request fields |
+| Errors | NestJS exceptions (`BadRequestException`, `NotFoundException`, etc.) |
+
+---
+
+## Pull request checklist
+
+- [ ] Branch is up to date with `main`
+- [ ] `pnpm build` passes
+- [ ] No secrets or `.env` files included
+- [ ] Database migrations documented in PR description
+- [ ] Mobile compatibility considered for API changes
+- [ ] Documentation updated if setup or conventions changed
+- [ ] Test plan included in PR description
 
 ---
 
 ## Documentation changes
 
-Documentation PRs are welcome and do not require API smoke tests. Update cross-links when adding or renaming files.
+Documentation-only PRs are welcome. Key files:
 
-| Document | Update when |
-|----------|-------------|
-| `README.md` | Repo structure, quick start, or scripts change |
-| `docs/engineering-playbook.md` | Conventions or workflows change |
-| `apps/api/README.md` | Endpoints, packages, or API behavior change |
-| `CONTRIBUTING.md` | Setup steps or PR process change |
+| File | When to update |
+|------|----------------|
+| `README.md` | Setup steps, repo structure, or status changes |
+| `docs/engineering-playbook.md` | New conventions or workflow changes |
+| `docs/08-guides/staging-deploy.md` | Staging/production Railway deployment |
+| `CONTRIBUTING.md` | Contribution process changes |
+| `apps/api/README.md` | New endpoints, migrations, or packages |
+| `docs/03-domain-model/` | Entity spec changes |
 
 ---
 
 ## Getting help
 
-| Topic | Resource |
-|-------|----------|
-| Running the API | [README.md](README.md) |
-| Engineering conventions | [docs/engineering-playbook.md](docs/engineering-playbook.md) |
-| API endpoints | [apps/api/README.md](apps/api/README.md) |
-| Business actors | [docs/business/business-actors.md](docs/business/business-actors.md) |
-| Architecture principles | [docs/02-architecture/architecture-principles.md](docs/02-architecture/architecture-principles.md) |
+| Resource | Contents |
+|----------|----------|
+| [README](README.md) | Quick start and repo map |
+| [Engineering Playbook](docs/engineering-playbook.md) | Conventions and architecture |
+| [API README](apps/api/README.md) | Endpoints, migrations, dev notes |
+| [Architecture Principles](docs/02-architecture/architecture-principles.md) | Design principles |
+| [Business Actors](docs/business/business-actors.md) | Platform actors and roles |
 
 ---
 

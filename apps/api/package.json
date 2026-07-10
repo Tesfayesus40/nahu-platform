@@ -8,8 +8,8 @@
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
-    "start": "node $(find dist -name main.js -not -path '*/node_modules/*' | head -1)",
-    "start:prod": "node $(find dist -name main.js -not -path '*/node_modules/*' | head -1)",
+    "start": "node dist/main.js",
+    "start:prod": "node dist/main.js",
     "postinstall": "prisma generate",
     "lint": "eslint \"src/**/*.ts\"",
     "test": "jest",

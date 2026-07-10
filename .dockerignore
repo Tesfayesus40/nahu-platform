@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+**/dist
+.git
+.github
+apps/api/api
+apps/.cursor
+**/.env
+**/.env.*
+!**/.env.example
+*.md
+docs
+database/migrations
+docker-compose.yml

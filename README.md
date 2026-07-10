@@ -188,7 +188,7 @@ Both apps target `/api/v1` on the platform API. Migration from the legacy Expres
 | [Business Actors](docs/business/business-actors.md) | All platform actors and IAM foundation |
 | [Users Entity](docs/03-domain-model/users-entity.md) | Approved Identity domain spec |
 | [Data Dictionary](database/docs/data-dictionary.md) | Database module overview |
-| [API README](apps/api/README.md) | Endpoint catalog, packages 001–005, dev notes |
+| [Staging deployment](docs/08-guides/staging-deploy.md) | Deploy API to Railway staging |
 
 ### Planned documentation structure
 
