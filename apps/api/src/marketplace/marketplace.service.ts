@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateFarmerProfileDto } from './dto/create-farmer-profile.dto';
 import { UpdateFarmerProfileDto } from './dto/update-farmer-profile.dto';
 import { CreateListingDto } from './dto/create-listing.dto';
+import { UpdateListingDto } from './dto/update-listing.dto';
 import { QueryListingsDto } from './dto/query-listings.dto';
 
 /** Prisma returns NUMERIC/DECIMAL columns as Decimal objects — flatten to plain numbers for JSON responses. */
@@ -71,6 +72,7 @@ export class MarketplaceService {
       region: profile.region,
       zone: profile.zone,
       woreda: profile.woreda,
+      primaryLanguage: profile.primaryLanguage,
       altitudeM: toNumber(profile.altitudeM),
       farmSizeHa: toNumber(profile.farmSizeHa),
       verified: profile.verified,
@@ -168,6 +170,58 @@ export class MarketplaceService {
       throw new NotFoundException('Listing not found');
     }
     return this.shapeListing(listing, { includeFarmerDetail: true });
+  }
+
+  async updateListing(userId: string, listingId: string, dto: UpdateListingDto) {
+    const farmer = await this.prisma.farmerProfile.findUnique({ where: { userId } });
+    if (!farmer) {
+      throw new NotFoundException('Farmer profile not found');
+    }
+
+    const listing = await this.prisma.listing.findFirst({
+      where: { id: listingId, farmerId: farmer.id },
+    });
+    if (!listing) {
+      throw new NotFoundException('Listing not found');
+    }
+    if (listing.status !== 'ACTIVE') {
+      throw new BadRequestException('Only active listings can be edited');
+    }
+
+    const { harvestDate, ...rest } = dto;
+    const updated = await this.prisma.listing.update({
+      where: { id: listingId },
+      data: {
+        ...rest,
+        ...(harvestDate ? { harvestDate: new Date(harvestDate) } : {}),
+      },
+    });
+
+    return this.shapeListing(updated);
+  }
+
+  async withdrawListing(userId: string, listingId: string) {
+    const farmer = await this.prisma.farmerProfile.findUnique({ where: { userId } });
+    if (!farmer) {
+      throw new NotFoundException('Farmer profile not found');
+    }
+
+    const listing = await this.prisma.listing.findFirst({
+      where: { id: listingId, farmerId: farmer.id },
+    });
+    if (!listing) {
+      throw new NotFoundException('Listing not found');
+    }
+    if (listing.status !== 'ACTIVE') {
+      throw new BadRequestException('Only active listings can be withdrawn');
+    }
+
+    const updated = await this.prisma.listing.update({
+      where: { id: listingId },
+      data: { status: 'CANCELLED' },
+    });
+
+    return this.shapeListing(updated);
   }
 
   private shapeListing(
