@@ -1,83 +1,96 @@
 # Nahu Platform
 
-Ethiopia's digital agricultural marketplace — a secure, mobile-first platform connecting farmers, buyers, cooperatives, and the wider agricultural value chain.
+Ethiopia's digital agriculture platform — a secure, mobile-first marketplace connecting farmers, buyers, cooperatives, and the wider agricultural value chain.
 
-**Status:** Active development (MVP backend + mobile apps)  
-**License:** MIT  
-**Author:** Tesfayesus Yimenu Yirdaw
+**Author:** Tesfayesus Yimenu Yirdaw  
+**License:** MIT
 
 ---
 
 ## Vision
 
-Build the digital infrastructure that enables Ethiopia's agricultural economy to operate more efficiently, transparently, and globally. See [docs/business/nahu-platform-business-model.md](docs/business/nahu-platform-business-model.md) for the full business model.
+Build the digital infrastructure that enables Ethiopia's agricultural economy to operate more efficiently, transparently, and globally. See [Business Model](docs/business/nahu-platform-business-model.md) for the full enterprise vision.
 
 ---
 
-## Repository structure
-
-This is a **pnpm + Turborepo monorepo**.
+## Repository map
 
 ```
 nahu-platform/
 ├── apps/
-│   └── api/                  # NestJS backend (@nahu-platform/api)
-├── packages/                 # Shared libraries (planned)
+│   └── api/              # NestJS backend (@nahu-platform/api)
+├── packages/             # Shared libraries (future: mobile-core, ui)
 ├── database/
-│   ├── migrations/           # SQL-first schema migrations
-│   └── docs/                 # Data dictionary
-└── docs/                     # Business, architecture, and engineering docs
+│   ├── migrations/       # SQL-first schema migrations (identity, marketplace, orders)
+│   └── docs/             # Data dictionary
+├── docs/                 # Business, architecture, domain model, engineering guides
+├── package.json          # Monorepo root (pnpm + Turborepo)
+├── pnpm-workspace.yaml
+└── turbo.json
 ```
 
 | Path | Purpose |
 |------|---------|
-| `apps/api/` | REST API under `/api/v1` — identity, marketplace, orders, certificates, advisory |
-| `database/migrations/` | Authoritative schema changes (identity, marketplace, orders) |
-| `docs/` | Business model, architecture principles, domain specs, engineering playbook |
-| `packages/` | Reserved for shared code (`@nahu/mobile-core`, etc.) |
+| `apps/api/` | REST API under `/api/v1` — Identity, Marketplace, Orders, Certificates, Advisory |
+| `database/migrations/` | Authoritative schema changes (apply manually in order) |
+| `docs/` | Business rules, architecture principles, engineering playbook |
+| `packages/` | Reserved for shared packages (`@nahu-platform/*`) |
 
 ---
 
 ## Prerequisites
 
-- **Node.js** 20 or later
-- **pnpm** 9 (`corepack enable && corepack prepare pnpm@9.15.0 --activate`)
-- **PostgreSQL** 14+ (local or Docker)
+| Tool | Version |
+|------|---------|
+| Node.js | 20+ |
+| pnpm | 9.x (`packageManager` field pins 9.15.0) |
+| PostgreSQL | 14+ |
 
 ---
 
 ## Quick start
 
-### 1. Install dependencies
-
-From the repository root:
+### 1. Clone and install
 
 ```bash
+git clone <repository-url>
+cd nahu-platform
 pnpm install
 ```
 
-### 2. Configure the API
+### 2. Database setup
+
+**Option A — Docker (recommended)**
+
+```bash
+docker compose up -d
+```
+
+This starts PostgreSQL 16 and applies all SQL migrations from `database/migrations/` on first run. Connection string:
+
+```
+postgresql://postgres:postgres@localhost:5432/nahu_platform
+```
+
+**Option B — Manual**
+
+Create a PostgreSQL database, then apply migrations in order:
+
+```bash
+# Identity (001–012), then marketplace (001–006), then orders (001–003)
+# See database/migrations/ for the full ordered list.
+psql $DATABASE_URL -f database/migrations/001_identity_schema.sql
+# ... continue through all migration files in numeric order
+```
+
+> **Important:** Migrations are SQL-first. Do **not** run `prisma migrate dev` against a database that already has these migrations applied. Prisma maps the schema; SQL files are the source of truth. See [Engineering Playbook](docs/engineering-playbook.md#database).
+
+### 3. Configure the API
 
 ```bash
 cp apps/api/.env.example apps/api/.env
+# Edit DATABASE_URL and JWT_SECRET
 ```
-
-Edit `apps/api/.env`:
-
-- Set `DATABASE_URL` to your PostgreSQL instance
-- Set `JWT_SECRET` to a long random string (required outside local dev)
-
-Leave `AT_API_KEY` and `AT_USERNAME` blank for local development — the dev OTP bypass (`123456`) works without SMS credentials.
-
-### 3. Apply database migrations
-
-Migrations are **SQL files applied manually** in order. See [database/migrations/](database/migrations/) and [CONTRIBUTING.md](CONTRIBUTING.md) for the full sequence.
-
-At minimum, apply all files under:
-
-- `database/migrations/` (identity: `001`–`012`)
-- `database/migrations/marketplace/` (`001`–`006`)
-- `database/migrations/orders/` (`001`–`003`)
 
 ### 4. Generate Prisma client and start the API
 
@@ -86,17 +99,19 @@ pnpm --filter @nahu-platform/api prisma:generate
 pnpm --filter @nahu-platform/api dev
 ```
 
-The API listens on `http://localhost:3000` by default.
-
 ### 5. Verify
 
 ```bash
 curl http://localhost:3000/health
 ```
 
-Expected response includes `"status": "ok"`.
+Expected response:
 
-### 6. Try authentication (dev mode)
+```json
+{ "status": "ok", "service": "nahu-platform-api", "dependencies": { ... } }
+```
+
+### 6. Smoke-test authentication
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/auth/request-otp \
@@ -108,52 +123,57 @@ curl -X POST http://localhost:3000/api/v1/auth/verify-otp \
   -d '{"phone":"+251911223344","otp":"123456"}'
 ```
 
-In non-production environments, OTP `123456` always verifies after a request has been made.
+In development (`NODE_ENV !== production`), OTP `123456` always verifies. See [API README](apps/api/README.md) for the full endpoint catalog.
 
 ---
 
-## Root scripts
+## Monorepo scripts
+
+Run from the repository root:
 
 | Command | Description |
 |---------|-------------|
 | `pnpm dev` | Start all apps in dev mode (Turborepo) |
 | `pnpm build` | Build all packages |
 | `pnpm lint` | Lint all packages |
-| `pnpm test` | Run tests across the monorepo |
+| `pnpm test` | Run tests across packages |
 | `pnpm format` | Format with Prettier |
 
 Filter to the API only:
 
 ```bash
-pnpm --filter @nahu-platform/api <script>
+pnpm --filter @nahu-platform/api dev
+pnpm --filter @nahu-platform/api build
 ```
 
 ---
 
 ## API overview
 
-The backend exposes ~25 endpoints grouped by domain:
+The backend exposes ~25 endpoints under `/api/v1`:
 
-| Domain | Base path | Auth |
-|--------|-----------|------|
-| Health | `/health` | Public |
-| Identity | `/api/v1/auth/*` | OTP + JWT |
-| Marketplace | `/api/v1/farmers/*`, `/api/v1/listings/*` | Mixed |
-| Orders | `/api/v1/orders/*` | JWT + role |
-| Certificates | `/api/v1/certificates/*` | Mixed |
-| Advisory | `/api/v1/advisory/*` | JWT + FARMER |
+| Module | Examples |
+|--------|----------|
+| Identity | `POST /auth/request-otp`, `POST /auth/verify-otp`, `GET /auth/me` |
+| Marketplace | `GET /listings`, `POST /listings`, `GET /farmers/profile` |
+| Orders | `POST /orders`, `GET /orders/my`, `PATCH /orders/:id/confirm-delivery` |
+| Certificates | `GET /certificates/verify/:certNumber` |
+| Advisory | `POST /advisory/ask`, `GET /advisory/price-alert/:region` |
 
-Full endpoint documentation, package history, and design notes: **[apps/api/README.md](apps/api/README.md)**.
+Full route list, migration history, and design notes: **[apps/api/README.md](apps/api/README.md)**
 
 ---
 
 ## Mobile applications
 
-The Farmer and Buyer Expo apps live in a separate repository:
+The Farmer and Buyer Expo apps live in a separate repository (`nahu-buna-gebaya`):
 
-**`nahu-buna-gebaya`** — contains `nahu-buna-farmer` and `nahu-buna-buyer`.
+| App | Role | Default language |
+|-----|------|------------------|
+| `nahu-buna-farmer` | FARMER | Amharic |
+| `nahu-buna-buyer` | BUYER | English |
 
-Both apps target `/api/v1` on the backend. Migration from the legacy Express server to this NestJS API is in progress. See the engineering playbook for mobile compatibility requirements.
+Both apps target `/api/v1` on the platform API. Migration from the legacy Express backend is in progress — see the [Engineering Playbook](docs/engineering-playbook.md#mobile-compatibility) for compatibility requirements.
 
 ---
 
@@ -161,40 +181,51 @@ Both apps target `/api/v1` on the backend. Migration from the legacy Express ser
 
 | Document | Description |
 |----------|-------------|
-| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute — setup, PRs, migrations |
-| [docs/engineering-playbook.md](docs/engineering-playbook.md) | Day-to-day engineering conventions |
-| [docs/02-architecture/architecture-principles.md](docs/02-architecture/architecture-principles.md) | Core architectural principles |
-| [docs/business/business-actors.md](docs/business/business-actors.md) | Platform actors and IAM foundation |
-| [docs/03-domain-model/users-entity.md](docs/03-domain-model/users-entity.md) | Users entity specification |
-| [database/docs/data-dictionary.md](database/docs/data-dictionary.md) | Database module outline |
-| [apps/api/README.md](apps/api/README.md) | API packages, routes, and local dev details |
+| [Engineering Playbook](docs/engineering-playbook.md) | How we build — conventions, database workflow, API rules |
+| [Contributing](CONTRIBUTING.md) | How to contribute — setup, PRs, commit style |
+| [Architecture Principles](docs/02-architecture/architecture-principles.md) | Ten platform design principles |
+| [Business Model](docs/business/nahu-platform-business-model.md) | Enterprise vision and business model |
+| [Business Actors](docs/business/business-actors.md) | All platform actors and IAM foundation |
+| [Users Entity](docs/03-domain-model/users-entity.md) | Approved Identity domain spec |
+| [Data Dictionary](database/docs/data-dictionary.md) | Database module overview |
+| [API README](apps/api/README.md) | Endpoint catalog, packages 001–005, dev notes |
 
-### Planned documentation layout
+### Planned documentation structure
 
-The repository is moving toward a numbered docs structure (`docs/01-business` through `docs/08-guides`). Existing files are mapped in the [engineering playbook](docs/engineering-playbook.md).
+```
+docs/
+├── business/              # exists — business model, actors
+├── 02-architecture/       # exists — architecture principles
+├── 03-domain-model/       # exists — entity specs
+├── 04-requirements/       # planned
+├── 05-api/                # planned — OpenAPI, error catalog
+├── 06-database/           # planned — detailed schema docs
+├── 07-decisions/          # planned — ADRs
+└── 08-guides/             # planned — how-to guides
+```
 
 ---
 
-## Architecture at a glance
+## Current status
 
-- **API-first** — NestJS modules per business domain; mobile and web consume the same REST API
-- **SQL-first database** — migrations in `database/migrations/`; Prisma maps tables but does not own schema evolution
-- **Mobile-first** — JSON errors shaped as `{ error: "..." }` for Expo app compatibility
-- **Modular** — identity, marketplace, orders, certificates, and advisory are independent NestJS modules
+| Area | Status |
+|------|--------|
+| NestJS API (Identity, Marketplace, Orders, Certificates, Advisory) | Implemented |
+| SQL migrations (22 files, 3 schemas) | Implemented |
+| Mobile apps (Expo) | MVP — separate repo |
+| CI/CD, Docker | CI build on PR; Docker Compose for local Postgres |
+| Real payment integration (Telebirr) | Planned — Phase 2 |
+| Admin portal | Planned — Phase 3 |
+| Shared mobile package | Planned — Phase 1 |
 
 ---
 
 ## Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. For conventions and patterns, see [docs/engineering-playbook.md](docs/engineering-playbook.md).
-
-Major architectural or database changes require an explanation and approval before implementation.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. For conventions and workflow details, see the [Engineering Playbook](docs/engineering-playbook.md).
 
 ---
 
-## Related repositories
+## License
 
-| Repository | Role |
-|------------|------|
-| `nahu-platform` (this repo) | Canonical enterprise backend and platform docs |
-| `nahu-buna-gebaya` | Legacy Express backend (being retired) + Farmer/Buyer Expo apps |
+MIT — see [package.json](package.json).

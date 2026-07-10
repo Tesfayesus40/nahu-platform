@@ -2,40 +2,39 @@
 
 **Version:** 1.0  
 **Status:** Active  
-**Audience:** Backend engineers, mobile engineers, and AI coding agents
+**Audience:** Backend engineers, mobile engineers, DevOps, AI agents
 
 ---
 
 ## Purpose
 
-This document defines how we build the Nahu Platform. It covers conventions, workflows, and quality expectations for day-to-day engineering.
+This document defines how we build software on the Nahu Platform. It complements:
 
-For business context, see [business/nahu-platform-business-model.md](business/nahu-platform-business-model.md).  
-For architectural principles, see [02-architecture/architecture-principles.md](02-architecture/architecture-principles.md).  
-For contributor setup steps, see [../CONTRIBUTING.md](../CONTRIBUTING.md).
+- [Architecture Principles](02-architecture/architecture-principles.md) — *why* we design this way
+- [Business Model](business/nahu-platform-business-model.md) — *what* we are building
+- [Contributing Guide](../CONTRIBUTING.md) — *how to submit changes*
+- [API README](../apps/api/README.md) — endpoint catalog and package history
+
+When this playbook and another document conflict, the more specific document wins for its domain (e.g. API README for route details, Users Entity spec for Identity fields).
 
 ---
 
 ## Documentation-first workflow
 
-Before writing or modifying code, consult the relevant documentation.
+Before writing or modifying code, consult the relevant documentation:
 
-### Current documentation map
+| Priority | Folder | Status | Contents |
+|----------|--------|--------|----------|
+| 1 | `docs/business/` | Active | Business model, actors |
+| 2 | `docs/02-architecture/` | Active | Architecture principles |
+| 3 | `docs/03-domain-model/` | Active | Entity specifications |
+| 4 | `docs/04-requirements/` | Planned | Feature requirements |
+| 5 | `docs/05-api/` | Planned | OpenAPI, error catalog |
+| 6 | `docs/06-database/` | Planned | Detailed schema docs |
+| 7 | `docs/07-decisions/` | Planned | Architecture decision records |
+| 8 | `docs/08-guides/` | Planned | How-to guides |
 
-| Intended path | Current location | Contents |
-|---------------|------------------|----------|
-| `docs/01-business/` | `docs/business/` | Business model, business actors |
-| `docs/02-architecture/` | `docs/02-architecture/` | Architecture principles |
-| `docs/03-domain-model/` | `docs/03-domain-model/` | Entity specifications (users) |
-| `docs/04-requirements/` | — | Not yet created |
-| `docs/05-api/` | `apps/api/README.md` | Endpoint catalog and package history |
-| `docs/06-database/` | `database/docs/data-dictionary.md` | Data dictionary outline |
-| `docs/07-decisions/` | — | ADRs not yet created |
-| `docs/08-guides/` | `CONTRIBUTING.md`, this file | Contributor and engineering guides |
-
-Never contradict documented architecture without explaining why in the PR or an ADR.
-
-Cursor rules in `apps/.cursor/rules.md` mirror these priorities for AI-assisted development.
+Never contradict documented architecture without explaining why in the PR and, for significant decisions, adding an ADR to `docs/07-decisions/`.
 
 ---
 
@@ -45,7 +44,7 @@ Cursor rules in `apps/.cursor/rules.md` mirror these priorities for AI-assisted 
 
 | Tool | Role |
 |------|------|
-| **pnpm** 9 | Package manager (`packageManager` field in root `package.json`) |
+| **pnpm** | Package manager (workspaces) |
 | **Turborepo** | Task orchestration (`dev`, `build`, `lint`, `test`) |
 | **Prettier** | Formatting (root `pnpm format`) |
 
@@ -61,156 +60,145 @@ packages:
 | Package | Name | Description |
 |---------|------|-------------|
 | `apps/api` | `@nahu-platform/api` | NestJS REST API |
-| `packages/*` | `@nahu-platform/*` | Shared libraries (planned) |
+| `packages/*` | `@nahu-platform/*` | Shared libraries (future) |
 
-### Commands
+### Naming
 
-Run from the **repository root** unless noted:
+- **Packages:** `@nahu-platform/<name>` (scoped, lowercase)
+- **NestJS modules:** `<domain>.module.ts` matching business capability
+- **Database schemas:** `identity`, `marketplace`, `orders` (lowercase, singular concept)
+- **Migration files:** `<sequence>_<schema>_<description>.sql` (e.g. `004_marketplace_listings.sql`)
+
+### Running tasks
 
 ```bash
-pnpm install                              # Install all workspace dependencies
-pnpm dev                                  # Start all apps in watch mode
-pnpm build                                # Build all packages
-pnpm --filter @nahu-platform/api dev      # API only
-pnpm --filter @nahu-platform/api build    # API build only
+# All packages
+pnpm dev
+pnpm build
+
+# Single package
+pnpm --filter @nahu-platform/api dev
+pnpm --filter @nahu-platform/api build
 ```
-
-### Package naming
-
-- Scoped: `@nahu-platform/<name>`
-- Private packages (`"private": true`) until published
 
 ---
 
 ## Backend architecture
 
-### NestJS module layout
+### Stack
 
-Each business domain is an independent NestJS module:
+- **Framework:** NestJS 10
+- **ORM:** Prisma 5 (schema mapping only — not migration authority)
+- **Validation:** `class-validator` + global `ValidationPipe`
+- **Auth:** JWT Bearer tokens, phone OTP via Africa's Talking SMS
+
+### Module structure
+
+Each business capability is a NestJS module:
 
 ```
-apps/api/src/
-├── identity/       # OTP auth, JWT, users
-├── marketplace/    # Farmers, listings, cooperatives
-├── orders/         # Order lifecycle
-├── certificates/   # Origin certificates
-├── advisory/       # AI farmer advice
-├── health/         # Liveness probe
-├── prisma/         # @Global PrismaService
-├── common/         # Guards, filters, decorators
-└── config/         # Typed environment configuration
+apps/api/src/<module>/
+├── <module>.module.ts
+├── <module>.controller.ts    # Thin — routing and guards only
+├── <module>.service.ts       # Business logic lives here
+└── dto/                      # Request/response validation
 ```
+
+**Current modules:** `health`, `identity`, `marketplace`, `orders`, `certificates`, `advisory`
 
 ### Coding rules
 
 | Rule | Detail |
 |------|--------|
-| Thin controllers | Route definitions, guards, DTO binding only |
-| Business logic in services | All domain rules live in `*.service.ts` |
-| DTO validation | `class-validator` on every request body and query object |
-| Global validation | `ValidationPipe` with `whitelist`, `forbidNonWhitelisted`, `transform` |
-| Shared JWT | `@Global JwtConfigModule` — any module can use guards |
-| Shared Prisma | `@Global PrismaModule` — inject `PrismaService` anywhere |
+| Thin controllers | Delegate to services; no business logic in controllers |
+| Global modules | `PrismaModule`, `JwtConfigModule` are `@Global()` — inject anywhere |
+| Guards | `JwtAuthGuard` for auth; `RolesGuard` + `@Roles()` for authorization |
+| DTOs | Every request body and query object gets a validated DTO class |
+| Errors | Throw NestJS `HttpException` subclasses (`BadRequestException`, etc.) |
 
-### Adding a new module
+### Bootstrap (`main.ts`)
 
-1. Create `src/<module>/` with `*.module.ts`, `*.controller.ts`, `*.service.ts`
-2. Add DTOs under `src/<module>/dto/`
-3. Register in `app.module.ts`
-4. Add SQL migrations if new tables are needed
-5. Update `prisma/schema.prisma` to map new tables
-6. Document routes in `apps/api/README.md`
+- Global prefix: `/api/v1` (health excluded at `/health`)
+- Global `ValidationPipe`: `whitelist`, `forbidNonWhitelisted`, `transform`
+- Global `MobileCompatExceptionFilter`: reshapes errors to `{ error: "message" }`
+- CORS enabled
 
 ---
 
-## Database workflow
+## Database
 
 ### SQL-first migrations
 
-Schema evolution is **SQL-first**. Migration files live in:
+**The source of truth for schema changes is SQL files in `database/migrations/`.**
+
+Prisma's `schema.prisma` maps existing tables — it does not drive migrations.
 
 ```
 database/migrations/
-├── 001_identity_schema.sql … 012_identity_seed_core_roles.sql
+├── 001_identity_schema.sql          # identity schema
+├── 002_identity_users.sql
+├── ...
 ├── marketplace/
-│   ├── 001_marketplace_schema.sql … 006_marketplace_widen_primary_language.sql
+│   ├── 001_marketplace_schema.sql
+│   └── ...
 └── orders/
-    ├── 001_orders_schema.sql … 003_orders_origin_certificates.sql
+    ├── 001_orders_schema.sql
+    └── ...
 ```
 
 ### Rules
 
 | Do | Don't |
 |----|-------|
-| Add numbered SQL files for every schema change | Run `prisma migrate dev` against production or migrated databases |
-| Include a header comment explaining rationale | Modify applied migrations in place |
-| Apply migrations in order (identity → marketplace → orders) | Let Prisma own schema evolution |
-| Update `prisma/schema.prisma` after SQL changes | Skip the data dictionary for significant tables |
-| Run `pnpm --filter @nahu-platform/api prisma:generate` after schema changes | Commit `.env` files |
+| Add new `.sql` migration files in order | Run `prisma migrate dev` on a DB with existing SQL migrations |
+| Update `schema.prisma` to match new tables/columns | Modify production schema without a migration file |
+| Document rationale in migration file header comments | Delete or rename applied migration files |
+| Apply migrations manually via `psql` or a future tracking script | Assume Prisma will create tables |
 
-### Prisma's role
+### After adding a migration
 
-Prisma is the **ORM mapping layer** only. It reads the schema defined by SQL migrations. The `prisma/schema.prisma` file must stay in sync with the actual database.
+1. Apply the SQL file to your local database
+2. Update `apps/api/prisma/schema.prisma` to reflect new tables/columns
+3. Run `pnpm --filter @nahu-platform/api prisma:generate`
+4. Verify `pnpm --filter @nahu-platform/api build` succeeds
 
 ### Schemas
 
-PostgreSQL uses multiple schemas:
+| Schema | Module | Key tables |
+|--------|--------|------------|
+| `identity` | Identity | `users`, `roles`, `user_roles`, `otp_codes`, `organizations` |
+| `marketplace` | Marketplace | `farmer_profiles`, `listings`, `cooperatives` |
+| `orders` | Orders | `orders`, `origin_certificates` |
 
-| Schema | Module |
-|--------|--------|
-| `identity` | Users, roles, OTP, organizations |
-| `marketplace` | Farmer profiles, listings, cooperatives |
-| `orders` | Orders, origin certificates |
+See [Data Dictionary](../database/docs/data-dictionary.md) for the full module map.
 
 ---
 
 ## API conventions
 
-### Versioning
+### URL structure
 
-- Global prefix: `/api/v1`
-- Health check excluded: `GET /health` (unversioned, for load balancers)
+```
+GET  /health                          # Unversioned health check
+POST /api/v1/auth/request-otp         # Versioned API
+GET  /api/v1/listings?page=1&limit=20
+```
 
-### Request / response
+### Request format
 
-| Convention | Detail |
-|------------|--------|
-| JSON body | camelCase field names (`quantityKg`, `deliveryAddress`) |
-| Phone format | `+251` followed by 9 digits |
-| Roles | Uppercase enums: `FARMER`, `BUYER`, `ADMIN` |
-| Auth header | `Authorization: Bearer <JWT>` |
-| Listing grades | `GRADE_1` … `GRADE_9` (not display strings) |
-| Process methods | `WASHED`, `NATURAL`, `ANAEROBIC`, etc. |
+- **Content-Type:** `application/json`
+- **Auth:** `Authorization: Bearer <jwt>`
+- **Field naming:** camelCase in JSON (`quantityKg`, `deliveryAddress`, `processMethod`)
 
-### Error format (mobile compatibility)
+### Response format
 
-All HTTP errors return:
+**Success:** Return the resource directly (no wrapper envelope in v1).
 
 ```json
-{ "error": "Human-readable message" }
+{ "id": "...", "region": "ይርጋጨፌ", "pricePerKg": 250 }
 ```
 
-Implemented by `MobileCompatExceptionFilter` in `apps/api/src/common/filters/`. Do not change this shape without coordinating a mobile app release.
-
-Validation errors are joined into a single string in the `error` field.
-
-### Input validation
-
-Global `ValidationPipe` settings:
-
-```typescript
-{ whitelist: true, forbidNonWhitelisted: true, transform: true }
-```
-
-Every endpoint must have a DTO with `class-validator` decorators. Reject unknown fields.
-
-### Pagination (listings)
-
-```
-GET /api/v1/listings?page=1&limit=20&region=...&sort=newest
-```
-
-Response envelope:
+**Listings pagination:**
 
 ```json
 {
@@ -219,11 +207,23 @@ Response envelope:
 }
 ```
 
+**Errors (v1 — mobile compatible):**
+
+```json
+{ "error": "Human-readable error message" }
+```
+
+HTTP status code is in the response header only. Do not add `statusCode` to the body in v1 — mobile apps parse `error` as a string.
+
+### Validation
+
+Global pipe rejects unknown fields (`forbidNonWhitelisted`). All enums, bounds, and formats are validated in DTOs before reaching services.
+
 ### Backward compatibility
 
-- Do not remove or rename existing `/api/v1` routes without a deprecation period
-- Mobile apps match error messages by substring — preserve recognizable phrases
-- Enum value changes require coordinated mobile updates
+- Do not remove or rename v1 endpoints without a deprecation period
+- Do not change error message substrings that mobile apps match (e.g. `"profile not found"`)
+- Enum values use stable codes (`GRADE_1`, `WASHED`, `FARMER`) — not display labels
 
 ---
 
@@ -231,79 +231,78 @@ Response envelope:
 
 ### Flow
 
-1. `POST /api/v1/auth/request-otp` — `{ phone, role }`
-2. `POST /api/v1/auth/verify-otp` — `{ phone, otp }` → `{ token, user }`
-3. Subsequent requests: `Authorization: Bearer <JWT>`
+```
+1. POST /api/v1/auth/request-otp   { phone, role }
+2. POST /api/v1/auth/verify-otp    { phone, otp }
+3. → { token, user: { id, phone, role } }
+4. Subsequent requests: Authorization: Bearer <token>
+```
+
+### Roles (seeded)
+
+`FARMER`, `BUYER`, `ADMIN` — uppercase strings matching `identity.roles.code`.
 
 ### Guards
-
-| Guard | Purpose |
-|-------|---------|
-| `JwtAuthGuard` | Validates Bearer token |
-| `RolesGuard` | Checks `@Roles('FARMER')` etc. against JWT payload |
-
-Use both on protected routes:
 
 ```typescript
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('FARMER')
+@Post('listings')
 ```
 
 ### Dev mode
 
-When `NODE_ENV !== 'production'`:
+When `NODE_ENV !== production`:
 
 - OTP `123456` verifies for any phone that requested an OTP
 - `request-otp` returns `dev_otp` in the response
-- SMS credentials (`AT_API_KEY`, `AT_USERNAME`) are not required
+- Africa's Talking credentials are not required
 
-In production, SMS delivery is required and `dev_otp` is never returned.
-
-### Known limitation
-
-JWT currently carries a single `role` string. Users with multiple roles need `activeRole` support (planned in Phase 1). `/auth/me` already returns `roles[]`.
+In production, `AT_API_KEY` and `AT_USERNAME` are required. `dev_otp` is never returned.
 
 ---
 
 ## Mobile compatibility
 
-The Farmer and Buyer Expo apps (`nahu-buna-gebaya`) consume this API.
+The Expo apps (`nahu-buna-farmer`, `nahu-buna-buyer`) in the `nahu-buna-gebaya` repository consume this API. Every API change must consider mobile impact.
 
-### Requirements for API changes
+### Contract requirements
 
-| Requirement | Reason |
-|-------------|--------|
-| camelCase JSON fields | Matches TypeScript/mobile conventions |
-| `{ error: "..." }` error body | Mobile interceptors parse this shape |
-| Uppercase role enums | Mobile guards and registration |
-| `/api/v1` prefix | Hardcoded in mobile `config.js` |
-| Recognizable error substrings | Mobile maps "profile not found", "validation", etc. to friendly Amharic/English messages |
+| Area | Convention |
+|------|------------|
+| Base URL | `/api/v1` |
+| JSON fields | camelCase |
+| Roles | Uppercase (`FARMER`, `BUYER`) |
+| Error body | `{ error: "string" }` |
+| Error matching | Mobile uses substring checks on `error` message |
+| Listing grades | Enum codes (`GRADE_1`–`GRADE_9`), not display labels |
+| Process methods | Enum codes (`WASHED`, `NATURAL`, etc.) |
 
-### Testing API changes against mobile
+### Before merging API changes
 
-1. Point mobile `EXPO_PUBLIC_API_URL` (or `config.js`) at local or staging API
-2. Test full user journeys: login → profile → listing → order → certificate
-3. Verify error alerts show bilingual friendly messages
+- [ ] Test against both Farmer and Buyer app flows
+- [ ] Verify error messages still match mobile interceptor patterns
+- [ ] Confirm camelCase field names in request and response
+- [ ] Check enum values match mobile `constants.js` codes
 
 ---
 
 ## Environment variables
 
-Defined in `apps/api/.env.example`:
+Configuration is loaded from `apps/api/.env` (see `.env.example`):
 
-| Variable | Required | Purpose |
-|----------|----------|---------|
+| Variable | Required | Description |
+|----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `JWT_SECRET` | Yes (prod) | JWT signing key |
+| `JWT_SECRET` | Yes | Must not be default in production |
 | `JWT_EXPIRES_IN` | No | Default `7d` |
-| `OTP_EXPIRES_MINUTES` | No | Default `10` |
-| `AT_API_KEY` | Prod only | Africa's Talking SMS |
-| `AT_USERNAME` | Prod only | Africa's Talking SMS |
-| `ANTHROPIC_API_KEY` | For advisory | Claude API for farmer advice |
 | `NODE_ENV` | No | `development` / `production` |
 | `PORT` | No | Default `3000` |
+| `AT_API_KEY` | Prod only | Africa's Talking SMS |
+| `AT_USERNAME` | Prod only | Africa's Talking SMS |
+| `ANTHROPIC_API_KEY` | For advisory | Claude API for `/advisory/*` |
 
-Never commit `.env` files. Never use the example `JWT_SECRET` in production.
+Never commit `.env` files. Never commit secrets.
 
 ---
 
@@ -311,19 +310,33 @@ Never commit `.env` files. Never use the example `JWT_SECRET` in production.
 
 | Branch | Purpose |
 |--------|---------|
-| `main` | Stable, deployable code |
+| `main` | Stable, deployable |
 | `feature/<name>` | New features |
 | `fix/<name>` | Bug fixes |
 
 ### Release flow (target)
 
-1. Merge feature branch to `main`
-2. Deploy to staging
-3. Run smoke tests (health, auth, order lifecycle)
-4. Deploy to production
-5. Monitor error rates
+1. Feature branch → PR to `main`
+2. CI passes (build, lint, test)
+3. Deploy to staging
+4. Mobile regression on staging
+5. Deploy to production
 
-CI/CD is not yet configured (planned: Phase 1, task 1.1.2).
+CI runs on every push/PR to `main` (install → prisma generate → build). Lint and test jobs will be added when those tools are configured.
+
+### Local database with Docker
+
+```bash
+docker compose up -d
+```
+
+Uses `docker-compose.yml` at the repo root. On first start, `database/docker/init-db.sh` applies every `*.sql` file under `database/migrations/` in sorted order. Set `DATABASE_URL` in `apps/api/.env` to:
+
+```
+postgresql://postgres:postgres@localhost:5432/nahu_platform
+```
+
+To reset the database: `docker compose down -v` then `docker compose up -d`.
 
 ---
 
@@ -331,24 +344,22 @@ CI/CD is not yet configured (planned: Phase 1, task 1.1.2).
 
 ### Current state
 
-- No automated test suite in CI
-- API smoke-tested manually and documented in `apps/api/README.md`
-- `pnpm test` runs Jest in the API package (scaffold only)
+No automated tests exist yet. Manual smoke testing is documented in `apps/api/README.md`.
 
 ### Target (Phase 1)
 
-- Integration tests for auth, listings, and orders
-- CI runs `build`, `lint`, and `test` on every PR
-- Staging environment for pre-production validation
+| Layer | Tool | Scope |
+|-------|------|-------|
+| API integration | Jest + Supertest | Auth, listings, orders lifecycle |
+| Unit | Jest | Services with mocked Prisma |
+| E2E mobile | Maestro / Detox | Login → order flow |
 
-### Writing tests
+### Minimum before merging (once CI exists)
 
-When adding tests:
-
-- Use a dedicated test database or in-memory stand-in
-- Test the full order lifecycle: create → pay → deliver → certificate
-- Test role guards: FARMER cannot create orders, BUYER cannot create listings
-- Test mobile error shape: `{ error: "..." }` not NestJS default format
+- `pnpm build` passes
+- `pnpm lint` passes
+- `pnpm test` passes
+- New endpoints have at least one integration test
 
 ---
 
@@ -356,12 +367,12 @@ When adding tests:
 
 | Rule | Detail |
 |------|--------|
-| No secrets in git | `.env`, API keys, credentials |
-| Input validation on every endpoint | `class-validator` DTOs |
-| Resource ownership in services | Orders check `buyerId`; certificates check buyer/farmer |
-| Rate limiting | Planned on OTP endpoints (Phase 1) |
-| Payment webhooks | User-callable `confirm-payment` must be replaced with signed webhooks (Phase 2) |
-| Audit logging | Planned for payment, dispute, and auth events (Phase 1) |
+| No secrets in git | Use `.env` locally; env vars in deployment |
+| No default JWT secret in prod | App should fail startup if `JWT_SECRET` is unchanged |
+| Rate limiting | Planned — OTP and auth endpoints (Phase 1) |
+| Payment webhooks | User-callable `confirm-payment` must be replaced with signed webhooks (Phase 1) |
+| Input validation | All inputs through DTOs; `forbidNonWhitelisted` globally |
+| Audit log | Planned for sensitive actions (Phase 1) |
 
 ---
 
@@ -369,55 +380,48 @@ When adding tests:
 
 Before requesting review:
 
-- [ ] Code builds: `pnpm --filter @nahu-platform/api build`
-- [ ] No secrets committed
-- [ ] New endpoints documented in `apps/api/README.md`
-- [ ] New migrations numbered and include header comments
-- [ ] `prisma/schema.prisma` updated if schema changed
-- [ ] Mobile compatibility considered (error shape, field names, enums)
-- [ ] Breaking changes called out explicitly in PR description
-- [ ] Major architectural changes were approved before implementation
+- [ ] Read relevant docs (`business/`, `02-architecture/`, `03-domain-model/`)
+- [ ] Business logic is in services, not controllers
+- [ ] New endpoints have DTOs with validation
+- [ ] Database changes include SQL migration + Prisma schema update
+- [ ] Error responses use `{ error: "..." }` format
+- [ ] Mobile compatibility considered (camelCase, enum codes, error strings)
+- [ ] No secrets, `.env`, or compiled artifacts committed
+- [ ] `pnpm build` succeeds locally
+- [ ] Documentation updated if conventions or setup changed
 
 ---
 
-## What not to do
+## Major changes protocol
 
-| Anti-pattern | Why |
-|--------------|-----|
-| Duplicate `apps/api/api/` nested copy | Canonical source is `apps/api/src/` |
-| Run `prisma migrate dev` on migrated DBs | SQL files are authoritative |
-| Change error response shape without mobile coordination | Breaks Expo app interceptors |
-| Put business logic in controllers | Hard to test and reuse |
-| Hardcode production URLs in mobile apps | Use environment config |
-| Skip migrations and edit schema.prisma only | Database and ORM will diverge |
+For architectural changes, new schemas, or breaking API changes:
 
----
+1. **Explain** the proposed change and rationale
+2. **Wait for approval** before implementing
+3. **Document** the decision (ADR in `docs/07-decisions/` when that folder exists)
+4. **Implement** in focused PRs
 
-## Roadmap alignment
-
-This playbook supports **Phase 1 — Foundation** of the platform roadmap:
-
-| Task | Status |
-|------|--------|
-| Root README | Done |
-| Engineering playbook (this file) | Done |
-| Contribution guide | Done |
-| CI pipeline | Planned |
-| Docker Compose | Planned |
-| API security hardening | Planned |
-| Shared mobile package | Planned |
-| Legacy cutover | Planned |
-
-See the platform roadmap for Phases 2–5 (Marketplace, Enterprise, AI, National Platform).
+This applies to: new database schemas, API version bumps, auth model changes, and module restructuring.
 
 ---
 
-## Getting help
+## Related repositories
 
-| Question | Where to look |
-|----------|---------------|
-| How do I run the API locally? | [README.md](../README.md), [apps/api/README.md](../apps/api/README.md) |
-| What actors exist on the platform? | [business/business-actors.md](business/business-actors.md) |
-| How is the users table designed? | [03-domain-model/users-entity.md](03-domain-model/users-entity.md) |
-| What modules exist in the database? | [database/docs/data-dictionary.md](../database/docs/data-dictionary.md) |
-| How do I submit a PR? | [CONTRIBUTING.md](../CONTRIBUTING.md) |
+| Repository | Contents | Relationship |
+|------------|----------|--------------|
+| `nahu-platform` (this repo) | Backend API, migrations, docs | Canonical backend |
+| `nahu-buna-gebaya` | Farmer app, Buyer app, legacy Express API | Mobile clients; Express being replaced |
+
+---
+
+## Roadmap reference
+
+Engineering work is organized in five phases. This playbook supports **Phase 1 — Foundation**. See the platform roadmap for full phase breakdown:
+
+| Phase | Focus |
+|-------|-------|
+| 1 — Foundation | CI/CD, security, shared mobile core, production cutover |
+| 2 — Marketplace | Photos, Telebirr, notifications, offline |
+| 3 — Enterprise | IAM, admin portal, cooperatives, multi-commodity |
+| 4 — AI | Production advisory, market intelligence |
+| 5 — National Platform | Government, logistics, finance, export |
