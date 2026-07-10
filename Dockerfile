@@ -1,13 +1,16 @@
 # syntax=docker/dockerfile:1
 
 FROM node:20-bookworm-slim AS base
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json ./apps/api/
-RUN pnpm install --frozen-lockfile
+# postinstall runs prisma generate — schema must exist, or skip scripts until build
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
@@ -20,7 +23,8 @@ RUN pnpm --filter @nahu-platform/api build
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app/apps/api
 ENV NODE_ENV=production
-RUN apt-get update && apt-get install -y --no-install-recommends wget && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends wget openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/apps/api/node_modules ./node_modules
 COPY --from=build /app/apps/api/dist ./dist
