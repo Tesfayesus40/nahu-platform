@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import configuration from './config/configuration';
 import { PrismaModule } from './prisma/prisma.module';
 import { JwtConfigModule } from './common/jwt/jwt-config.module';
@@ -16,6 +17,7 @@ import { AdvisoryModule } from './advisory/advisory.module';
       isGlobal: true,
       load: [configuration],
     }),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     PrismaModule,
     JwtConfigModule,
     HealthModule,
