@@ -1,7 +1,10 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
+import { join } from 'path';
+import * as express from 'express';
 import { AppModule } from './app.module';
 import { MobileCompatExceptionFilter } from './common/filters/mobile-compat-exception.filter';
 
@@ -18,9 +21,16 @@ async function bootstrap() {
     throw new Error('JWT_SECRET must be set to a strong value in production');
   }
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  app.use(helmet());
+  const uploadDir = process.env.UPLOAD_DIR ?? join(process.cwd(), 'uploads');
+  app.use('/uploads/files', express.static(uploadDir));
+
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
 
   // Matches the original nahu-buna-gebaya Express backend's /api/v1
   // prefix, which the nahu_buna_farmer mobile app is already built

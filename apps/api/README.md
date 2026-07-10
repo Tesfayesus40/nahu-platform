@@ -178,6 +178,8 @@ Routes:
 - `GET /listings` (public) — filter by region/grade/process method, sort, paginate
 - `GET /listings/:id` (public) — full detail incl. farmer + cooperative
 - `POST /listings` (auth, FARMER) — requires a farmer profile to exist first
+- `POST /uploads/listing-photo` (auth, FARMER) — multipart `file` field (JPEG/PNG/WebP, max 5 MB); returns `{ url }` for use in `photoUrls` on create/update listing
+- `GET /uploads/files/:filename` (public, no `/api/v1` prefix) — serves uploaded images; set `PUBLIC_API_URL` in production so returned URLs are reachable
 
 **One refactor made along the way:** Package 002 registered `JwtModule`
 inside `IdentityModule` only. That would have blocked `MarketplaceModule`
