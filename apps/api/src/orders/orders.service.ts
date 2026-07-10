@@ -249,6 +249,26 @@ export class OrdersService {
     return orders.map((o: any) => this.shapeOrder(o, o.listing));
   }
 
+  async getOrderById(orderId: string, userId: string, role: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { listing: true, farmer: true },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (role === 'FARMER') {
+      if (order.farmer.userId !== userId) {
+        throw new ForbiddenException('You do not have access to this order');
+      }
+    } else if (order.buyerId !== userId) {
+      throw new ForbiddenException('You do not have access to this order');
+    }
+
+    return this.shapeOrder(order, order.listing);
+  }
+
   private shapeOrder(order: any, listing?: any) {
     return {
       id: order.id,

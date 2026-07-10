@@ -72,4 +72,10 @@ export class OrdersController {
   getMyOrders(@CurrentUser() user: JwtPayload) {
     return this.orders.getMyOrders(user.userId, user.role);
   }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  getOrderById(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.orders.getOrderById(id, user.userId, user.role);
+  }
 }
