@@ -13,8 +13,8 @@ Railway project: nahu-platform-api
     └── nahu-api          # NestJS container (this repo, Dockerfile)
 ```
 
-**Staging API URL (after deploy):** `https://<nahu-api-staging>.up.railway.app`  
-Mobile apps use: `https://<host>/api/v1`
+**Staging API URL:** `https://nahu-api-staging.up.railway.app`  
+Mobile apps use: `https://nahu-api-staging.up.railway.app/api/v1`
 
 ---
 
