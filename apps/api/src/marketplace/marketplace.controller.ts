@@ -34,15 +34,15 @@ export class FarmersController {
     return this.marketplace.updateFarmerProfile(user.userId, dto);
   }
 
-  // Public — buyers browsing farmer profiles
-  @Get(':id')
-  getPublicProfile(@Param('id') id: string) {
-    return this.marketplace.getPublicProfile(id);
-  }
-
+  // Public — static paths before parameterized routes
   @Get('cooperatives/list')
   getCooperatives() {
     return this.marketplace.getCooperatives();
+  }
+
+  @Get(':id')
+  getPublicProfile(@Param('id') id: string) {
+    return this.marketplace.getPublicProfile(id);
   }
 }
 
