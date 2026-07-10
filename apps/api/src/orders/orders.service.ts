@@ -79,8 +79,10 @@ export class OrdersService {
   }
 
   /** Simulates a Telebirr/CBE Birr payment callback confirming funds are held in escrow. */
-  async confirmPayment(orderId: string) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+  async confirmPayment(orderId: string, buyerId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, buyerId },
+    });
     if (!order) {
       throw new NotFoundException('Order not found');
     }
@@ -133,6 +135,73 @@ export class OrdersService {
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.listing.update({ where: { id: order.listingId }, data: { status: 'ACTIVE' } });
       return tx.order.update({ where: { id: orderId }, data: { status: 'CANCELLED' } });
+    });
+
+    return this.shapeOrder(updated);
+  }
+
+  /**
+   * Lets a farmer decline a sale before the buyer has paid. Mirrors
+   * cancelOrder's rules exactly (only PENDING_PAYMENT, reverts the listing
+   * to ACTIVE) -- once money is in escrow, neither side can unilaterally
+   * back out with a single tap; see raiseDispute() for that case instead.
+   */
+  async declineOrder(orderId: string, userId: string) {
+    const farmerProfile = await this.prisma.farmerProfile.findUnique({ where: { userId } });
+    if (!farmerProfile) {
+      throw new NotFoundException('Farmer profile not found');
+    }
+
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, farmerId: farmerProfile.id },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    if (order.status !== 'PENDING_PAYMENT') {
+      throw new BadRequestException(
+        'Only unpaid orders can be declined -- once payment is in escrow, raise a dispute instead',
+      );
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.listing.update({ where: { id: order.listingId }, data: { status: 'ACTIVE' } });
+      return tx.order.update({ where: { id: orderId }, data: { status: 'CANCELLED' } });
+    });
+
+    return this.shapeOrder(updated);
+  }
+
+  /**
+   * Either party (buyer or farmer) can raise a dispute once payment is
+   * already in escrow -- this is deliberately NOT an automatic refund.
+   * It just flags the order for manual/support follow-up, since real
+   * money movement deserves a human decision, not a single tap.
+   */
+  async raiseDispute(orderId: string, userId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { farmer: true },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const isBuyer = order.buyerId === userId;
+    const isFarmer = order.farmer.userId === userId;
+    if (!isBuyer && !isFarmer) {
+      throw new ForbiddenException('You do not have access to this order');
+    }
+
+    if (order.status === 'CANCELLED' || order.status === 'COMPLETED') {
+      throw new BadRequestException(
+        `Cannot raise a dispute on an order with status ${order.status}`,
+      );
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'DISPUTED' },
     });
 
     return this.shapeOrder(updated);

@@ -18,13 +18,13 @@ export class OrdersController {
     return this.orders.createOrder(user.userId, dto);
   }
 
-  // Simulates a Telebirr/CBE Birr payment callback. Any authenticated
-  // caller, matching the original app's behavior (this stands in for a
-  // webhook in production, not a user-facing action gated by role).
+  // Buyer who owns the order — simulates Telebirr callback until a signed
+  // webhook replaces this in production (Phase 2).
   @Patch(':id/confirm-payment')
-  @UseGuards(JwtAuthGuard)
-  confirmPayment(@Param('id') id: string) {
-    return this.orders.confirmPayment(id);
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('BUYER')
+  confirmPayment(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.orders.confirmPayment(id, user.userId);
   }
 
   @Patch(':id/confirm-delivery')
@@ -39,6 +39,21 @@ export class OrdersController {
   @Roles('BUYER')
   cancelOrder(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.orders.cancelOrder(id, user.userId);
+  }
+
+  @Patch(':id/decline')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('FARMER')
+  declineOrder(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.orders.declineOrder(id, user.userId);
+  }
+
+  // Either party can raise a dispute once payment is in escrow -- no role
+  // restriction, since both buyer and farmer might need this.
+  @Patch(':id/dispute')
+  @UseGuards(JwtAuthGuard)
+  raiseDispute(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.orders.raiseDispute(id, user.userId);
   }
 
   @Patch(':id/address')
