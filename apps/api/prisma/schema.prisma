@@ -311,6 +311,9 @@ enum OrderStatus {
 enum PaymentMethod {
   TELEBIRR
   CBE_BIRR
+  MPESA
+  CHAPA
+  SANTIMPAY
 
   @@schema("orders")
   @@map("payment_method")

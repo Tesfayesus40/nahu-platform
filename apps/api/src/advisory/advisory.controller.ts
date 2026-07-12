@@ -10,6 +10,13 @@ import { JwtPayload } from '../common/jwt-payload.interface';
 export class AdvisoryController {
   constructor(private readonly advisory: AdvisoryService) {}
 
+  @Get('services')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('FARMER')
+  listServices() {
+    return this.advisory.getServiceCatalog();
+  }
+
   @Post('ask')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('FARMER')
@@ -22,5 +29,26 @@ export class AdvisoryController {
   @Roles('FARMER')
   priceAlert(@Param('region') region: string) {
     return this.advisory.getPriceAlert(region);
+  }
+
+  @Get('weather/:region')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('FARMER')
+  weather(@Param('region') region: string) {
+    return this.advisory.getWeatherOutlook(region);
+  }
+
+  @Get('disease-alerts')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('FARMER')
+  diseaseAlerts(@CurrentUser() user: JwtPayload) {
+    return this.advisory.getDiseaseAlerts(user.userId);
+  }
+
+  @Get('harvest-tips')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('FARMER')
+  harvestTips(@CurrentUser() user: JwtPayload) {
+    return this.advisory.getHarvestRecommendations(user.userId);
   }
 }

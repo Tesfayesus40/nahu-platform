@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PaymentsService } from '../payments/payments.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CertificatesService } from '../certificates/certificates.service';
 
@@ -20,9 +21,16 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly certificates: CertificatesService,
+    private readonly payments: PaymentsService,
   ) {}
 
   async createOrder(buyerId: string, dto: CreateOrderDto) {
+    if (!this.payments.isActive(dto.paymentMethod)) {
+      throw new BadRequestException(
+        'This payment method is not available yet. Please choose Telebirr or CBE Birr.',
+      );
+    }
+
     const listing = await this.prisma.listing.findUnique({
       where: { id: dto.listingId },
     });
@@ -73,7 +81,7 @@ export class OrdersService {
         method: dto.paymentMethod,
         amount: totalEtb,
         reference,
-        message: 'In production this would redirect to the Telebirr payment page',
+        message: `In production this would redirect to the ${dto.paymentMethod} payment page`,
       },
     };
   }

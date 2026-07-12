@@ -4,6 +4,9 @@ import { IsEnum, IsNumber, IsString, IsUUID, Max, MaxLength, Min, MinLength } fr
 export enum PaymentMethod {
   TELEBIRR = 'TELEBIRR',
   CBE_BIRR = 'CBE_BIRR',
+  MPESA = 'MPESA',
+  CHAPA = 'CHAPA',
+  SANTIMPAY = 'SANTIMPAY',
 }
 
 export class CreateOrderDto {

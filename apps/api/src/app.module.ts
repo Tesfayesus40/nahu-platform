@@ -9,6 +9,7 @@ import { IdentityModule } from './identity/identity.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
 import { CertificatesModule } from './certificates/certificates.module';
 import { OrdersModule } from './orders/orders.module';
+import { PaymentsModule } from './payments/payments.module';
 import { AdvisoryModule } from './advisory/advisory.module';
 import { UploadsModule } from './uploads/uploads.module';
 
@@ -26,6 +27,7 @@ import { UploadsModule } from './uploads/uploads.module';
     MarketplaceModule,
     CertificatesModule,
     OrdersModule,
+    PaymentsModule,
     AdvisoryModule,
     UploadsModule,
     // Next modules land here, one per package: Logistics, Finance, etc.

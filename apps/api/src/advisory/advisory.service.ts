@@ -195,4 +195,113 @@ and what to watch for in the coming week.`;
       };
     }
   }
+
+  getServiceCatalog() {
+    return {
+      services: [
+        {
+          id: 'ai_chat',
+          status: 'active',
+          nameEn: 'AI Advisor',
+          nameAm: 'የቡና ምክር',
+          descriptionEn: 'Ask questions about your coffee',
+          descriptionAm: 'ስለ ቡናዎ ጥያቄ ይጠይቁ',
+          icon: '🌱',
+        },
+        {
+          id: 'coffee_prices',
+          status: 'active',
+          nameEn: 'Coffee Prices',
+          nameAm: 'የቡና ዋጋ',
+          descriptionEn: 'ECX price snapshot',
+          descriptionAm: 'የECX ዋጋ ማጠቃለያ',
+          icon: '📊',
+        },
+        {
+          id: 'weather',
+          status: 'preview',
+          nameEn: 'Weather',
+          nameAm: 'የአየር ሁኔታ',
+          descriptionEn: 'Rain and temperature outlook',
+          descriptionAm: 'ዝናብ እና ሙቀት ትንበያ',
+          icon: '🌦️',
+        },
+        {
+          id: 'disease_alerts',
+          status: 'preview',
+          nameEn: 'Disease Alerts',
+          nameAm: 'የበሽታ ማስጠንቀቂያ',
+          descriptionEn: 'Regional pest and disease watch',
+          descriptionAm: 'ክልላዊ ተባዮች እና በሽታዎች',
+          icon: '⚠️',
+        },
+        {
+          id: 'harvest',
+          status: 'preview',
+          nameEn: 'Harvest Tips',
+          nameAm: 'የመከዝ ምክር',
+          descriptionEn: 'When and how to harvest',
+          descriptionAm: 'መቼ እና እንዴት ማጨድ',
+          icon: '🌾',
+        },
+      ],
+    };
+  }
+
+  async getWeatherOutlook(region: string) {
+    const canonical = this.normalizeRegion(region);
+    return {
+      region: canonical,
+      status: 'preview',
+      summary:
+        `${canonical} ክልል — በቀጣዩ ሳምንት ቀን መካከል ቀላል ዝናብ እና ማታ ቀዝቃዛ አየር ይጠበቃል። ` +
+        'የቡና ዛፎችን ከበሽታ ለመከላከል ጥሩ አየር መተላለፍ ያረጋግጡ። ይህ ቅድመ-ተዘጋጅ መረጃ ነው።',
+      updatedAt: new Date().toISOString(),
+      fallback: true,
+    };
+  }
+
+  async getDiseaseAlerts(userId: string) {
+    const farmer = await this.prisma.farmerProfile.findUnique({ where: { userId } });
+    const region = farmer?.region ?? 'Ethiopia';
+
+    return {
+      region,
+      status: 'preview',
+      alerts: [
+        {
+          titleAm: 'ቡና ቅጠል ዝብብሽ',
+          titleEn: 'Coffee leaf rust',
+          level: 'watch',
+          adviceAm: 'የቅጠላ ቀለምን ይቆጣጠሩ። አየር መተላለፍ ያሻሽሉ።',
+          adviceEn: 'Monitor leaf colour. Improve airflow between trees.',
+        },
+        {
+          titleAm: 'ተባዮች',
+          titleEn: 'Berry borer watch',
+          level: 'low',
+          adviceAm: 'ቡና ከመቀመጥ በፊት ጥራት ይመርጡ።',
+          adviceEn: 'Sort cherries carefully before storage.',
+        },
+      ],
+      updatedAt: new Date().toISOString(),
+      fallback: true,
+    };
+  }
+
+  async getHarvestRecommendations(userId: string) {
+    const farmer = await this.prisma.farmerProfile.findUnique({ where: { userId } });
+    const altitude = farmer?.altitudeM ? `${farmer.altitudeM}m` : 'your area';
+
+    return {
+      status: 'preview',
+      summary:
+        `በ${altitude} ከፍታ ላይ ቡናን በቀስቱ ሲበስሉ ለመከዝ ዝግጁ ይሆናሉ። ` +
+        'ቀይ ፍሬዎችን ብቻ ይምረጡ፣ በፀሐይ ላይ በቀጥታ አይደርቁ። ይህ ቅድመ-ተዘጋጅ መረጃ ነው።',
+      summaryEn:
+        `Cherries at ${altitude} are approaching harvest window. Pick only ripe red cherries and avoid drying in direct sun. Preview tips only.`,
+      updatedAt: new Date().toISOString(),
+      fallback: true,
+    };
+  }
 }
