@@ -26,9 +26,14 @@ export class MarketplaceService {
       throw new BadRequestException('Profile already exists');
     }
 
-    return this.prisma.farmerProfile.create({
-      data: { ...dto, userId },
+    const { firstName, fathersName, ...profileData } = dto;
+    await this.syncUserNames(userId, firstName, fathersName);
+
+    const profile = await this.prisma.farmerProfile.create({
+      data: { ...profileData, userId },
+      include: { user: true, cooperative: true },
     });
+    return this.shapeProfile(profile, { includePhone: true });
   }
 
   async updateFarmerProfile(userId: string, dto: UpdateFarmerProfileDto) {
@@ -37,7 +42,33 @@ export class MarketplaceService {
       throw new NotFoundException('Profile not found');
     }
 
-    return this.prisma.farmerProfile.update({ where: { userId }, data: dto });
+    const { firstName, fathersName, ...profileData } = dto;
+    await this.syncUserNames(userId, firstName, fathersName);
+
+    const profile = await this.prisma.farmerProfile.update({
+      where: { userId },
+      data: profileData,
+      include: { user: true, cooperative: true },
+    });
+    return this.shapeProfile(profile, { includePhone: true });
+  }
+
+  private async syncUserNames(
+    userId: string,
+    firstName?: string,
+    fathersName?: string,
+  ) {
+    if (firstName === undefined && fathersName === undefined) return;
+
+    const data: { firstName?: string | null; middleName?: string | null } = {};
+    if (firstName !== undefined) {
+      data.firstName = firstName.trim() || null;
+    }
+    if (fathersName !== undefined) {
+      data.middleName = fathersName.trim() || null;
+    }
+
+    await this.prisma.user.update({ where: { id: userId }, data });
   }
 
   async getMyProfile(userId: string) {
@@ -77,7 +108,7 @@ export class MarketplaceService {
       farmSizeHa: toNumber(profile.farmSizeHa),
       verified: profile.verified,
       firstName: profile.user?.firstName ?? null,
-      middleName: profile.user?.middleName ?? null,
+      fathersName: profile.user?.middleName ?? null,
       lastName: profile.user?.lastName ?? null,
       ...(includePhone ? { phone: profile.user?.phone } : {}),
       cooperativeName: profile.cooperative?.name ?? null,
@@ -135,12 +166,24 @@ export class MarketplaceService {
   }
 
   async getListings(query: QueryListingsDto) {
-    const { region, grade, processMethod, minKg, maxPrice, sort = 'newest', page = 1, limit = 20 } = query;
+    const { region, regions, grade, grades, processMethod, minKg, maxPrice, sort = 'newest', page = 1, limit = 20 } = query;
+
+    const regionList = regions
+      ? regions.split(',').map(r => r.trim()).filter(Boolean)
+      : region
+        ? [region]
+        : undefined;
+
+    const gradeList = grades
+      ? grades.split(',').map(g => g.trim()).filter(Boolean)
+      : grade
+        ? [grade]
+        : undefined;
 
     const where = {
       status: 'ACTIVE' as const,
-      ...(region ? { region } : {}),
-      ...(grade ? { grade } : {}),
+      ...(regionList?.length ? { region: { in: regionList } } : {}),
+      ...(gradeList?.length ? { grade: { in: gradeList as any } } : {}),
       ...(processMethod ? { processMethod } : {}),
       ...(minKg ? { quantityKg: { gte: minKg } } : {}),
       ...(maxPrice ? { pricePerKg: { lte: maxPrice } } : {}),

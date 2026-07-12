@@ -11,6 +11,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from './sms/sms.service';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { UpdateMeDto } from './dto/update-me.dto';
 
 // Dev/staging-only universal OTP, gated behind nodeEnv below — same
 // approach as the original auth.service.js, so any phone can be tested
@@ -147,7 +148,7 @@ export class IdentityService {
       id: user.id,
       phone: user.phone,
       firstName: user.firstName,
-      middleName: user.middleName,
+      fathersName: user.middleName,
       lastName: user.lastName,
       email: user.email,
       preferredLanguage: user.preferredLanguage,
@@ -155,6 +156,23 @@ export class IdentityService {
       phoneVerified: user.phoneVerified,
       roles: user.userRoles.map((ur: { role: { code: string } }) => ur.role.code),
     };
+  }
+
+  async updateMe(userId: string, dto: UpdateMeDto) {
+    const data: { firstName?: string | null; middleName?: string | null } = {};
+    if (dto.firstName !== undefined) {
+      data.firstName = dto.firstName.trim() || null;
+    }
+    if (dto.fathersName !== undefined) {
+      data.middleName = dto.fathersName.trim() || null;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return this.me(userId);
+    }
+
+    await this.prisma.user.update({ where: { id: userId }, data });
+    return this.me(userId);
   }
 
   /** Signs a JWT and returns it with a minimal user summary — shared by both DEV_OTP and normal verify paths. */

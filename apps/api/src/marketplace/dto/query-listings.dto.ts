@@ -9,9 +9,19 @@ export class QueryListingsDto {
   @IsString()
   region?: string;
 
+  /** Comma-separated origin names for multi-select filters. */
+  @IsOptional()
+  @IsString()
+  regions?: string;
+
   @IsOptional()
   @IsEnum(CoffeeGrade)
   grade?: CoffeeGrade;
+
+  /** Comma-separated grade codes for multi-select filters. */
+  @IsOptional()
+  @IsString()
+  grades?: string;
 
   @IsOptional()
   @IsEnum(ProcessMethod)

@@ -33,6 +33,7 @@ export enum CoffeeGrade {
   GRADE_7 = 'GRADE_7',
   GRADE_8 = 'GRADE_8',
   GRADE_9 = 'GRADE_9',
+  GRADE_UNKNOWN = 'GRADE_UNKNOWN',
 }
 
 export class CreateListingDto {

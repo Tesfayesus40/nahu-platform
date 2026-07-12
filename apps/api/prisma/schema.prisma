@@ -201,6 +201,7 @@ enum CoffeeGrade {
   GRADE_7
   GRADE_8
   GRADE_9
+  GRADE_UNKNOWN
 
   @@schema("marketplace")
   @@map("coffee_grade")
@@ -242,7 +243,7 @@ model FarmerProfile {
   woreda             String?   @db.VarChar(100)
   altitudeM          Decimal?  @map("altitude_m") @db.Decimal(6, 1)
   farmSizeHa         Decimal?  @map("farm_size_ha") @db.Decimal(6, 2)
-  primaryLanguage    String    @default("am") @map("primary_language") @db.Char(2)
+  primaryLanguage    String    @default("am") @map("primary_language") @db.VarChar(200)
   verified           Boolean   @default(false)
   verificationNotes  String?   @map("verification_notes") @db.VarChar(500)
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
