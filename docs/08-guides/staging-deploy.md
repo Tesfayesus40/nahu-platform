@@ -66,6 +66,7 @@ In Railway dashboard → **staging** → **nahu-api** → Variables, set:
 | `JWT_SECRET` | Strong random string (see below) |
 | `JWT_EXPIRES_IN` | `7d` |
 | `OTP_EXPIRES_MINUTES` | `10` |
+| `PUBLIC_API_URL` | `https://nahu-api-staging.up.railway.app` (no trailing slash; required for listing photo URLs) |
 
 Generate JWT secret:
 
@@ -77,17 +78,24 @@ See `apps/api/.env.staging.example` for optional SMS and Anthropic keys.
 
 ### 6. Apply database migrations
 
-Get the public Postgres URL from Railway (Postgres service → Connect), then:
+**Fresh database** — run all migrations:
 
 ```bash
 export DATABASE_URL="postgresql://..."
 ./scripts/apply-migrations.sh
 ```
 
+**Existing staging/production DB** (already on migrations 001–005) — run only Pack 2–4 pending files:
+
+```bash
+export DATABASE_URL="postgresql://..."
+./scripts/apply-pending-migrations.sh
+```
+
 On Windows (Git Bash):
 
 ```bash
-DATABASE_URL="postgresql://..." bash scripts/apply-migrations.sh
+DATABASE_URL="postgresql://..." bash scripts/apply-pending-migrations.sh
 ```
 
 ### 7. Verify
