@@ -97,14 +97,14 @@ export class IdentityService {
     return { message: 'OTP sent' };
   }
 
-  async verifyOtp({ phone, otp }: VerifyOtpDto) {
+  async verifyOtp({ phone, otp, role }: VerifyOtpDto) {
     if (!this.isProduction && otp === DEV_OTP) {
       const user = await this.prisma.user.findUnique({ where: { phone } });
       if (!user) {
         throw new UnauthorizedException('Phone number not registered. Request OTP first.');
       }
       this.logger.debug(`[DEV] Universal OTP used for ${phone}`);
-      return this.issueSession(user.id, phone);
+      return this.issueSession(user.id, phone, role);
     }
 
     const record = await this.prisma.otpCode.findFirst({
@@ -131,7 +131,7 @@ export class IdentityService {
       });
     }
 
-    return this.issueSession(user.id, phone);
+    return this.issueSession(user.id, phone, role);
   }
 
   async me(userId: string) {
@@ -158,13 +158,27 @@ export class IdentityService {
   }
 
   /** Signs a JWT and returns it with a minimal user summary — shared by both DEV_OTP and normal verify paths. */
-  private async issueSession(userId: string, phone: string) {
-    const primaryRole = await this.prisma.userRole.findFirst({
-      where: { userId },
-      include: { role: true },
-      orderBy: { assignedAt: 'asc' },
-    });
-    const roleCode = primaryRole?.role.code ?? null;
+  private async issueSession(userId: string, phone: string, preferredRole?: string) {
+    let roleCode: string | null = null;
+
+    if (preferredRole) {
+      const match = await this.prisma.userRole.findFirst({
+        where: { userId, role: { code: preferredRole } },
+        include: { role: true },
+      });
+      if (match) {
+        roleCode = match.role.code;
+      }
+    }
+
+    if (!roleCode) {
+      const primaryRole = await this.prisma.userRole.findFirst({
+        where: { userId },
+        include: { role: true },
+        orderBy: { assignedAt: 'asc' },
+      });
+      roleCode = primaryRole?.role.code ?? null;
+    }
 
     const token = this.jwt.sign({ userId, phone, role: roleCode });
 

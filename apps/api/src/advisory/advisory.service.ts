@@ -19,12 +19,24 @@ When giving price advice, remind farmers prices vary by region and day.
 Never give advice that could harm the farmer financially.
 Always be encouraging and respectful.`;
 
-// Placeholder data — in production, fetch real ECX prices instead.
 const SAMPLE_PRICES: Record<string, { grade1: number; grade2: number }> = {
   Yirgacheffe: { grade1: 285, grade2: 245 },
   Sidama: { grade1: 270, grade2: 235 },
   Jimma: { grade1: 250, grade2: 215 },
   Harrar: { grade1: 295, grade2: 260 },
+};
+
+const REGION_ALIASES: Record<string, string> = {
+  yirgacheffe: 'Yirgacheffe',
+  'ይርጋጨፌ': 'Yirgacheffe',
+  yirga: 'Yirgacheffe',
+  sidama: 'Sidama',
+  'ሲዳማ': 'Sidama',
+  jimma: 'Jimma',
+  'ጅማ': 'Jimma',
+  harrar: 'Harrar',
+  harar: 'Harrar',
+  'ሐረር': 'Harrar',
 };
 
 @Injectable()
@@ -36,6 +48,10 @@ export class AdvisoryService {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
   ) {}
+
+  private get hasAnthropicKey(): boolean {
+    return !!this.config.get<string>('anthropic.apiKey');
+  }
 
   private getClient() {
     if (!this.client) {
@@ -50,7 +66,56 @@ export class AdvisoryService {
     return this.client;
   }
 
+  private normalizeRegion(region: string): string {
+    const trimmed = decodeURIComponent(region).trim();
+    const lower = trimmed.toLowerCase();
+    return REGION_ALIASES[trimmed] ?? REGION_ALIASES[lower] ?? trimmed;
+  }
+
+  private staticPriceAdvice(region: string, prices: { grade1: number; grade2: number }): string {
+    return (
+      `የ${region} ቡና ዋጋ ዛሬ በECX: ደረጃ 1 ${prices.grade1} ብር/ኪ.ግ፣ ደረጃ 2 ${prices.grade2} ብር/ኪ.ግ። ` +
+      'ዋጋ በክልል እና በቀን ይለዋወጣል። ከቀጥሎ ሳምንት ገበያ ትንተና ከመሸጥዎ በፊት ይመልከቱ። ' +
+      'ቡናዎን ከብዛት ጋር በሚስማማ ዋጋ ለመሸጥ ዝግጁ ከሆኑ ለመሸጥ ጥሩ ጊዜ ሊሆን ይችላል።'
+    );
+  }
+
+  private staticAnswer(message: string, language: string): string {
+    const lower = message.toLowerCase();
+    const amharic = language === 'amharic' || language === 'am';
+
+    if (lower.includes('price') || lower.includes('ዋጋ') || lower.includes('ሸጥ')) {
+      return amharic
+        ? 'ዋጋ በክልል፣ በደረጃ እና በገበያ ቀን ይለዋወጣል። ከመሸጥዎ በፊት የዛሬ ዋጋ ቁልፍን ይጫኑ። ቡናዎን ከብዙ ገዢዎች ጋር ከመወያየት በኋላ ይሽጡ።'
+        : 'Prices vary by region, grade, and market day. Use the price button before selling, and compare offers from multiple buyers.';
+    }
+
+    if (lower.includes('pest') || lower.includes('ተባይ') || lower.includes('ብጥብጥ')) {
+      return amharic
+        ? 'ተባዮችን ለመከላከል የቡና ቅጠላዎችን በደንብ ይጠብቁ፣ ጥሩ አየር መተላለፍ ያረጋግጡ፣ እና የቡና ዛፎችን በመደበኛ ይቁረጡ። ሲታዩ ችግሮችን ወዲያውኑ ያሳውቁ።'
+        : 'Prevent pests by keeping the farm clean, ensuring good airflow, and pruning regularly. Report problems early.';
+    }
+
+    if (lower.includes('grade') || lower.includes('ደረጃ')) {
+      return amharic
+        ? 'ደረጃ 1 ለማግኘት ቡናን በጥራት ይምረጡ፣ ጥሩ ማብሰል/ማጠብ ያድርጉ፣ እና በንጹህ ሁኔታ ያቀርቡ። ጥራት ቀጣይነት ዋጋን ይጨምራል።'
+        : 'For Grade 1, select cherries carefully, process consistently, and deliver clean coffee. Quality consistency raises your price.';
+    }
+
+    return amharic
+      ? 'እኔ የቡና ምክር ረዳት ነኝ። ስለ ዋጋ፣ ማብሰል፣ ተባዮች እና ደረጃ ጥያቄዎችን መጠየቅ ይችላሉ። የዛሬ ዋጋ ቁልፍንም ይሞክሩ።'
+      : 'I am your coffee advisory assistant. Ask about prices, processing, pests, or grading. Try the today\'s price button too.';
+  }
+
   async askAdvisor(userId: string, dto: AskAdvisorDto) {
+    if (!this.hasAnthropicKey) {
+      return {
+        answer: this.staticAnswer(dto.message, dto.language ?? 'amharic'),
+        language: dto.language,
+        fallback: true,
+      };
+    }
+
     const farmer = await this.prisma.farmerProfile.findUnique({ where: { userId } });
 
     const context = farmer
@@ -60,41 +125,74 @@ export class AdvisoryService {
     const fullMessage = `${context}\n\nFarmer question: ${dto.message}`;
     const model = this.config.get<string>('anthropic.model');
 
-    const response = await this.getClient().messages.create({
-      model,
-      max_tokens: 400,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: fullMessage }],
-    });
+    try {
+      const response = await this.getClient().messages.create({
+        model,
+        max_tokens: 400,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: fullMessage }],
+      });
 
-    return {
-      answer: response.content[0].text,
-      language: dto.language,
-    };
+      return {
+        answer: response.content[0].text,
+        language: dto.language,
+        fallback: false,
+      };
+    } catch (err) {
+      this.logger.warn(`Advisory AI unavailable: ${(err as Error).message}`);
+      return {
+        answer: this.staticAnswer(dto.message, dto.language ?? 'amharic'),
+        language: dto.language,
+        fallback: true,
+      };
+    }
   }
 
   async getPriceAlert(region: string) {
-    const prices = SAMPLE_PRICES[region] ?? SAMPLE_PRICES['Yirgacheffe'];
-    const model = this.config.get<string>('anthropic.model');
+    const canonical = this.normalizeRegion(region);
+    const prices = SAMPLE_PRICES[canonical] ?? SAMPLE_PRICES['Yirgacheffe'];
 
-    const prompt = `Current ECX coffee prices for ${region}:
+    if (!this.hasAnthropicKey) {
+      return {
+        region: canonical,
+        prices,
+        advice: this.staticPriceAdvice(canonical, prices),
+        updatedAt: new Date().toISOString(),
+        fallback: true,
+      };
+    }
+
+    const model = this.config.get<string>('anthropic.model');
+    const prompt = `Current ECX coffee prices for ${canonical}:
 Grade 1: ${prices.grade1} ETB/kg
 Grade 2: ${prices.grade2} ETB/kg
 In 2 sentences in Amharic, tell the farmer if this is a good time to sell
 and what to watch for in the coming week.`;
 
-    const response = await this.getClient().messages.create({
-      model,
-      max_tokens: 200,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: prompt }],
-    });
+    try {
+      const response = await this.getClient().messages.create({
+        model,
+        max_tokens: 200,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: prompt }],
+      });
 
-    return {
-      region,
-      prices,
-      advice: response.content[0].text,
-      updatedAt: new Date().toISOString(),
-    };
+      return {
+        region: canonical,
+        prices,
+        advice: response.content[0].text,
+        updatedAt: new Date().toISOString(),
+        fallback: false,
+      };
+    } catch (err) {
+      this.logger.warn(`Price alert AI unavailable: ${(err as Error).message}`);
+      return {
+        region: canonical,
+        prices,
+        advice: this.staticPriceAdvice(canonical, prices),
+        updatedAt: new Date().toISOString(),
+        fallback: true,
+      };
+    }
   }
 }

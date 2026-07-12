@@ -120,6 +120,20 @@ export class MarketplaceService {
     return this.shapeListing(listing);
   }
 
+  async getMyListings(userId: string) {
+    const farmer = await this.prisma.farmerProfile.findUnique({ where: { userId } });
+    if (!farmer) {
+      throw new NotFoundException('Farmer profile not found');
+    }
+
+    const listings = await this.prisma.listing.findMany({
+      where: { farmerId: farmer.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return { data: listings.map((l: any) => this.shapeListing(l)) };
+  }
+
   async getListings(query: QueryListingsDto) {
     const { region, grade, processMethod, minKg, maxPrice, sort = 'newest', page = 1, limit = 20 } = query;
 

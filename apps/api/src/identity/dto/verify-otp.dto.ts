@@ -1,4 +1,5 @@
-import { IsString, Length, Matches } from 'class-validator';
+import { IsEnum, IsOptional, IsString, Length, Matches } from 'class-validator';
+import { RegistrationRole } from './request-otp.dto';
 
 export class VerifyOtpDto {
   @IsString()
@@ -10,4 +11,9 @@ export class VerifyOtpDto {
   @IsString()
   @Length(6, 6)
   otp: string;
+
+  /** App that initiated login — JWT role matches this when the user has that role. */
+  @IsOptional()
+  @IsEnum(RegistrationRole)
+  role?: RegistrationRole;
 }

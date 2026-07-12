@@ -57,6 +57,13 @@ export class ListingsController {
     return this.marketplace.getListings(query);
   }
 
+  @Get('mine')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('FARMER')
+  getMyListings(@CurrentUser() user: JwtPayload) {
+    return this.marketplace.getMyListings(user.userId);
+  }
+
   // Public — view a single listing
   @Get(':id')
   getListingById(@Param('id') id: string) {
