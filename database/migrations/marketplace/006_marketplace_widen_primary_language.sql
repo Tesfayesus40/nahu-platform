@@ -20,6 +20,6 @@ ALTER TABLE marketplace.farmer_profiles
     ALTER COLUMN primary_language SET DEFAULT 'am';
 
 COMMENT ON COLUMN marketplace.farmer_profiles.primary_language IS
-'Comma-joined list of languages the farmer speaks, as selected in the mobile app (free text display labels, not coded values -- e.g. "አማርኛ,ኦሮሚፋ").';
+'Comma-joined list of languages the farmer speaks, as selected in the mobile app (free text display labels).';
 
 COMMIT;

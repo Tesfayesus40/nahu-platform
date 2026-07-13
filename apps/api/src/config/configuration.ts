@@ -17,6 +17,7 @@ export default () => {
   },
   otp: {
     expiresMinutes: parseInt(process.env.OTP_EXPIRES_MINUTES ?? '10', 10),
+    devBypassEnabled: process.env.OTP_DEV_BYPASS === 'true',
   },
   sms: {
     apiKey: process.env.AT_API_KEY,

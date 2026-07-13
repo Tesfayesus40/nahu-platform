@@ -4,7 +4,14 @@ import { randomUUID } from 'crypto';
 import { mkdir, writeFile } from 'fs/promises';
 import { extname, join } from 'path';
 
-const ALLOWED_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const ALLOWED_MIMES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+]);
 const MAX_PHOTOS = 5;
 
 @Injectable()
@@ -39,6 +46,7 @@ export class UploadsService {
   private mimeToExt(mime: string) {
     if (mime === 'image/png') return '.png';
     if (mime === 'image/webp') return '.webp';
+    if (mime === 'image/heic' || mime === 'image/heif') return '.heic';
     return '.jpg';
   }
 }

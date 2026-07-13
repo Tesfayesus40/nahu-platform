@@ -14,7 +14,9 @@
     "lint": "eslint \"src/**/*.ts\"",
     "test": "jest",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "db:reset-staging": "node scripts/reset-test-data.mjs",
+    "db:dump-staging": "node scripts/dump-staging-data.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

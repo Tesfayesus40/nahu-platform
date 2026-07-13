@@ -48,6 +48,8 @@ export class OrdersService {
     const farmerPayoutEtb = totalEtb - commissionEtb;
     const reference = `NBG-${Date.now().toString(16).toUpperCase().slice(-8)}`;
 
+    const remainingKg = Number(listing.quantityKg) - dto.quantityKg;
+
     const order = await this.prisma.$transaction(async (tx) => {
       const created = await tx.order.create({
         data: {
@@ -69,7 +71,9 @@ export class OrdersService {
 
       await tx.listing.update({
         where: { id: listing.id },
-        data: { status: 'RESERVED' },
+        data: remainingKg > 0
+          ? { quantityKg: remainingKg, status: 'ACTIVE' }
+          : { quantityKg: 0, status: 'RESERVED' },
       });
 
       return created;
@@ -141,7 +145,7 @@ export class OrdersService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      await tx.listing.update({ where: { id: order.listingId }, data: { status: 'ACTIVE' } });
+      await this.restoreListingStock(tx, order.listingId, Number(order.quantityKg));
       return tx.order.update({ where: { id: orderId }, data: { status: 'CANCELLED' } });
     });
 
@@ -173,7 +177,7 @@ export class OrdersService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      await tx.listing.update({ where: { id: order.listingId }, data: { status: 'ACTIVE' } });
+      await this.restoreListingStock(tx, order.listingId, Number(order.quantityKg));
       return tx.order.update({ where: { id: orderId }, data: { status: 'CANCELLED' } });
     });
 
@@ -275,6 +279,23 @@ export class OrdersService {
     }
 
     return this.shapeOrder(order, order.listing);
+  }
+
+  private async restoreListingStock(
+    tx: Pick<PrismaService, 'listing'>,
+    listingId: string,
+    quantityKg: number,
+  ) {
+    const listing = await tx.listing.findUnique({ where: { id: listingId } });
+    if (!listing) return;
+
+    await tx.listing.update({
+      where: { id: listingId },
+      data: {
+        quantityKg: Number(listing.quantityKg) + quantityKg,
+        status: 'ACTIVE',
+      },
+    });
   }
 
   private shapeOrder(order: any, listing?: any) {

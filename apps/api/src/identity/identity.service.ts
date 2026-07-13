@@ -37,6 +37,10 @@ export class IdentityService {
     return this.config.get<string>('nodeEnv') === 'production';
   }
 
+  private get devOtpEnabled(): boolean {
+    return !this.isProduction || this.config.get<boolean>('otp.devBypassEnabled') === true;
+  }
+
   async requestOtp({ phone, role }: RequestOtpDto) {
     let user = await this.prisma.user.findUnique({ where: { phone } });
 
@@ -83,14 +87,14 @@ export class IdentityService {
       // DEV_OTP fallback below covers it, so a missing/invalid AT sandbox
       // key doesn't block local testing.
       this.logger.error(`SMS send failed for ${phone}: ${(smsErr as Error).message}`);
-      if (this.isProduction) {
+      if (this.isProduction && !this.devOtpEnabled) {
         throw new ForbiddenException(
           'Could not send verification code. Please try again shortly.',
         );
       }
     }
 
-    if (!this.isProduction) {
+    if (this.devOtpEnabled) {
       this.logger.debug(`[DEV] OTP for ${phone}: ${code}`);
       return { message: 'OTP sent', dev_otp: code };
     }
@@ -99,7 +103,7 @@ export class IdentityService {
   }
 
   async verifyOtp({ phone, otp, role }: VerifyOtpDto) {
-    if (!this.isProduction && otp === DEV_OTP) {
+    if (this.devOtpEnabled && otp === DEV_OTP) {
       const user = await this.prisma.user.findUnique({ where: { phone } });
       if (!user) {
         throw new UnauthorizedException('Phone number not registered. Request OTP first.');

@@ -66,6 +66,7 @@ In Railway dashboard → **staging** → **nahu-api** → Variables, set:
 | `JWT_SECRET` | Strong random string (see below) |
 | `JWT_EXPIRES_IN` | `7d` |
 | `OTP_EXPIRES_MINUTES` | `10` |
+| `OTP_DEV_BYPASS` | `true` (staging only — enables test code `123456` when SMS is not configured) |
 | `PUBLIC_API_URL` | `https://nahu-api-staging.up.railway.app` (no trailing slash; required for listing photo URLs) |
 
 Generate JWT secret:
