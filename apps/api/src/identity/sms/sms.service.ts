@@ -26,7 +26,6 @@ export class SmsService {
         );
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const AfricasTalking = require('africastalking')({ apiKey, username });
       this.client = AfricasTalking.SMS;
     }

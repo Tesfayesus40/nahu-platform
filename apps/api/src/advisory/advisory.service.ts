@@ -59,7 +59,6 @@ export class AdvisoryService {
       if (!apiKey) {
         throw new Error('ANTHROPIC_API_KEY must be set to use the advisory module.');
       }
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const Anthropic = require('@anthropic-ai/sdk');
       this.client = new Anthropic({ apiKey });
     }

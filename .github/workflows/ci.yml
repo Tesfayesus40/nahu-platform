@@ -27,5 +27,8 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @nahu-platform/api prisma:generate
 
+      - name: Lint
+        run: pnpm --filter @nahu-platform/api lint
+
       - name: Build
         run: pnpm build
