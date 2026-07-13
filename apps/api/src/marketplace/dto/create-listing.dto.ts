@@ -37,6 +37,12 @@ export enum CoffeeGrade {
 }
 
 export class CreateListingDto {
+  /** Defaults to COFFEE when omitted — preserves legacy mobile app behaviour. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  categoryCode?: string;
+
   @IsString()
   @MaxLength(100)
   region: string;

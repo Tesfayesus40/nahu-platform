@@ -1,10 +1,15 @@
 import { Type } from 'class-transformer';
-import { IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { CoffeeGrade, ProcessMethod } from './create-listing.dto';
 
 export type ListingSort = 'newest' | 'price_asc' | 'price_desc';
 
 export class QueryListingsDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  categoryCode?: string;
+
   @IsOptional()
   @IsString()
   region?: string;
