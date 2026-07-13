@@ -179,6 +179,8 @@ Both apps target `/api/v1` on the platform API. Migration from the legacy Expres
 
 ## Documentation
 
+**[Documentation index](docs/README.md)** — start here for the full map of business, architecture, and engineering documents.
+
 | Document | Description |
 |----------|-------------|
 | [Engineering Playbook](docs/engineering-playbook.md) | How we build — conventions, database workflow, API rules |
