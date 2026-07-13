@@ -12,6 +12,7 @@ import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { AdvisoryModule } from './advisory/advisory.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { CatalogModule } from './catalog/catalog.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { UploadsModule } from './uploads/uploads.module';
     JwtConfigModule,
     HealthModule,
     IdentityModule,
+    CatalogModule,
     MarketplaceModule,
     CertificatesModule,
     OrdersModule,
