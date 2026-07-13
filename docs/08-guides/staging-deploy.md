@@ -108,7 +108,7 @@ curl -X POST https://<your-staging-host>/api/v1/auth/request-otp \
   -d '{"phone":"+251911223344","role":"FARMER"}'
 ```
 
-In staging/production, real SMS is required unless you configure Africa's Talking — OTP `123456` dev bypass is **disabled** when `NODE_ENV=production`.
+On staging, `OTP_DEV_BYPASS=true` enables test code `123456` even when `NODE_ENV=production`. Without that flag (or without Africa's Talking configured), OTP verification requires a real SMS code.
 
 ---
 
@@ -151,5 +151,5 @@ After pushing to `main`:
 |-------|-----|
 | Build fails on Prisma | Ensure `pnpm-lock.yaml` is committed; Dockerfile runs `prisma generate` |
 | `/health` 502 | Check logs: `railway logs --service nahu-api` |
-| OTP always fails | Set `AT_API_KEY` / `AT_USERNAME` or use `NODE_ENV=development` only locally |
+| OTP always fails | Staging: set `OTP_DEV_BYPASS=true` or configure `AT_API_KEY` / `AT_USERNAME`. Local dev: leave SMS unset and use OTP `123456` (`NODE_ENV` not `production`) |
 | Migrations error | Run `./scripts/apply-migrations.sh` against empty DB; use `docker compose down -v` locally to reset |

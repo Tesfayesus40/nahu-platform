@@ -175,7 +175,7 @@ See [Major changes protocol](docs/engineering-playbook.md#major-changes-protocol
 | `.env` files | Contain secrets |
 | `node_modules/` | Installed via pnpm |
 | Compiled `.js` / `.js.map` in `src/` | Build artifacts |
-| `apps/api/api/` duplicate folder | Stale nested copy — canonical source is `apps/api/` |
+| `apps/api/api/` duplicate folder | Removed — path is gitignored; canonical source is `apps/api/` |
 | API keys, passwords, tokens | Security |
 
 ---
