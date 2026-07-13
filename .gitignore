@@ -6,3 +6,9 @@ dist/
 .turbo/
 .DS_Store
 *.tsbuildinfo
+
+# Stale duplicate backend tree (canonical source is apps/api/)
+apps/api/api/
+
+# Temporary docx extraction artifacts
+docs/_extracted/
