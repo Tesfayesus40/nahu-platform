@@ -273,6 +273,11 @@ export class FarmsService {
     return this.shapePlot(updated);
   }
 
+  /** Used by Inventory and other modules that must enforce farm party access. */
+  async assertFarmAccess(userId: string, farmId: string, requireWrite = false) {
+    return this.requirePartyAccess(userId, farmId, requireWrite);
+  }
+
   private async requireFarmerProfile(userId: string) {
     const profile = await this.prisma.farmerProfile.findUnique({ where: { userId } });
     if (!profile) {

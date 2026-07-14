@@ -14,6 +14,7 @@ import { AdvisoryModule } from './advisory/advisory.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { FarmsModule } from './farms/farms.module';
+import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { FarmsModule } from './farms/farms.module';
     IdentityModule,
     CatalogModule,
     FarmsModule,
+    InventoryModule,
     MarketplaceModule,
     CertificatesModule,
     OrdersModule,
