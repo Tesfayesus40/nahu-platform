@@ -39,7 +39,8 @@ docs/
 database/docs/                ← data dictionary (outside this folder)
 ```
 
-Planned (not yet created): `04-requirements/`, `05-api/`, `06-database/`, `07-decisions/`.
+Planned (not yet created): `04-requirements/`, `05-api/`, `06-database/`.  
+Present: `07-decisions/` (design proposals awaiting or recording approval).
 
 ---
 
@@ -54,6 +55,9 @@ Planned (not yet created): `04-requirements/`, `05-api/`, `06-database/`, `07-de
 | [Business Actors](business/business-actors.md) | Platform actors and IAM foundation |
 | [Users Entity](03-domain-model/users-entity.md) | Approved Identity domain specification |
 | [Staging deployment](08-guides/staging-deploy.md) | Deploy API to Railway staging |
+| [Phase 3 — Product Catalog design](07-decisions/phase-3-product-catalog-design.md) | Approved v1.2 — multi-product catalog (status + multilingual) |
+| [Phase 4 — Farmer Platform design](07-decisions/phase-4-farmer-platform-design.md) | Approved — Nahu Farm architecture & roadmap |
+| [Phase 4.1 — Farm management design](07-decisions/phase-4.1-farm-management-design.md) | Approved v1.2 — farm management (implementation authorized) |
 
 ---
 
@@ -101,13 +105,15 @@ Planned (not yet created): `04-requirements/`, `05-api/`, `06-database/`, `07-de
 
 Incremental evolution toward the enterprise architecture (preserve existing coffee marketplace functionality throughout):
 
-| Phase | Focus |
-|-------|-------|
-| 1 | Repository stabilization — cleanup, documentation, CI |
-| 2 | Nahu Farms generalization — multi-commodity marketplace (coffee first) |
-| 3 | Product catalog |
-| 4 | Inventory |
-| 5 | Nahu Delivery |
+| Phase | Focus | Status |
+|-------|-------|--------|
+| 1 | Repository stabilization — cleanup, documentation, CI | Done |
+| 2 | Nahu Farms generalization — multi-commodity marketplace (coffee first) | Done |
+| 3 | Product catalog | **Done** (staging validated; milestone tagged) |
+| 4 | Farmer Platform (Nahu Farm) — farms, inventory, warehouse readiness, production planning, dashboards | **4.1 Farm management done** (staging validated); 4.2 Inventory next |
+| 5 | Nahu Delivery | Planned |
+
+**Stable milestone:** Product Catalog (Phase 3) + Farm Management (Phase 4.1) — on-device Farmer/Buyer staging validation passed 2026-07-14. See `docs/07-decisions/`.
 
 ---
 

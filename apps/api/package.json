@@ -13,6 +13,8 @@
     "postinstall": "prisma generate",
     "lint": "eslint \"src/**/*.ts\"",
     "test": "jest",
+    "test:catalog-rules": "node --test src/catalog/product-resolve.rules.test.mjs",
+    "test:farms-rules": "node --test src/farms/farms.rules.test.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "db:reset-staging": "node scripts/reset-test-data.mjs",

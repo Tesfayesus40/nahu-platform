@@ -1,6 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogService } from '../catalog/catalog.service';
+import {
+  isProductSellable,
+  productCategoryConflicts,
+} from '../catalog/product-resolve.rules';
 import { CreateFarmerProfileDto } from './dto/create-farmer-profile.dto';
 import { UpdateFarmerProfileDto } from './dto/update-farmer-profile.dto';
 import { CreateListingDto } from './dto/create-listing.dto';
@@ -132,18 +136,19 @@ export class MarketplaceService {
       );
     }
 
-    const category = await this.resolveActiveCategory(dto.categoryCode);
-    const { categoryCode: _categoryCode, ...listingData } = dto;
+    const product = await this.resolveListingProduct(dto.productCode, dto.categoryCode);
+    const { categoryCode: _categoryCode, productCode: _productCode, ...listingData } = dto;
 
     const listing = await this.prisma.listing.create({
       data: {
         ...listingData,
         farmerId: farmer.id,
-        categoryId: category.id,
+        categoryId: product.categoryId,
+        productId: product.id,
         harvestDate: new Date(dto.harvestDate),
         photoUrls: dto.photoUrls ?? [],
       },
-      include: { category: true },
+      include: { category: true, product: { include: { defaultUnit: true } } },
     });
 
     return this.shapeListing(listing);
@@ -157,7 +162,7 @@ export class MarketplaceService {
 
     const listings = await this.prisma.listing.findMany({
       where: { farmerId: farmer.id },
-      include: { category: true },
+      include: { category: true, product: { include: { defaultUnit: true } } },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -167,6 +172,7 @@ export class MarketplaceService {
   async getListings(query: QueryListingsDto) {
     const {
       categoryCode,
+      productCode,
       region,
       regions,
       grade,
@@ -203,9 +209,22 @@ export class MarketplaceService {
       categoryId = category.id;
     }
 
+    let productId: string | undefined;
+    if (productCode) {
+      const product = await this.catalog.findActiveProductByCode(productCode);
+      if (!product) {
+        return {
+          data: [],
+          pagination: { page, limit, total: 0, pages: 0 },
+        };
+      }
+      productId = product.id;
+    }
+
     const where = {
       status: 'ACTIVE' as const,
       ...(categoryId ? { categoryId } : {}),
+      ...(productId ? { productId } : {}),
       ...(regionList?.length ? { region: { in: regionList } } : {}),
       ...(gradeList?.length ? { grade: { in: gradeList as any } } : {}),
       ...(processMethod ? { processMethod } : {}),
@@ -223,7 +242,11 @@ export class MarketplaceService {
     const [listings, total] = await Promise.all([
       this.prisma.listing.findMany({
         where,
-        include: { farmer: { include: { user: true } }, category: true },
+        include: {
+          farmer: { include: { user: true } },
+          category: true,
+          product: { include: { defaultUnit: true } },
+        },
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
@@ -245,7 +268,11 @@ export class MarketplaceService {
   async getListingById(id: string) {
     const listing = await this.prisma.listing.findUnique({
       where: { id },
-      include: { farmer: { include: { user: true, cooperative: true } }, category: true },
+      include: {
+        farmer: { include: { user: true, cooperative: true } },
+        category: true,
+        product: { include: { defaultUnit: true } },
+      },
     });
     if (!listing) {
       throw new NotFoundException('Listing not found');
@@ -269,14 +296,21 @@ export class MarketplaceService {
       throw new BadRequestException('Only active listings can be edited');
     }
 
-    const { harvestDate, categoryCode: _categoryCode, ...rest } = dto;
+    const { harvestDate, categoryCode, productCode, ...rest } = dto;
+    let productUpdate: { categoryId: string; productId: string } | undefined;
+    if (categoryCode !== undefined || productCode !== undefined) {
+      const product = await this.resolveListingProduct(productCode, categoryCode);
+      productUpdate = { categoryId: product.categoryId, productId: product.id };
+    }
+
     const updated = await this.prisma.listing.update({
       where: { id: listingId },
       data: {
         ...rest,
         ...(harvestDate ? { harvestDate: new Date(harvestDate) } : {}),
+        ...(productUpdate ?? {}),
       },
-      include: { category: true },
+      include: { category: true, product: { include: { defaultUnit: true } } },
     });
 
     return this.shapeListing(updated);
@@ -301,13 +335,29 @@ export class MarketplaceService {
     const updated = await this.prisma.listing.update({
       where: { id: listingId },
       data: { status: 'CANCELLED' },
-      include: { category: true },
+      include: { category: true, product: { include: { defaultUnit: true } } },
     });
 
     return this.shapeListing(updated);
   }
 
-  private async resolveActiveCategory(categoryCode?: string) {
+  private async resolveListingProduct(productCode?: string, categoryCode?: string) {
+    if (productCode) {
+      const product = await this.catalog.findActiveProductByCode(productCode);
+      if (
+        !product ||
+        !isProductSellable(product.category.isActive, product.status)
+      ) {
+        throw new BadRequestException('This product is not available yet');
+      }
+      if (productCategoryConflicts(product.category.code, categoryCode)) {
+        throw new BadRequestException(
+          'productCode does not belong to the specified categoryCode',
+        );
+      }
+      return product;
+    }
+
     const category = categoryCode
       ? await this.catalog.findActiveCategoryByCode(categoryCode)
       : await this.catalog.findCoffeeCategory();
@@ -316,7 +366,12 @@ export class MarketplaceService {
       throw new BadRequestException('This product category is not available yet');
     }
 
-    return category;
+    const product = await this.catalog.findDefaultActiveProduct(category.id);
+    if (!product || !isProductSellable(category.isActive, product.status)) {
+      throw new BadRequestException('This product category is not available yet');
+    }
+
+    return product;
   }
 
   private shapeCategoryFields(listing: any) {
@@ -327,6 +382,16 @@ export class MarketplaceService {
     };
   }
 
+  private shapeProductFields(listing: any) {
+    return {
+      productId: listing.product?.id ?? listing.productId ?? null,
+      productCode: listing.product?.code ?? null,
+      productNameEn: listing.product?.nameEn ?? null,
+      productNameAm: listing.product?.nameAm ?? null,
+      defaultUnitCode: listing.product?.defaultUnit?.code ?? null,
+    };
+  }
+
   private shapeListing(
     listing: any,
     opts: { includeFarmerSummary?: boolean; includeFarmerDetail?: boolean } = {},
@@ -334,6 +399,7 @@ export class MarketplaceService {
     const base = {
       id: listing.id,
       ...this.shapeCategoryFields(listing),
+      ...this.shapeProductFields(listing),
       region: listing.region,
       regionEn: listing.regionEn,
       woreda: listing.woreda,
