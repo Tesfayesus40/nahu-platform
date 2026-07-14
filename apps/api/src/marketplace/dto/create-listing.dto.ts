@@ -43,6 +43,12 @@ export class CreateListingDto {
   @MaxLength(50)
   categoryCode?: string;
 
+  /** Optional product code; defaults to the category's default ACTIVE product. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  productCode?: string;
+
   @IsString()
   @MaxLength(100)
   region: string;

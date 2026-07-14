@@ -35,6 +35,43 @@ phone + SMS OTP authentication flow ported from `nahu-buna-gebaya`.
 
   and it will work normally.
 
+## Phase 4.1 — Farm Management
+
+Design: `docs/07-decisions/phase-4.1-farm-management-design.md` (Approved v1.2).
+
+SQL: `database/migrations/farms/001`–`006`.
+
+Domain rule: **Farms do not own Products.** Listings reference `catalog.products`; farms are production places. Season/cropping cycles are reserved for Phase 4.5.
+
+Routes (FARMER auth):
+- `GET /api/v1/farms/mine`
+- `POST /api/v1/farms`
+- `GET /api/v1/farms/:id`
+- `PATCH /api/v1/farms/:id`
+- `GET /api/v1/farms/:farmId/plots`
+- `POST /api/v1/farms/:farmId/plots`
+- `PATCH /api/v1/plots/:id`
+
+Unit tests: `pnpm --filter @nahu-platform/api test:farms-rules`
+
+## Phase 3 — Product Catalog
+
+Design: `docs/07-decisions/phase-3-product-catalog-design.md` (Approved v1.2).
+
+SQL migrations: `database/migrations/catalog/003`–`008`, `marketplace/010`–`011`.
+
+Routes:
+- `GET /api/v1/categories` — unchanged (Phase 2)
+- `GET /api/v1/products?categoryCode=&activeOnly=&page=&limit=` — list products (`activeOnly` default true = `status=ACTIVE`)
+- `GET /api/v1/products/:codeOrId` — UUID or product code
+- `POST /api/v1/listings` — optional `productCode`; defaults to COFFEE default `ACTIVE` product; responses include additive `productId` / `productCode` / names / `defaultUnitCode`
+- `GET /api/v1/listings?productCode=` — optional product filter
+
+Product statuses: `ACTIVE` | `INACTIVE` | `COMING_SOON` | `DISCONTINUED` (independent of category `is_active`).
+Additional Ethiopian languages: `catalog.product_translations` (en/am stay on product columns).
+
+Unit tests (no DB): `pnpm --filter @nahu-platform/api test:catalog-rules`
+
 ## What's included
 
 ```

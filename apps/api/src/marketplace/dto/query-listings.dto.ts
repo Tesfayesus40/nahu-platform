@@ -12,6 +12,11 @@ export class QueryListingsDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(80)
+  productCode?: string;
+
+  @IsOptional()
+  @IsString()
   region?: string;
 
   /** Comma-separated origin names for multi-select filters. */
