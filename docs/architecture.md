@@ -44,4 +44,12 @@ This page is the entry point for platform architecture documentation. It does no
 
 ## Current implementation snapshot
 
-The running backend (`apps/api`) implements Phase 1 foundation modules: Identity, Marketplace (coffee), Orders, Certificates, Payments (catalog), Advisory, and Uploads. See [API README](../apps/api/README.md) for the live endpoint catalog and [Data Dictionary](../database/docs/data-dictionary.md) for database modules.
+The running backend (`apps/api`) implements:
+
+- **Phase 1–2:** Identity, Marketplace (coffee-first), Orders, Certificates, Payments (methods catalog), Advisory, Uploads, Categories
+- **Phase 3:** Product Catalog (`catalog.products`, units, varieties, translations; listings `product_id`)
+- **Phase 4.1:** Farm Management (`farms` schema — parties, hierarchy tables, farms/plots APIs)
+
+Farms do **not** own products; listings reference `catalog.products`. Inventory (4.2) is next.
+
+See [API README](../apps/api/README.md), [Data Dictionary](../database/docs/data-dictionary.md), and [Phase decisions](07-decisions/).
