@@ -13,6 +13,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { AdvisoryModule } from './advisory/advisory.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { FarmsModule } from './farms/farms.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { CatalogModule } from './catalog/catalog.module';
     HealthModule,
     IdentityModule,
     CatalogModule,
+    FarmsModule,
     MarketplaceModule,
     CertificatesModule,
     OrdersModule,
