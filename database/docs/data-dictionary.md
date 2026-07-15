@@ -36,10 +36,10 @@ It is the primary reference for:
 | Agricultural Catalog | See below |
 | Farms (Nahu Farm) | Farm holdings, parties, plots/fields/production units (Phase 4.1) |
 | Inventory | Stock lots and movements for catalog products (Phase 4.2) |
+| Warehouse | Storage sites and parties (Phase 4.3 readiness) |
 | Marketplace | Listings and offers |
 | Orders | Buying and selling |
 | Payments | Transactions |
-| Warehousing | Inventory |
 | Logistics | Transportation |
 | Messaging | Chat system |
 | AI | Intelligent services |
@@ -89,14 +89,26 @@ Schema: `inventory`
 
 | Table | Purpose |
 |-------|---------|
-| `stock_lots` | Traceable product batches at a farm |
-| `stock_movements` | Append-only ledger |
+| `stock_lots` | Traceable product batches at a farm; optional `storage_site_id` |
+| `stock_movements` | Append-only ledger (includes `RELOCATE`; optional from/to site columns) |
 | `reservations` | Soft holds (API in 4.4) |
 
 Also: `catalog.unit_conversions` for same-dimension unit factors.
 
 Authoritative design: `docs/07-decisions/phase-4.2-inventory-design.md`.
-| Logistics | Transportation |
-| Messaging | Chat system |
-| AI | Intelligent services |
-| Administration | Platform configuration |
+
+---
+
+# Warehouse (Phase 4.3)
+
+Schema: `warehouse`
+
+| Table | Purpose |
+|-------|---------|
+| `storage_sites` | Named hold locations (`ON_FARM` MVP; coop/NAHU later) |
+| `warehouse_parties` | Access to a storage site |
+| `storage_zones` | Stub for future WMS hierarchy (no API in 4.3) |
+
+Run SQL in order: `database/migrations/warehouse/001`…`005`, then `inventory/006_inventory_warehouse_fk_relocate.sql`.
+
+Authoritative design: `docs/07-decisions/phase-4.3-warehouse-design.md`.

@@ -12,7 +12,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["identity", "catalog", "marketplace", "orders", "farms", "inventory"]
+  schemas  = ["identity", "catalog", "marketplace", "orders", "farms", "inventory", "warehouse"]
 }
 
 enum UserStatus {
@@ -221,6 +221,7 @@ model Unit {
   stockLots         StockLot[]
   stockMovements    StockMovement[]
   reservations      Reservation[]
+  storageSites      StorageSite[]
 
   @@map("units")
   @@schema("catalog")
@@ -361,9 +362,11 @@ model Cooperative {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime  @default(now()) @map("updated_at") @db.Timestamptz
 
-  farmerProfiles FarmerProfile[]
-  farms          Farm[]
-  farmParties    FarmParty[]
+  farmerProfiles   FarmerProfile[]
+  farms            Farm[]
+  farmParties      FarmParty[]
+  storageSites     StorageSite[]
+  warehouseParties WarehouseParty[]
 
   @@map("cooperatives")
   @@schema("marketplace")
@@ -389,6 +392,7 @@ model FarmerProfile {
   listings           Listing[]
   orders             Order[]       @relation("FarmerOrders")
   farmParties        FarmParty[]
+  warehouseParties   WarehouseParty[]
 
   @@map("farmer_profiles")
   @@schema("marketplace")
@@ -622,6 +626,7 @@ model Farm {
   partyHistory      FarmPartyHistory[]
   auditLogs         FarmAuditLog[]
   stockLots         StockLot[]
+  storageSites      StorageSite[]
 
   @@index([status])
   @@index([cooperativeId])
@@ -819,6 +824,7 @@ enum MovementType {
   DISPATCH
   LOSS
   RETURN
+  RELOCATE
 
   @@schema("inventory")
   @@map("movement_type")
@@ -861,6 +867,7 @@ model StockLot {
   productVariety   ProductVariety? @relation(fields: [productVarietyId], references: [id], onDelete: SetNull)
   farm             Farm            @relation(fields: [farmId], references: [id], onDelete: Restrict)
   plot             Plot?           @relation(fields: [plotId], references: [id], onDelete: SetNull)
+  storageSite      StorageSite?    @relation(fields: [storageSiteId], references: [id], onDelete: SetNull)
   unit             Unit            @relation(fields: [unitCode], references: [code], onDelete: Restrict)
   movements        StockMovement[]
   reservations     Reservation[]
@@ -869,6 +876,7 @@ model StockLot {
   @@index([farmId])
   @@index([productId])
   @@index([status])
+  @@index([storageSiteId])
   @@map("stock_lots")
   @@schema("inventory")
 }
@@ -885,6 +893,8 @@ model StockMovement {
   listingId             String?      @map("listing_id") @db.Uuid
   orderId               String?      @map("order_id") @db.Uuid
   counterpartMovementId String?      @map("counterpart_movement_id") @db.Uuid
+  fromStorageSiteId     String?      @map("from_storage_site_id") @db.Uuid
+  toStorageSiteId       String?      @map("to_storage_site_id") @db.Uuid
   metadata              Json?
   createdAt             DateTime     @default(now()) @map("created_at") @db.Timestamptz
 
@@ -892,11 +902,128 @@ model StockMovement {
   unit                  Unit          @relation(fields: [unitCode], references: [code], onDelete: Restrict)
   counterpart           StockMovement? @relation("MovementCounterpart", fields: [counterpartMovementId], references: [id], onDelete: SetNull)
   counterparts          StockMovement[] @relation("MovementCounterpart")
+  fromStorageSite       StorageSite?  @relation("MovementFromSite", fields: [fromStorageSiteId], references: [id], onDelete: SetNull)
+  toStorageSite         StorageSite?  @relation("MovementToSite", fields: [toStorageSiteId], references: [id], onDelete: SetNull)
 
   @@index([lotId])
   @@index([createdAt])
   @@map("stock_movements")
   @@schema("inventory")
+}
+
+// ============================================================================
+// Warehouse module (Phase 4.3)
+// Maps database/migrations/warehouse/001..005 + inventory/006
+// ============================================================================
+
+enum WarehouseSiteType {
+  ON_FARM
+  COOPERATIVE
+  NAHU
+  THIRD_PARTY
+
+  @@schema("warehouse")
+  @@map("site_type")
+}
+
+enum WarehouseSiteStatus {
+  ACTIVE
+  INACTIVE
+
+  @@schema("warehouse")
+  @@map("site_status")
+}
+
+enum WarehousePartyRole {
+  OWNER
+  MANAGER
+  VIEWER
+
+  @@schema("warehouse")
+  @@map("party_role")
+}
+
+enum WarehousePartyStatus {
+  ACTIVE
+  INACTIVE
+
+  @@schema("warehouse")
+  @@map("party_status")
+}
+
+model StorageSite {
+  id               String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code             String?             @db.VarChar(40)
+  name             String              @db.VarChar(150)
+  nameAm           String?             @map("name_am") @db.VarChar(150)
+  siteType         WarehouseSiteType   @map("site_type")
+  status           WarehouseSiteStatus @default(ACTIVE)
+  farmId           String?             @map("farm_id") @db.Uuid
+  cooperativeId    String?             @map("cooperative_id") @db.Uuid
+  region           String?             @db.VarChar(100)
+  regionEn         String?             @map("region_en") @db.VarChar(100)
+  zone             String?             @db.VarChar(100)
+  woreda           String?             @db.VarChar(100)
+  kebele           String?             @db.VarChar(100)
+  centroidLat      Decimal?            @map("centroid_lat") @db.Decimal(10, 7)
+  centroidLng      Decimal?            @map("centroid_lng") @db.Decimal(10, 7)
+  capacity         Decimal?            @db.Decimal(14, 3)
+  capacityUnitCode String?             @map("capacity_unit_code") @db.VarChar(20)
+  notes            String?
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime            @default(now()) @map("updated_at") @db.Timestamptz
+
+  farm             Farm?               @relation(fields: [farmId], references: [id], onDelete: Restrict)
+  cooperative      Cooperative?        @relation(fields: [cooperativeId], references: [id], onDelete: SetNull)
+  capacityUnit     Unit?               @relation(fields: [capacityUnitCode], references: [code], onDelete: Restrict)
+  parties          WarehouseParty[]
+  zones            StorageZone[]
+  stockLots        StockLot[]
+  movementsFrom    StockMovement[]     @relation("MovementFromSite")
+  movementsTo      StockMovement[]     @relation("MovementToSite")
+
+  @@index([farmId])
+  @@index([status])
+  @@index([siteType])
+  @@map("storage_sites")
+  @@schema("warehouse")
+}
+
+model WarehouseParty {
+  id              String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storageSiteId   String                @map("storage_site_id") @db.Uuid
+  farmerProfileId String?               @map("farmer_profile_id") @db.Uuid
+  cooperativeId   String?               @map("cooperative_id") @db.Uuid
+  partyRole       WarehousePartyRole    @map("party_role")
+  isPrimary       Boolean               @default(false) @map("is_primary")
+  status          WarehousePartyStatus  @default(ACTIVE)
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime              @default(now()) @map("updated_at") @db.Timestamptz
+
+  storageSite     StorageSite           @relation(fields: [storageSiteId], references: [id], onDelete: Cascade)
+  farmerProfile   FarmerProfile?        @relation(fields: [farmerProfileId], references: [id], onDelete: Cascade)
+  cooperative     Cooperative?          @relation(fields: [cooperativeId], references: [id], onDelete: Cascade)
+
+  @@index([storageSiteId])
+  @@index([farmerProfileId])
+  @@map("warehouse_parties")
+  @@schema("warehouse")
+}
+
+model StorageZone {
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storageSiteId String              @map("storage_site_id") @db.Uuid
+  code          String?             @db.VarChar(40)
+  name          String              @db.VarChar(150)
+  status        WarehouseSiteStatus @default(ACTIVE)
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime            @default(now()) @map("updated_at") @db.Timestamptz
+
+  storageSite   StorageSite         @relation(fields: [storageSiteId], references: [id], onDelete: Cascade)
+
+  @@index([storageSiteId])
+  @@map("storage_zones")
+  @@schema("warehouse")
 }
 
 model Reservation {
