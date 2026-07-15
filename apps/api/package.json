@@ -16,6 +16,7 @@
     "test:catalog-rules": "node --test src/catalog/product-resolve.rules.test.mjs",
     "test:farms-rules": "node --test src/farms/farms.rules.test.mjs",
     "test:cropping-cycles-rules": "node --test src/farms/cropping-cycles.rules.test.mjs",
+    "test:dashboard-rules": "node --test src/farms/dashboard.rules.test.mjs",
     "test:inventory-rules": "node --test src/inventory/inventory.rules.test.mjs",
     "test:reservations-rules": "node --test src/inventory/reservations.rules.test.mjs",
     "test:warehouse-rules": "node --test src/warehouse/warehouse.rules.test.mjs",
