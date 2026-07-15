@@ -6,6 +6,7 @@ import {
 import { LotStatus, MovementType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { FarmsService } from '../farms/farms.service';
+import { CroppingCyclesService } from '../farms/cropping-cycles.service';
 import { WarehouseService } from '../warehouse/warehouse.service';
 import {
   CreateMovementDto,
@@ -23,6 +24,7 @@ export class InventoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly farms: FarmsService,
+    private readonly croppingCycles: CroppingCyclesService,
     private readonly warehouse: WarehouseService,
   ) {}
 
@@ -212,6 +214,16 @@ export class InventoryService {
     );
     const lotUnit = product.defaultUnitCode;
 
+    const cycleBind = await this.croppingCycles.assertReceiveBind({
+      userId,
+      farmId: dto.farmId,
+      plotId: dto.plotId,
+      productId: product.id,
+      productVarietyId: varietyId,
+      croppingCycleId: dto.croppingCycleId,
+      cycleLineId: dto.cycleLineId,
+    });
+
     const lotCode =
       dto.lotCode?.trim() ||
       `LOT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random()
@@ -239,6 +251,8 @@ export class InventoryService {
           storageLabel: dto.storageLabel,
           storageSiteId: dto.storageSiteId,
           externalRef: dto.externalRef,
+          croppingCycleId: cycleBind.croppingCycleId,
+          croppingCycleLineId: cycleBind.croppingCycleLineId,
         },
         include: { product: true, unit: true },
       });
@@ -587,6 +601,8 @@ export class InventoryService {
       expiresOn: lot.expiresOn,
       qualityNote: lot.qualityNote,
       externalRef: lot.externalRef,
+      croppingCycleId: lot.croppingCycleId,
+      croppingCycleLineId: lot.croppingCycleLineId,
       createdAt: lot.createdAt,
     };
   }

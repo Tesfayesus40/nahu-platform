@@ -17,6 +17,8 @@ Expose completed Nest capabilities in the **Farmer** app first, then resume back
 | **M4** Inventory screens | **Done** (Settings → Inventory / receive / lot movements) |
 | Phase **4.3 Warehouse** | **Complete** — staging + Farmer M7 on-device; production still held |
 | Phase **4.4 Listing ↔ stock** | **Staging smoked** — Farmer M8 wired; production held |
+| Phase **4.5 Production planning** | **Closed** — staging + Farmer M10 on-device; Amharic packaged; production held |
+| Phase **4.6 Dashboards** | **Design draft** — review only; implementation not authorized |
 
 **Production:** Nest production URL and EAS `production` profile stay unchanged until new mobile functionality is validated on **staging**. Canonical Farmer notes: `nahu-buna-farmer/MOBILE_NEST.md`.
 
@@ -172,7 +174,7 @@ Principles:
 1. **Do not duplicate backend** — if Nest already exposes the capability, prefer mobile/client work.
 2. **Do not build mobile screens** for APIs that are still 🔵 (especially live payments, **4.4 stock↔listing until approved + staging smoke**).
 3. **Prefer additive UI** that keeps coffee MVP working when fields are omitted.
-4. **Backend Phase 4.4 Listing↔stock** is next after Warehouse completion — design → approve → implement.
+4. **Backend Phase 4.6 Dashboards** is next after 4.5 — design review only (product decisions locked); **no implementation** until explicitly authorized.
 
 ### Mobile track (Farmer / Buyer Expo)
 
@@ -187,6 +189,7 @@ Principles:
 | **M6** | Advisory extras + certificates for farmer (optional) | Farmer | Nice-to-have after M3–M4 |
 | **M7** | Warehouse / storage-site UI | Farmer | **Done** against staging 4.3 API |
 | **M8** | Sell-from-stock / reservation UX | Farmer | **Done** against staging 4.4 (optional lot on New Listing) |
+| **M10** | Seasons / production plans UX | Farmer | **Done** — staging on-device + Amharic closeout APK |
 | **M9** | Live payments UX | Buyer | **After** real provider integration (not `GET /methods` alone) |
 
 ### Backend track (stay synchronized)
@@ -196,9 +199,10 @@ Principles:
 | **B0** | Keep staging Nest as mobile validation target | Supports M0 |
 | **B1** | Phase **4.3 Warehouse** — complete (M7 on-device) | Done; production still explicit |
 | **B2** | Promote 4.2/4.3 (+ later 4.4) to production when smoke-ready | Independent of Expo UI; explicit gate |
-| **B3** | Phase **4.4** listing↔stock (after design approval) | Enables M8 |
-| **B4** | Phase 4.5 / 4.6 planning & dashboards | Mobile dashboards after data exists |
-| **B5** | Live payments / SMS production cutover | Ops + M9; separate gate |
+| **B3** | Phase **4.4** listing↔stock | Done on staging (enables M8) |
+| **B4** | Phase **4.5** production planning — **closed** on staging + M10 | Done; production still explicit |
+| **B5** | Phase **4.6** dashboards — design review only | M11 after design Approved + implement auth |
+| **B6** | Live payments / SMS production cutover | Ops + M9; separate gate |
 
 ### Explicit “do not do yet”
 

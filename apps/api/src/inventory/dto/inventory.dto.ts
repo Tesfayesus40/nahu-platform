@@ -78,6 +78,14 @@ export class ReceiveStockDto {
   @IsOptional()
   @IsBoolean()
   quarantine?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  croppingCycleId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  cycleLineId?: string;
 }
 
 export type MovementCommand =
