@@ -35,11 +35,29 @@ phone + SMS OTP authentication flow ported from `nahu-buna-gebaya`.
 
   and it will work normally.
 
+## Phase 4.3 — Warehouse readiness
+
+Design: `docs/07-decisions/phase-4.3-warehouse-design.md` (**Approved**).
+
+SQL (order matters): `database/migrations/warehouse/001`–`005`, then `database/migrations/inventory/006_inventory_warehouse_fk_relocate.sql`.
+
+Routes (FARMER auth):
+- `GET /api/v1/warehouse/sites`
+- `POST /api/v1/warehouse/sites/on-farm`
+- `GET /api/v1/warehouse/sites/:id`
+- `PATCH /api/v1/warehouse/sites/:id`
+
+Inventory extensions:
+- optional `storageSiteId` on receive / lot & balance filters
+- `POST /api/v1/inventory/movements` with `type: RELOCATE` + `toStorageSiteId` (qty-neutral)
+
+Unit tests: `pnpm --filter @nahu-platform/api test:warehouse-rules`
+
 ## Phase 4.2 — Inventory
 
 Design: `docs/07-decisions/phase-4.2-inventory-design.md` (Approved).
 
-SQL: `database/migrations/catalog/009_catalog_unit_conversions.sql`, `database/migrations/inventory/001`–`005`.
+SQL: `database/migrations/catalog/009_catalog_unit_conversions.sql`, `database/migrations/inventory/001`–`005` (+ `006` with Phase 4.3).
 
 Routes (FARMER auth):
 - `GET /api/v1/inventory/lots`
@@ -47,7 +65,7 @@ Routes (FARMER auth):
 - `GET /api/v1/inventory/lots/:id/movements`
 - `GET /api/v1/inventory/balances`
 - `POST /api/v1/inventory/receive`
-- `POST /api/v1/inventory/movements` (`ADJUST_IN` / `ADJUST_OUT` / `LOSS` / `TRANSFER_OUT`)
+- `POST /api/v1/inventory/movements` (`ADJUST_IN` / `ADJUST_OUT` / `LOSS` / `TRANSFER_OUT` / `RELOCATE`)
 
 Listing/order APIs unchanged (reservation bind in 4.4).
 

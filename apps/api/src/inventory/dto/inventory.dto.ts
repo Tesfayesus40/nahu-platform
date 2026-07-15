@@ -62,6 +62,10 @@ export class ReceiveStockDto {
   storageLabel?: string;
 
   @IsOptional()
+  @IsUUID()
+  storageSiteId?: string;
+
+  @IsOptional()
   @IsString()
   @MaxLength(100)
   externalRef?: string;
@@ -89,10 +93,12 @@ export class CreateMovementDto {
   @IsEnum(MovementType)
   type: MovementType;
 
+  /** Optional for RELOCATE (defaults to 0). Required-positive for other types. */
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  @Min(0.001)
-  qty: number;
+  @Min(0)
+  qty?: number;
 
   @IsOptional()
   @IsString()
@@ -112,12 +118,21 @@ export class CreateMovementDto {
   @IsOptional()
   @IsUUID()
   toPlotId?: string;
+
+  /** Required when type is RELOCATE */
+  @IsOptional()
+  @IsUUID()
+  toStorageSiteId?: string;
 }
 
 export class QueryLotsDto {
   @IsOptional()
   @IsUUID()
   farmId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  storageSiteId?: string;
 
   @IsOptional()
   @IsString()
@@ -145,6 +160,10 @@ export class QueryBalancesDto {
   @IsOptional()
   @IsUUID()
   farmId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  storageSiteId?: string;
 
   @IsOptional()
   @IsString()

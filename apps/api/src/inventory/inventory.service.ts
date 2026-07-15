@@ -6,6 +6,7 @@ import {
 import { LotStatus, MovementType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { FarmsService } from '../farms/farms.service';
+import { WarehouseService } from '../warehouse/warehouse.service';
 import {
   CreateMovementDto,
   QueryBalancesDto,
@@ -22,6 +23,7 @@ export class InventoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly farms: FarmsService,
+    private readonly warehouse: WarehouseService,
   ) {}
 
   async listLots(userId: string, query: QueryLotsDto) {
@@ -52,6 +54,7 @@ export class InventoryService {
       farmId: query.farmId ? query.farmId : { in: accessibleFarmIds },
       ...(productId ? { productId } : {}),
       ...(query.status ? { status: query.status } : {}),
+      ...(query.storageSiteId ? { storageSiteId: query.storageSiteId } : {}),
     };
 
     const [lots, total] = await Promise.all([
@@ -121,6 +124,7 @@ export class InventoryService {
       where: {
         farmId: query.farmId ? query.farmId : { in: accessibleFarmIds },
         ...(productId ? { productId } : {}),
+        ...(query.storageSiteId ? { storageSiteId: query.storageSiteId } : {}),
         status: { in: ['AVAILABLE', 'RESERVED', 'QUARANTINE'] },
       },
       include: { product: true, unit: true },
@@ -130,6 +134,7 @@ export class InventoryService {
       string,
       {
         farmId: string;
+        storageSiteId: string | null;
         productCode: string;
         productNameEn: string;
         unitCode: string;
@@ -139,7 +144,7 @@ export class InventoryService {
     >();
 
     for (const lot of lots) {
-      const key = `${lot.farmId}:${lot.productId}:${lot.unitCode}`;
+      const key = `${lot.farmId}:${lot.storageSiteId ?? '_'}:${lot.productId}:${lot.unitCode}`;
       const existing = map.get(key);
       if (existing) {
         existing.quantityOnHand += toNumber(lot.quantityOnHand);
@@ -147,6 +152,7 @@ export class InventoryService {
       } else {
         map.set(key, {
           farmId: lot.farmId,
+          storageSiteId: lot.storageSiteId,
           productCode: lot.product.code,
           productNameEn: lot.product.nameEn,
           unitCode: lot.unitCode,
@@ -167,6 +173,13 @@ export class InventoryService {
         where: { id: dto.plotId, farmId: dto.farmId },
       });
       if (!plot) throw new BadRequestException('Plot not found on this farm');
+    }
+
+    if (dto.storageSiteId) {
+      const site = await this.warehouse.assertSiteUsable(userId, dto.storageSiteId, true);
+      if (site.siteType === 'ON_FARM' && site.farmId && site.farmId !== dto.farmId) {
+        throw new BadRequestException('Storage site does not belong to this farm');
+      }
     }
 
     const product = await this.prisma.product.findFirst({
@@ -224,6 +237,7 @@ export class InventoryService {
           expiresOn: dto.expiresOn ? new Date(dto.expiresOn) : undefined,
           qualityNote: dto.qualityNote,
           storageLabel: dto.storageLabel,
+          storageSiteId: dto.storageSiteId,
           externalRef: dto.externalRef,
         },
         include: { product: true, unit: true },
@@ -238,6 +252,7 @@ export class InventoryService {
           qtyInLotUnit,
           reason: 'Stock receive',
           actorUserId: userId,
+          toStorageSiteId: dto.storageSiteId,
         },
       });
 
@@ -248,10 +263,16 @@ export class InventoryService {
   }
 
   async createMovement(userId: string, dto: CreateMovementDto) {
-    const allowed: MovementType[] = ['ADJUST_IN', 'ADJUST_OUT', 'LOSS', 'TRANSFER_OUT'];
+    const allowed: MovementType[] = [
+      'ADJUST_IN',
+      'ADJUST_OUT',
+      'LOSS',
+      'TRANSFER_OUT',
+      'RELOCATE',
+    ];
     if (!allowed.includes(dto.type)) {
       throw new BadRequestException(
-        'Unsupported movement type in Phase 4.2. Use RECEIVE via /inventory/receive.',
+        'Unsupported movement type. Use RECEIVE via /inventory/receive.',
       );
     }
 
@@ -260,16 +281,25 @@ export class InventoryService {
       throw new BadRequestException(`Cannot apply ${dto.type} to lot in status ${lot.status}`);
     }
 
+    if (dto.type === 'RELOCATE') {
+      return this.relocate(userId, lot, dto);
+    }
+
+    if (dto.qty === undefined || dto.qty < 0.001) {
+      throw new BadRequestException('qty must be at least 0.001 for this movement type');
+    }
+    const qty = dto.qty;
+
     const unitCode = (dto.unitCode ?? lot.unitCode).toUpperCase();
     const qtyInLotUnit = await this.convertQty(
-      dto.qty,
+      qty,
       unitCode,
       lot.unitCode,
       lot.unit.dimension,
     );
 
     if (dto.type === 'TRANSFER_OUT') {
-      return this.transferOut(userId, lot, dto, qtyInLotUnit, unitCode);
+      return this.transferOut(userId, lot, dto, qty, qtyInLotUnit, unitCode);
     }
 
     const signed =
@@ -292,7 +322,7 @@ export class InventoryService {
         data: {
           lotId: lot.id,
           movementType: dto.type,
-          qty: dto.qty,
+          qty,
           unitCode,
           qtyInLotUnit: signed,
           reason: dto.reason,
@@ -319,10 +349,63 @@ export class InventoryService {
     };
   }
 
+  private async relocate(
+    userId: string,
+    lot: Prisma.StockLotGetPayload<{ include: { product: true; unit: true } }>,
+    dto: CreateMovementDto,
+  ) {
+    if (!dto.toStorageSiteId) {
+      throw new BadRequestException('toStorageSiteId is required for RELOCATE');
+    }
+    if (lot.storageSiteId === dto.toStorageSiteId) {
+      throw new BadRequestException('Lot is already at this storage site');
+    }
+
+    const toSite = await this.warehouse.assertSiteUsable(userId, dto.toStorageSiteId, true);
+    if (toSite.siteType === 'ON_FARM' && toSite.farmId && toSite.farmId !== lot.farmId) {
+      throw new BadRequestException(
+        'ON_FARM destination must belong to the lot farm; use TRANSFER_OUT for farm change',
+      );
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const movement = await tx.stockMovement.create({
+        data: {
+          lotId: lot.id,
+          movementType: 'RELOCATE',
+          qty: 0,
+          unitCode: lot.unitCode,
+          qtyInLotUnit: 0,
+          reason: dto.reason ?? 'Relocate storage site',
+          actorUserId: userId,
+          fromStorageSiteId: lot.storageSiteId,
+          toStorageSiteId: dto.toStorageSiteId,
+        },
+      });
+
+      const saved = await tx.stockLot.update({
+        where: { id: lot.id },
+        data: {
+          storageSiteId: dto.toStorageSiteId,
+          updatedAt: new Date(),
+        },
+        include: { product: true, unit: true },
+      });
+
+      return { saved, movement };
+    });
+
+    return {
+      lot: this.shapeLot(result.saved),
+      movement: this.shapeMovement(result.movement),
+    };
+  }
+
   private async transferOut(
     userId: string,
     sourceLot: Prisma.StockLotGetPayload<{ include: { product: true; unit: true } }>,
     dto: CreateMovementDto,
+    qty: number,
     qtyInLotUnit: number,
     unitCode: string,
   ) {
@@ -347,7 +430,7 @@ export class InventoryService {
         data: {
           lotId: sourceLot.id,
           movementType: 'TRANSFER_OUT',
-          qty: dto.qty,
+          qty,
           unitCode,
           qtyInLotUnit: -qtyInLotUnit,
           reason: dto.reason ?? 'Transfer out',
@@ -388,7 +471,7 @@ export class InventoryService {
         data: {
           lotId: destLot.id,
           movementType: 'TRANSFER_IN',
-          qty: dto.qty,
+          qty,
           unitCode,
           qtyInLotUnit,
           reason: dto.reason ?? 'Transfer in',
@@ -491,6 +574,7 @@ export class InventoryService {
       productNameAm: lot.product.nameAm,
       farmId: lot.farmId,
       plotId: lot.plotId,
+      storageSiteId: lot.storageSiteId,
       storageLabel: lot.storageLabel,
       unitCode: lot.unitCode,
       unitNameEn: lot.unit.nameEn,
@@ -519,6 +603,8 @@ export class InventoryService {
     listingId: string | null;
     orderId: string | null;
     counterpartMovementId: string | null;
+    fromStorageSiteId?: string | null;
+    toStorageSiteId?: string | null;
     createdAt: Date;
   }) {
     return {
@@ -533,6 +619,8 @@ export class InventoryService {
       listingId: m.listingId,
       orderId: m.orderId,
       counterpartMovementId: m.counterpartMovementId,
+      fromStorageSiteId: m.fromStorageSiteId ?? null,
+      toStorageSiteId: m.toStorageSiteId ?? null,
       createdAt: m.createdAt,
     };
   }

@@ -59,7 +59,7 @@ Present: `07-decisions/` (design proposals awaiting or recording approval).
 | [Phase 4 — Farmer Platform design](07-decisions/phase-4-farmer-platform-design.md) | Approved — Nahu Farm architecture & roadmap |
 | [Phase 4.1 — Farm management design](07-decisions/phase-4.1-farm-management-design.md) | Approved v1.2 — farm management (implementation authorized) |
 | [Phase 4.2 — Inventory design](07-decisions/phase-4.2-inventory-design.md) | **Closed** — staging + Farmer APK validated |
-| [Phase 4.3 — Warehouse design](07-decisions/phase-4.3-warehouse-design.md) | Draft — awaiting approval (design only) |
+| [Phase 4.3 — Warehouse design](07-decisions/phase-4.3-warehouse-design.md) | **Closed** — staging + Farmer M7; production held |
 | [Backend ↔ Mobile feature mapping](backend-mobile-feature-mapping.md) | Capability matrix (Farmer/Buyer vs Nest modules) |
 
 ---
@@ -113,7 +113,7 @@ Incremental evolution toward the enterprise architecture (preserve existing coff
 | 1 | Repository stabilization — cleanup, documentation, CI | Done |
 | 2 | Nahu Farms generalization — multi-commodity marketplace (coffee first) | Done |
 | 3 | Product catalog | **Done** (staging validated; milestone tagged) |
-| 4 | Farmer Platform (Nahu Farm) — farms, inventory, warehouse readiness, production planning, dashboards | **4.1 + 4.2 closed** (staging + Farmer APK); **4.3 Warehouse design** next |
+| 4 | Farmer Platform (Nahu Farm) — farms, inventory, warehouse readiness, production planning, dashboards | **4.1–4.3 closed** on staging (+ Farmer M7); production Nest cutover held |
 | 5 | Nahu Delivery | Planned |
 
 **Stable milestone:** Phase 3 Catalog + Phase 4.1 Farms + Phase 4.2 Inventory — Farmer staging APK validated 2026-07-15 (`milestone-phase-4.2`). Production Nest/mobile cutover remains held until explicit approval. See `docs/07-decisions/`.

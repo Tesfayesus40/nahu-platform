@@ -1,13 +1,13 @@
 # Phase 4.3 — Warehouse Readiness Architecture
 
-**Status:** Complete draft — **awaiting review and approval** (design only; **no implementation authorized**)  
-**Date:** 2026-07-15  
-**Version:** 1.0 (review package)  
+**Status:** **Closed** — implemented on staging + Farmer M7 UI; production held  
+**Date:** 2026-07-15 (approved and closed same day)  
+**Version:** 1.1  
 **Parent:** [Phase 4 — Farmer Platform](phase-4-farmer-platform-design.md) (Approved)  
 **Depends on:** Phase 3 Product Catalog · Phase 4.1 Farm Management · Phase 4.2 Inventory (**closed** — staging + Farmer APK validated)  
 **Next after approval:** Design → SQL → Prisma → API → Tests → Docs → Staging → Mobile → Production (explicit)
 
-**Implementation gate:** **Closed** until the approval checklist is signed. No SQL, Prisma, Nest modules, or mobile UI for warehouse until then.
+**Implementation gate:** **Closed on staging** — SQL → Prisma → API → Tests → Docs → Staging smoke → Farmer M7. Production promotion remains explicit.
 
 **Production:** Remains unchanged until a future production promotion is explicitly approved.
 
@@ -455,21 +455,19 @@ Workflow: **Design → Review → Approval → SQL → Prisma → API → Tests 
 
 ## 18. Approval checklist
 
-Please confirm each review theme:
+- [x] **Ownership model** accepted (ON_FARM MVP + warehouse_parties DDL)  
+- [x] **Multi-warehouse** accepted (many sites; filters by site)  
+- [x] **Hierarchy** accepted (Site now; Zone/Bin later without redesign)  
+- [x] **Relationships** with Inventory / Farms / Products accepted  
+- [x] **Lot movement & traceability** (RELOCATE + append-only) accepted  
+- [x] **Future Delivery / Orders / AI / Analytics** hooks accepted  
+- [x] **Backward compatibility & migration** accepted (`storage_site_id` already reserved)  
+- [x] **Long-term extensibility** accepted  
+- [x] Out-of-scope (no full WMS / no 4.4 bind / no Production cutover) accepted  
+- [x] API-first mobile sequencing accepted  
+- [x] **Implementation authorized** (explicit — unlocks SQL)
 
-- [ ] **Ownership model** accepted (ON_FARM MVP + warehouse_parties DDL)  
-- [ ] **Multi-warehouse** accepted (many sites; filters by site)  
-- [ ] **Hierarchy** accepted (Site now; Zone/Bin later without redesign)  
-- [ ] **Relationships** with Inventory / Farms / Products accepted  
-- [ ] **Lot movement & traceability** (RELOCATE + append-only) accepted  
-- [ ] **Future Delivery / Orders / AI / Analytics** hooks accepted  
-- [ ] **Backward compatibility & migration** accepted (`storage_site_id` already reserved)  
-- [ ] **Long-term extensibility** accepted  
-- [ ] Out-of-scope (no full WMS / no 4.4 bind / no Production cutover) accepted  
-- [ ] API-first mobile sequencing accepted  
-- [ ] **Implementation authorized** (explicit — unlocks SQL)
-
-**Approver:** _________________ **Date:** _________________
+**Approver:** Product owner **Date:** 2026-07-15
 
 ---
 
