@@ -16,6 +16,7 @@ import { CatalogModule } from './catalog/catalog.module';
 import { FarmsModule } from './farms/farms.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { WarehouseModule } from './warehouse/warehouse.module';
+import { HarvestModule } from './farms/harvest.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { WarehouseModule } from './warehouse/warehouse.module';
     FarmsModule,
     InventoryModule,
     WarehouseModule,
+    HarvestModule,
     MarketplaceModule,
     CertificatesModule,
     OrdersModule,

@@ -35,6 +35,26 @@ phone + SMS OTP authentication flow ported from `nahu-buna-gebaya`.
 
   and it will work normally.
 
+## Phase 4.7 — Harvest management
+
+Design: `docs/07-decisions/phase-4.7-harvest-management-design.md` (**Approved** v1.1 — implementing; production held).
+
+SQL: `database/migrations/farms/008_farms_harvest_management.sql`.
+
+Model: **Harvest Session → Harvest Lines**; DRAFT independent of inventory; **Post** → Inventory `RECEIVE` (stock SoR).
+
+Routes (FARMER auth):
+- `GET|POST /api/v1/farms/:farmId/harvest-sessions`
+- `GET /api/v1/farms/:farmId/harvest-history`
+- `GET|PATCH|DELETE /api/v1/harvest-sessions/:id`
+- `POST /api/v1/harvest-sessions/:id/lines`
+- `POST /api/v1/harvest-sessions/:id/post`
+- `PATCH|DELETE /api/v1/harvest-lines/:lineId`
+
+Rules: multiple sessions per cropping cycle; no mutate/delete after POSTED; corrections via inventory adjust; manual plan lifecycle.
+
+Unit tests: `pnpm --filter @nahu-platform/api test:harvest-rules`
+
 ## Phase 4.6 — Farmer dashboard
 
 Design: `docs/07-decisions/phase-4.6-dashboards-design.md` (**Closed** v1.3 — staging + Farmer M11; production held).

@@ -223,6 +223,7 @@ model Unit {
   reservations        Reservation[]
   storageSites        StorageSite[]
   croppingCycleLines  CroppingCycleLine[]
+  harvestLines        HarvestLine[]
 
   @@map("units")
   @@schema("catalog")
@@ -265,6 +266,7 @@ model Product {
   listings           Listing[]
   stockLots          StockLot[]
   croppingCycleLines CroppingCycleLine[]
+  harvestLines       HarvestLine[]
 
   @@index([categoryId])
   @@index([status])
@@ -286,6 +288,7 @@ model ProductVariety {
   product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   stockLots          StockLot[]
   croppingCycleLines CroppingCycleLine[]
+  harvestLines       HarvestLine[]
 
   @@unique([productId, code])
   @@index([productId])
@@ -609,6 +612,14 @@ enum CroppingCycleStatus {
   @@map("cropping_cycle_status")
 }
 
+enum HarvestSessionStatus {
+  DRAFT
+  POSTED
+
+  @@schema("farms")
+  @@map("harvest_session_status")
+}
+
 enum FarmAuditAction {
   CREATE
   UPDATE
@@ -655,6 +666,7 @@ model Farm {
   storageSites      StorageSite[]
   listings          Listing[]
   croppingCycles    CroppingCycle[]
+  harvestSessions   HarvestSession[]
 
   @@index([status])
   @@index([cooperativeId])
@@ -709,6 +721,7 @@ model Plot {
   productionUnits   ProductionUnit[]
   stockLots         StockLot[]
   croppingCycles    CroppingCycle[]
+  harvestSessions   HarvestSession[]
 
   @@index([farmId])
   @@map("plots")
@@ -811,6 +824,7 @@ model CroppingCycle {
   season            SeasonCode          @relation(fields: [seasonCode], references: [code], onDelete: Restrict)
   lines             CroppingCycleLine[]
   stockLots         StockLot[]
+  harvestSessions   HarvestSession[]
 
   @@index([farmId])
   @@index([status])
@@ -838,11 +852,73 @@ model CroppingCycleLine {
   productVariety   ProductVariety? @relation(fields: [productVarietyId], references: [id], onDelete: SetNull)
   unit             Unit           @relation(fields: [unitCode], references: [code], onDelete: Restrict)
   stockLots        StockLot[]
+  harvestLines     HarvestLine[]
 
   @@unique([cycleId, productId])
   @@index([productId])
   @@index([cycleId])
   @@map("cropping_cycle_lines")
+  @@schema("farms")
+}
+
+model HarvestSession {
+  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  farmId           String               @map("farm_id") @db.Uuid
+  plotId           String?              @map("plot_id") @db.Uuid
+  croppingCycleId  String?              @map("cropping_cycle_id") @db.Uuid
+  harvestedOn      DateTime             @map("harvested_on") @db.Date
+  harvestedAt      DateTime?            @map("harvested_at") @db.Timestamptz
+  status           HarvestSessionStatus @default(DRAFT)
+  notes            String?
+  crewCount        Int?                 @map("crew_count")
+  photoUrls        String[]             @default([]) @map("photo_urls")
+  postedAt         DateTime?            @map("posted_at") @db.Timestamptz
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime             @default(now()) @map("updated_at") @db.Timestamptz
+
+  farm             Farm                 @relation(fields: [farmId], references: [id], onDelete: Restrict)
+  plot             Plot?                @relation(fields: [plotId], references: [id], onDelete: SetNull)
+  croppingCycle    CroppingCycle?       @relation(fields: [croppingCycleId], references: [id], onDelete: SetNull)
+  lines            HarvestLine[]
+
+  @@index([farmId])
+  @@index([status])
+  @@index([croppingCycleId])
+  @@index([farmId, harvestedOn])
+  @@map("harvest_sessions")
+  @@schema("farms")
+}
+
+model HarvestLine {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId            String    @map("session_id") @db.Uuid
+  productId            String    @map("product_id") @db.Uuid
+  productVarietyId     String?   @map("product_variety_id") @db.Uuid
+  qty                  Decimal   @db.Decimal(14, 3)
+  unitCode             String    @map("unit_code") @db.VarChar(20)
+  moisturePct          Decimal?  @map("moisture_pct") @db.Decimal(5, 2)
+  harvestGradeClass    String?   @map("harvest_grade_class") @db.VarChar(40)
+  qualityNote          String?   @map("quality_note")
+  photoUrls            String[]  @default([]) @map("photo_urls")
+  storageSiteId        String?   @map("storage_site_id") @db.Uuid
+  croppingCycleLineId  String?   @map("cropping_cycle_line_id") @db.Uuid
+  stockLotId           String?   @map("stock_lot_id") @db.Uuid
+  sortOrder            Int       @default(0) @map("sort_order")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  session              HarvestSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  product              Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productVariety       ProductVariety?    @relation(fields: [productVarietyId], references: [id], onDelete: SetNull)
+  unit                 Unit               @relation(fields: [unitCode], references: [code], onDelete: Restrict)
+  storageSite          StorageSite?       @relation(fields: [storageSiteId], references: [id], onDelete: SetNull)
+  croppingCycleLine    CroppingCycleLine? @relation(fields: [croppingCycleLineId], references: [id], onDelete: SetNull)
+  stockLot             StockLot?          @relation(fields: [stockLotId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId])
+  @@index([productId])
+  @@index([stockLotId])
+  @@map("harvest_lines")
   @@schema("farms")
 }
 
@@ -985,6 +1061,7 @@ model StockLot {
   movements           StockMovement[]
   reservations        Reservation[]
   listings            Listing[]
+  harvestLines        HarvestLine[]
 
   @@unique([farmId, lotCode])
   @@index([farmId])
@@ -1097,6 +1174,7 @@ model StorageSite {
   stockLots        StockLot[]
   movementsFrom    StockMovement[]     @relation("MovementFromSite")
   movementsTo      StockMovement[]     @relation("MovementToSite")
+  harvestLines     HarvestLine[]
 
   @@index([farmId])
   @@index([status])
