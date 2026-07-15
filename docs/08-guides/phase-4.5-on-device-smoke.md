@@ -39,7 +39,7 @@ Mark each: ☐ Pass / ☐ Fail / ☐ Blocked
 |-------|--------|
 | Tester | Product / program (chat authorization) |
 | Device / OS | Staging farmer device checks |
-| APK build URL or version | Prior M10 staging APK + Amharic closeout APK (this release) |
+| APK build URL or version | Amharic closeout: https://expo.dev/accounts/tesfayesus/projects/nahu-buna-farmer/builds/4b3b634c-5673-43d2-b8f4-c0078830458c |
 | Date | 2026-07-15 |
 | Overall | ✅ **Pass** — Phase 4.5 git closeout authorized (`4.5 on-device pass`) |
 
