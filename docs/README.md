@@ -29,7 +29,7 @@ docs/
 ├── architecture.md           ← architecture entry point
 ├── engineering-playbook.md   ← how we build (active)
 ├── business/                 ← business model and actors
-├── 02-architecture/          ← architecture principles (markdown)
+├── 02-architecture/          ← architecture principles + Nahu Farm V1 overview (markdown)
 ├── 03-domain-model/          ← entity specifications
 ├── 08-guides/                ← operational how-to guides
 ├── architecture/             ← enterprise architecture (.docx)
@@ -51,6 +51,7 @@ Present: `07-decisions/` (design proposals awaiting or recording approval).
 | [Engineering Playbook](engineering-playbook.md) | Monorepo conventions, SQL-first migrations, API rules, mobile compatibility |
 | [Architecture entry point](architecture.md) | Links to architecture principles and enterprise documents |
 | [Architecture Principles](02-architecture/architecture-principles.md) | Ten platform design principles |
+| [Nahu Farm V1 Architecture Overview](02-architecture/nahu-farm-v1-architecture-overview.md) | Reference architecture — modules, entities, APIs, mobile hierarchy, data flow (Phases 4.1–4.7) |
 | [Business Model](business/nahu-platform-business-model.md) | Enterprise vision and business model |
 | [Business Actors](business/business-actors.md) | Platform actors and IAM foundation |
 | [Users Entity](03-domain-model/users-entity.md) | Approved Identity domain specification |

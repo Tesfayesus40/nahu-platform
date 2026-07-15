@@ -9,6 +9,7 @@ This page is the entry point for platform architecture documentation. It does no
 | Document | Description |
 |----------|-------------|
 | [Architecture Principles](02-architecture/architecture-principles.md) | Ten binding design principles (markdown, active) |
+| [Nahu Farm V1 Architecture Overview](02-architecture/nahu-farm-v1-architecture-overview.md) | Reference architecture for Farmer Platform Phases 4.1–4.7 (staging) |
 | [Documentation index](README.md) | Full map of all platform documentation |
 
 ---
@@ -44,12 +45,13 @@ This page is the entry point for platform architecture documentation. It does no
 
 ## Current implementation snapshot
 
-The running backend (`apps/api`) implements:
+The running backend (`apps/api`) and Farmer Expo client implement **Nahu Farm V1** on staging:
 
-- **Phase 1–2:** Identity, Marketplace (coffee-first), Orders, Certificates, Payments (methods catalog), Advisory, Uploads, Categories
+- **Phase 1–2:** Identity, Marketplace (coffee-first), Orders, Certificates, Payments (methods catalog), Advisory, Uploads
 - **Phase 3:** Product Catalog (`catalog.products`, units, varieties, translations; listings `product_id`)
-- **Phase 4.1:** Farm Management (`farms` schema — parties, hierarchy tables, farms/plots APIs)
+- **Phase 4.1–4.7:** Farms/plots → production planning → harvest → inventory → warehouse → listing↔stock → farmer dashboard
 
-Farms do **not** own products; listings reference `catalog.products`. Inventory (4.2) is next.
+Farms do **not** own products; listings reference `catalog.products`. Inventory is the stock system of record. **Production Nest / mobile cutover remains held.**
 
-See [API README](../apps/api/README.md), [Data Dictionary](../database/docs/data-dictionary.md), and [Phase decisions](07-decisions/).
+Canonical overview: [Nahu Farm V1 Architecture Overview](02-architecture/nahu-farm-v1-architecture-overview.md).  
+Also: [API README](../apps/api/README.md), [Data Dictionary](../database/docs/data-dictionary.md), [Phase decisions](07-decisions/), [Backend ↔ Mobile mapping](backend-mobile-feature-mapping.md).

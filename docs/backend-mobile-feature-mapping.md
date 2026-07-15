@@ -23,6 +23,8 @@ Expose completed Nest capabilities in the **Farmer** app first, then resume back
 
 **Production:** Nest production URL and EAS `production` profile stay unchanged until new mobile functionality is validated on **staging**. Canonical Farmer notes: `nahu-buna-farmer/MOBILE_NEST.md`.
 
+**Architecture reference:** [Nahu Farm V1 Architecture Overview](02-architecture/nahu-farm-v1-architecture-overview.md) — modules, entities, API boundaries, Farmer screen hierarchy, and plan→harvest→inventory→listing→order flow.
+
 ---
 
 ## Working model (confirmed)

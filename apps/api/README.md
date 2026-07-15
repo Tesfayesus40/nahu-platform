@@ -37,7 +37,8 @@ phone + SMS OTP authentication flow ported from `nahu-buna-gebaya`.
 
 ## Phase 4.7 — Harvest management
 
-Design: `docs/07-decisions/phase-4.7-harvest-management-design.md` (**Approved** v1.1 — implementing; production held).
+Design: `docs/07-decisions/phase-4.7-harvest-management-design.md` (**Closed** v1.1 — staging + Farmer M12; production held).  
+Architecture overview: `docs/02-architecture/nahu-farm-v1-architecture-overview.md`.
 
 SQL: `database/migrations/farms/008_farms_harvest_management.sql`.
 
