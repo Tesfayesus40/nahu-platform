@@ -19,6 +19,7 @@ Expose completed Nest capabilities in the **Farmer** app first, then resume back
 | Phase **4.4 Listing ↔ stock** | **Staging smoked** — Farmer M8 wired; production held |
 | Phase **4.5 Production planning** | **Closed** — staging + Farmer M10 on-device; Amharic packaged; production held |
 | Phase **4.6 Dashboards** | **Closed** — Nest `GET /farms/dashboard` + Farmer M11 on-device; production held |
+| Phase **4.7 Harvest management** | **Closed** — Nest harvest sessions + Farmer M12 on-device; production held |
 
 **Production:** Nest production URL and EAS `production` profile stay unchanged until new mobile functionality is validated on **staging**. Canonical Farmer notes: `nahu-buna-farmer/MOBILE_NEST.md`.
 
@@ -174,7 +175,7 @@ Principles:
 1. **Do not duplicate backend** — if Nest already exposes the capability, prefer mobile/client work.
 2. **Do not build mobile screens** for APIs that are still 🔵 (especially live payments, **4.4 stock↔listing until approved + staging smoke**).
 3. **Prefer additive UI** that keeps coffee MVP working when fields are omitted.
-4. **Phase 4.6 Dashboards** is **Closed** on staging + M11; production Nest cutover still explicit.
+4. **Phase 4.7 Harvest management** is **Closed** on staging + Farmer M12; production still explicit. Amharic UI cleanup remains a separate follow-up.
 
 ### Mobile track (Farmer / Buyer Expo)
 
@@ -191,6 +192,7 @@ Principles:
 | **M8** | Sell-from-stock / reservation UX | Farmer | **Done** against staging 4.4 (optional lot on New Listing) |
 | **M10** | Seasons / production plans UX | Farmer | **Done** — staging on-device + Amharic closeout APK |
 | **M11** | Farmer Home dashboard sections (`GET /farms/dashboard`) | Farmer | **Done** — staging on-device + APK |
+| **M12** | Harvest sessions UX (Session→Lines→Post) | Farmer | **Done** — staging on-device + APK |
 | **M9** | Live payments UX | Buyer | **After** real provider integration (not `GET /methods` alone) |
 
 ### Backend track (stay synchronized)
@@ -203,6 +205,7 @@ Principles:
 | **B3** | Phase **4.4** listing↔stock | Done on staging (enables M8) |
 | **B4** | Phase **4.5** production planning — **closed** on staging + M10 | Done; production still explicit |
 | **B5** | Phase **4.6** dashboards — **closed** on staging + M11 | Done; production still explicit |
+| **B7** | Phase **4.7** harvest management — **closed** on staging + M12 | Done; production still explicit |
 | **B6** | Live payments / SMS production cutover | Ops + M9; separate gate |
 
 ### Explicit “do not do yet”

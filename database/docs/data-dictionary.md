@@ -78,6 +78,7 @@ Schema: `farms`
 | `farm_party_history` / `farm_audit_log` | History & audit |
 | `season_codes` | Configurable season catalog (regional expansion via rows) |
 | `cropping_cycles` / `cropping_cycle_lines` | Production plans; actuals from inventory RECEIVE |
+| `harvest_sessions` / `harvest_lines` | Field harvest capture; post creates stock via RECEIVE |
 
 Products remain in `catalog`. Listings reference products. Production planning: Phase 4.5.
 
