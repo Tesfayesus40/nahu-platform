@@ -403,6 +403,8 @@ model Listing {
   farmerId       String        @map("farmer_id") @db.Uuid
   categoryId     String?       @map("category_id") @db.Uuid
   productId      String?       @map("product_id") @db.Uuid
+  stockLotId     String?       @map("stock_lot_id") @db.Uuid
+  farmId         String?       @map("farm_id") @db.Uuid
   region         String        @db.VarChar(100)
   regionEn       String?       @map("region_en") @db.VarChar(100)
   woreda         String?       @db.VarChar(100)
@@ -424,13 +426,18 @@ model Listing {
   farmer         FarmerProfile @relation(fields: [farmerId], references: [id], onDelete: Cascade)
   category       Category?     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   product        Product?      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  stockLot       StockLot?     @relation(fields: [stockLotId], references: [id], onDelete: SetNull)
+  farm           Farm?         @relation(fields: [farmId], references: [id], onDelete: SetNull)
   orders         Order[]
+  reservations   Reservation[]
 
   @@index([region])
   @@index([grade])
   @@index([status])
   @@index([categoryId])
   @@index([productId])
+  @@index([stockLotId])
+  @@index([farmId])
   @@map("listings")
   @@schema("marketplace")
 }
@@ -488,6 +495,7 @@ model Order {
   buyer             User               @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Restrict)
   farmer            FarmerProfile      @relation("FarmerOrders", fields: [farmerId], references: [id], onDelete: Restrict)
   certificate       OriginCertificate?
+  reservations      Reservation[]
 
   @@index([buyerId])
   @@index([farmerId])
@@ -627,6 +635,7 @@ model Farm {
   auditLogs         FarmAuditLog[]
   stockLots         StockLot[]
   storageSites      StorageSite[]
+  listings          Listing[]
 
   @@index([status])
   @@index([cooperativeId])
@@ -871,6 +880,7 @@ model StockLot {
   unit             Unit            @relation(fields: [unitCode], references: [code], onDelete: Restrict)
   movements        StockMovement[]
   reservations     Reservation[]
+  listings         Listing[]
 
   @@unique([farmId, lotCode])
   @@index([farmId])
@@ -1026,21 +1036,37 @@ model StorageZone {
   @@schema("warehouse")
 }
 
-model Reservation {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  lotId     String   @map("lot_id") @db.Uuid
-  listingId String?  @map("listing_id") @db.Uuid
-  orderId   String?  @map("order_id") @db.Uuid
-  qty       Decimal  @db.Decimal(14, 3)
-  unitCode  String   @map("unit_code") @db.VarChar(20)
-  status    String   @default("ACTIVE") @db.VarChar(20)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+enum ReservationStatus {
+  ACTIVE
+  ORDER_HELD
+  RELEASED
+  CONSUMED
+  ALLOCATED
+  DISPATCHED
 
-  lot       StockLot @relation(fields: [lotId], references: [id], onDelete: Restrict)
-  unit      Unit     @relation(fields: [unitCode], references: [code], onDelete: Restrict)
+  @@schema("inventory")
+  @@map("reservation_status")
+}
+
+model Reservation {
+  id        String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lotId     String            @map("lot_id") @db.Uuid
+  listingId String?           @map("listing_id") @db.Uuid
+  orderId   String?           @map("order_id") @db.Uuid
+  qty       Decimal           @db.Decimal(14, 3)
+  unitCode  String            @map("unit_code") @db.VarChar(20)
+  status    ReservationStatus @default(ACTIVE)
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime          @default(now()) @map("updated_at") @db.Timestamptz
+
+  lot       StockLot          @relation(fields: [lotId], references: [id], onDelete: Restrict)
+  unit      Unit              @relation(fields: [unitCode], references: [code], onDelete: Restrict)
+  listing   Listing?          @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  order     Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([lotId])
+  @@index([listingId])
+  @@index([orderId])
   @@map("reservations")
   @@schema("inventory")
 }

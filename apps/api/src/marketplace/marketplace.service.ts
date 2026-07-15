@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogService } from '../catalog/catalog.service';
+import { FarmsService } from '../farms/farms.service';
+import { ReservationsService } from '../inventory/reservations.service';
 import {
   isProductSellable,
   productCategoryConflicts,
@@ -22,6 +24,8 @@ export class MarketplaceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly catalog: CatalogService,
+    private readonly farms: FarmsService,
+    private readonly reservations: ReservationsService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -137,7 +141,41 @@ export class MarketplaceService {
     }
 
     const product = await this.resolveListingProduct(dto.productCode, dto.categoryCode);
-    const { categoryCode: _categoryCode, productCode: _productCode, ...listingData } = dto;
+    const { categoryCode: _c, productCode: _p, stockLotId, ...listingData } = dto;
+
+    if (stockLotId) {
+      const lot = await this.prisma.stockLot.findUnique({ where: { id: stockLotId } });
+      if (!lot) throw new BadRequestException('Stock lot not found');
+      await this.farms.assertFarmAccess(userId, lot.farmId, true);
+
+      const listing = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.listing.create({
+          data: {
+            ...listingData,
+            farmerId: farmer.id,
+            categoryId: product.categoryId,
+            productId: product.id,
+            stockLotId: lot.id,
+            farmId: lot.farmId,
+            harvestDate: new Date(dto.harvestDate),
+            photoUrls: dto.photoUrls ?? [],
+          },
+          include: { category: true, product: { include: { defaultUnit: true } } },
+        });
+
+        await this.reservations.reserveForListingTx(tx, {
+          userId,
+          lotId: lot.id,
+          listingId: created.id,
+          qty: dto.quantityKg,
+          expectedProductId: product.id,
+        });
+
+        return created;
+      });
+
+      return this.shapeListingWithReservation(listing);
+    }
 
     const listing = await this.prisma.listing.create({
       data: {
@@ -296,11 +334,72 @@ export class MarketplaceService {
       throw new BadRequestException('Only active listings can be edited');
     }
 
-    const { harvestDate, categoryCode, productCode, ...rest } = dto;
+    if (dto.stockLotId !== undefined && dto.stockLotId !== listing.stockLotId) {
+      throw new BadRequestException(
+        'Cannot change stock lot on an existing listing. Withdraw and create a new listing.',
+      );
+    }
+    if (dto.productCode !== undefined || dto.categoryCode !== undefined) {
+      const activeHold = await this.prisma.reservation.findFirst({
+        where: { listingId, status: 'ACTIVE' },
+      });
+      if (activeHold) {
+        throw new BadRequestException(
+          'Cannot change product on a stock-bound listing. Withdraw and create a new listing.',
+        );
+      }
+    }
+
+    const { harvestDate, categoryCode, productCode, stockLotId: _ignoreLot, quantityKg, ...rest } =
+      dto;
     let productUpdate: { categoryId: string; productId: string } | undefined;
     if (categoryCode !== undefined || productCode !== undefined) {
       const product = await this.resolveListingProduct(productCode, categoryCode);
       productUpdate = { categoryId: product.categoryId, productId: product.id };
+    }
+
+    if (quantityKg !== undefined && listing.stockLotId) {
+      const currentQty = Number(listing.quantityKg);
+      const delta = quantityKg - currentQty;
+      if (Math.abs(delta) > 1e-9) {
+        await this.prisma.$transaction(async (tx) => {
+          if (delta > 0) {
+            await this.reservations.growListingReservationTx(tx, {
+              listingId,
+              extraQty: delta,
+              userId,
+            });
+          } else {
+            const hold = await tx.reservation.findFirst({
+              where: { listingId, status: 'ACTIVE' },
+            });
+            if (!hold) throw new BadRequestException('Missing listing reservation');
+            await this.reservations.releaseReservationTx(
+              tx,
+              hold.id,
+              userId,
+              'Decrease listing reservation',
+              Math.abs(delta),
+            );
+          }
+          await tx.listing.update({
+            where: { id: listingId },
+            data: {
+              ...rest,
+              ...(harvestDate ? { harvestDate: new Date(harvestDate) } : {}),
+              ...(productUpdate ?? {}),
+              quantityKg,
+              updatedAt: new Date(),
+            },
+          });
+        });
+
+        const updatedBound = await this.prisma.listing.findUnique({
+          where: { id: listingId },
+          include: { category: true, product: { include: { defaultUnit: true } } },
+        });
+        return this.shapeListingWithReservation(updatedBound);
+      }
     }
 
     const updated = await this.prisma.listing.update({
@@ -309,11 +408,13 @@ export class MarketplaceService {
         ...rest,
         ...(harvestDate ? { harvestDate: new Date(harvestDate) } : {}),
         ...(productUpdate ?? {}),
+        ...(quantityKg !== undefined ? { quantityKg } : {}),
+        updatedAt: new Date(),
       },
       include: { category: true, product: { include: { defaultUnit: true } } },
     });
 
-    return this.shapeListing(updated);
+    return this.shapeListingWithReservation(updated);
   }
 
   async withdrawListing(userId: string, listingId: string) {
@@ -332,10 +433,18 @@ export class MarketplaceService {
       throw new BadRequestException('Only active listings can be withdrawn');
     }
 
-    const updated = await this.prisma.listing.update({
-      where: { id: listingId },
-      data: { status: 'CANCELLED' },
-      include: { category: true, product: { include: { defaultUnit: true } } },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await this.reservations.releaseActiveListingReservationTx(
+        tx,
+        listingId,
+        userId,
+        'Listing withdrawn',
+      );
+      return tx.listing.update({
+        where: { id: listingId },
+        data: { status: 'CANCELLED' },
+        include: { category: true, product: { include: { defaultUnit: true } } },
+      });
     });
 
     return this.shapeListing(updated);
@@ -400,6 +509,8 @@ export class MarketplaceService {
       id: listing.id,
       ...this.shapeCategoryFields(listing),
       ...this.shapeProductFields(listing),
+      stockLotId: listing.stockLotId ?? null,
+      farmId: listing.farmId ?? null,
       region: listing.region,
       regionEn: listing.regionEn,
       woreda: listing.woreda,
@@ -448,5 +559,30 @@ export class MarketplaceService {
     }
 
     return base;
+  }
+
+  private async shapeListingWithReservation(listing: any, opts: Parameters<MarketplaceService['shapeListing']>[1] = {}) {
+    const shaped = this.shapeListing(listing, opts);
+    if (!listing?.id) return shaped;
+    const reservation = await this.prisma.reservation.findFirst({
+      where: {
+        listingId: listing.id,
+        status: { in: ['ACTIVE', 'ORDER_HELD'] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return {
+      ...shaped,
+      reservation: reservation
+        ? {
+            id: reservation.id,
+            status: reservation.status,
+            qty: toNumber(reservation.qty),
+            unitCode: reservation.unitCode,
+            lotId: reservation.lotId,
+            orderId: reservation.orderId,
+          }
+        : null,
+    };
   }
 }

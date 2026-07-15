@@ -35,6 +35,20 @@ phone + SMS OTP authentication flow ported from `nahu-buna-gebaya`.
 
   and it will work normally.
 
+## Phase 4.4 — Listing ↔ stock
+
+Design: `docs/07-decisions/phase-4.4-listing-stock-design.md` (**Approved** — Option B).
+
+SQL: `database/migrations/inventory/007_inventory_reservations_listing_bind.sql`.
+
+Additive behaviour:
+- `POST /listings` optional `stockLotId` → ACTIVE reservation + RESERVE movement
+- Withdraw / qty edit adjust reservations
+- Orders use Option B (`ORDER_HELD`); on_hand unchanged until Phase 5 DISPATCH
+- `GET /inventory/lots/:lotId/reservations`, `GET /inventory/reservations?listingId=`, `POST /inventory/reservations/:id/release`
+
+Unit tests: `pnpm --filter @nahu-platform/api test:reservations-rules`
+
 ## Phase 4.3 — Warehouse readiness
 
 Design: `docs/07-decisions/phase-4.3-warehouse-design.md` (**Approved**).
