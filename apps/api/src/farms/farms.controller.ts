@@ -1,21 +1,33 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { FarmsService } from './farms.service';
+import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard, Roles } from '../common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../common/jwt-payload.interface';
 import { CreateFarmDto, QueryFarmsDto, UpdateFarmDto } from './dto/farm.dto';
 import { CreatePlotDto, UpdatePlotDto } from './dto/plot.dto';
+import { QueryDashboardDto } from './dto/dashboard.dto';
 
 @Controller('farms')
 export class FarmsController {
-  constructor(private readonly farms: FarmsService) {}
+  constructor(
+    private readonly farms: FarmsService,
+    private readonly dashboard: DashboardService,
+  ) {}
 
   @Get('mine')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('FARMER')
   listMine(@CurrentUser() user: JwtPayload, @Query() query: QueryFarmsDto) {
     return this.farms.listMine(user.userId, query);
+  }
+
+  @Get('dashboard')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('FARMER')
+  getDashboard(@CurrentUser() user: JwtPayload, @Query() query: QueryDashboardDto) {
+    return this.dashboard.getDashboard(user.userId, query);
   }
 
   @Post()

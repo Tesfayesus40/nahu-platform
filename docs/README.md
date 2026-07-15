@@ -62,8 +62,9 @@ Present: `07-decisions/` (design proposals awaiting or recording approval).
 | [Phase 4.3 — Warehouse design](07-decisions/phase-4.3-warehouse-design.md) | **Closed** — staging + Farmer M7 on-device (Warehouse complete); production held |
 | [Phase 4.4 — Listing ↔ stock design](07-decisions/phase-4.4-listing-stock-design.md) | **Approved** — implementation authorized; production held |
 | [Phase 4.5 — Production planning design](07-decisions/phase-4.5-production-planning-design.md) | **Closed** v1.1 — staging + Farmer M10 on-device (Amharic packaged); production held |
-| [Phase 4.6 — Dashboards design](07-decisions/phase-4.6-dashboards-design.md) | **Draft** — product decisions locked; design review only; no implementation |
+| [Phase 4.6 — Dashboards design](07-decisions/phase-4.6-dashboards-design.md) | **Closed** v1.3 — staging + Farmer M11 on-device; production held |
 | [Phase 4.5 — On-device smoke](08-guides/phase-4.5-on-device-smoke.md) | M10 staging smoke checklist (passed) |
+| [Phase 4.6 — On-device smoke](08-guides/phase-4.6-on-device-smoke.md) | M11 staging smoke checklist (passed) |
 | [Backend ↔ Mobile feature mapping](backend-mobile-feature-mapping.md) | Capability matrix (Farmer/Buyer vs Nest modules) |
 
 ---
@@ -117,7 +118,7 @@ Incremental evolution toward the enterprise architecture (preserve existing coff
 | 1 | Repository stabilization — cleanup, documentation, CI | Done |
 | 2 | Nahu Farms generalization — multi-commodity marketplace (coffee first) | Done |
 | 3 | Product catalog | **Done** (staging validated; milestone tagged) |
-| 4 | Farmer Platform (Nahu Farm) — farms, inventory, warehouse readiness, production planning, dashboards | **4.1–4.5 closed/approved on staging**; **4.6 Dashboards** design draft (review only); production Nest cutover held |
+| 4 | Farmer Platform (Nahu Farm) — farms, inventory, warehouse readiness, production planning, dashboards | **4.1–4.6 closed on staging**; production Nest cutover held |
 | 5 | Nahu Delivery | Planned |
 
 **Stable milestone:** Phase 3 Catalog + Phase 4.1 Farms + Phase 4.2 Inventory — Farmer staging APK validated 2026-07-15 (`milestone-phase-4.2`). Production Nest/mobile cutover remains held until explicit approval. See `docs/07-decisions/`.

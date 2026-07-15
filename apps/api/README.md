@@ -35,6 +35,17 @@ phone + SMS OTP authentication flow ported from `nahu-buna-gebaya`.
 
   and it will work normally.
 
+## Phase 4.6 — Farmer dashboard
+
+Design: `docs/07-decisions/phase-4.6-dashboards-design.md` (**Closed** v1.3 — staging + Farmer M11; production held).
+
+No new transactional tables. Single response optimized for mobile:
+
+- `GET /api/v1/farms/dashboard` (optional `farmId`, `seasonYear`, `seasonCode`, `productLimit`)
+- Sections: `farm` · `inventory` · `marketplace` (listings + nested orders) · `production` · `alerts`
+- Money / escrow omitted (Earnings remains elsewhere)
+- Unit tests: `pnpm --filter @nahu-platform/api test:dashboard-rules`
+
 ## Phase 4.5 — Production planning
 
 Design: `docs/07-decisions/phase-4.5-production-planning-design.md` (**Closed** v1.1 — staging + Farmer M10; production held).

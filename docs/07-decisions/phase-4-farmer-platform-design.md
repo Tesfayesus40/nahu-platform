@@ -178,7 +178,7 @@ Phase 4 is a **program**. Ship in slices; each slice: design approve → SQL →
 | **4.3** | Warehouse readiness | Storage sites; assign lots to sites; coop site type | Design draft — [phase-4.3-warehouse-design.md](phase-4.3-warehouse-design.md) |
 | **4.4** | Listing ↔ stock (optional bind) | Nullable reservation; create listing can deduct/reserve | M |
 | **4.5** | Production planning | Seasons + plan lines; plan vs actual (from movements) — [**Closed** on staging + M10](phase-4.5-production-planning-design.md) | M |
-| **4.6** | Dashboards & analytics | Farmer home summary API; stock & sales & plan KPIs | M |
+| **4.6** | Dashboards & analytics | Farmer home summary API; stock & sales & plan KPIs — [**Closed** on staging + M11](phase-4.6-dashboards-design.md) | M |
 
 **Recommended first implementation after this doc is approved:** **4.0 + 4.1** (farms) **then 4.2** (inventory). Warehouse and planning build on stock. Dashboards last so they read real data.
 
