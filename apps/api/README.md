@@ -35,6 +35,26 @@ phone + SMS OTP authentication flow ported from `nahu-buna-gebaya`.
 
   and it will work normally.
 
+## Phase 4.5 — Production planning
+
+Design: `docs/07-decisions/phase-4.5-production-planning-design.md` (**Closed** v1.1 — staging + Farmer M10; production held).
+
+SQL: `database/migrations/farms/007_farms_production_planning.sql`, `database/migrations/inventory/008_inventory_cropping_cycle_fk.sql`.
+
+Routes (FARMER auth):
+- `GET /api/v1/season-codes`
+- `GET|POST /api/v1/farms/:farmId/cropping-cycles`
+- `GET /api/v1/farms/:farmId/production-history`
+- `GET|PATCH /api/v1/cropping-cycles/:id`
+- `POST /api/v1/cropping-cycles/:id/plan|start|mark-harvested|complete|cancel|archive`
+- `GET /api/v1/cropping-cycles/:id/performance`
+- `POST /api/v1/cropping-cycles/:id/lines`
+- `PATCH|DELETE /api/v1/cropping-cycle-lines/:lineId`
+
+Inventory: optional `croppingCycleId` / `cycleLineId` on `POST /inventory/receive` (multiple harvest events per line supported).
+
+Unit tests: `pnpm --filter @nahu-platform/api test:cropping-cycles-rules`
+
 ## Phase 4.4 — Listing ↔ stock
 
 Design: `docs/07-decisions/phase-4.4-listing-stock-design.md` (**Approved** — Option B).
@@ -91,7 +111,7 @@ Design: `docs/07-decisions/phase-4.1-farm-management-design.md` (Approved v1.2).
 
 SQL: `database/migrations/farms/001`–`006`.
 
-Domain rule: **Farms do not own Products.** Listings reference `catalog.products`; farms are production places. Season/cropping cycles are reserved for Phase 4.5.
+Domain rule: **Farms do not own Products.** Listings reference `catalog.products`; farms are production places. Season/cropping cycles: see Phase 4.5.
 
 Routes (FARMER auth):
 - `GET /api/v1/farms/mine`

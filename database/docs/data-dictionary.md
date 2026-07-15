@@ -76,10 +76,12 @@ Schema: `farms`
 | `plots` / `fields` / `production_units` | Hierarchy |
 | `farm_translations` | Extra locales |
 | `farm_party_history` / `farm_audit_log` | History & audit |
+| `season_codes` | Configurable season catalog (regional expansion via rows) |
+| `cropping_cycles` / `cropping_cycle_lines` | Production plans; actuals from inventory RECEIVE |
 
-Products remain in `catalog`. Listings reference products. Season/cropping cycles planned in Phase 4.5.
+Products remain in `catalog`. Listings reference products. Production planning: Phase 4.5.
 
-Authoritative design: `docs/07-decisions/phase-4.1-farm-management-design.md`.
+Authoritative design: `docs/07-decisions/phase-4.1-farm-management-design.md`, `docs/07-decisions/phase-4.5-production-planning-design.md`.
 
 ---
 
@@ -89,7 +91,7 @@ Schema: `inventory`
 
 | Table | Purpose |
 |-------|---------|
-| `stock_lots` | Traceable product batches at a farm; optional `storage_site_id` |
+| `stock_lots` | Traceable product batches at a farm; optional `storage_site_id`, optional `cropping_cycle_id` / `cropping_cycle_line_id` |
 | `stock_movements` | Append-only ledger (includes `RELOCATE`; optional from/to site columns) |
 | `reservations` | Soft holds (API in 4.4) |
 

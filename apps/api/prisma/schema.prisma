@@ -215,13 +215,14 @@ model Unit {
   dimension String    @db.VarChar(20)
   sortOrder Int       @default(0) @map("sort_order") @db.SmallInt
 
-  products          Product[]
-  conversionsFrom   UnitConversion[] @relation("ConversionFrom")
-  conversionsTo     UnitConversion[] @relation("ConversionTo")
-  stockLots         StockLot[]
-  stockMovements    StockMovement[]
-  reservations      Reservation[]
-  storageSites      StorageSite[]
+  products            Product[]
+  conversionsFrom     UnitConversion[] @relation("ConversionFrom")
+  conversionsTo       UnitConversion[] @relation("ConversionTo")
+  stockLots           StockLot[]
+  stockMovements      StockMovement[]
+  reservations        Reservation[]
+  storageSites        StorageSite[]
+  croppingCycleLines  CroppingCycleLine[]
 
   @@map("units")
   @@schema("catalog")
@@ -261,8 +262,9 @@ model Product {
   defaultUnit      Unit               @relation(fields: [defaultUnitCode], references: [code], onDelete: Restrict)
   varieties        ProductVariety[]
   translations     ProductTranslation[]
-  listings         Listing[]
-  stockLots        StockLot[]
+  listings           Listing[]
+  stockLots          StockLot[]
+  croppingCycleLines CroppingCycleLine[]
 
   @@index([categoryId])
   @@index([status])
@@ -281,8 +283,9 @@ model ProductVariety {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
 
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  stockLots StockLot[]
+  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stockLots          StockLot[]
+  croppingCycleLines CroppingCycleLine[]
 
   @@unique([productId, code])
   @@index([productId])
@@ -586,9 +589,24 @@ enum FarmAuditEntityType {
   FIELD
   PARTY
   PRODUCTION_UNIT
+  CROPPING_CYCLE
+  CROPPING_CYCLE_LINE
 
   @@schema("farms")
   @@map("audit_entity_type")
+}
+
+enum CroppingCycleStatus {
+  DRAFT
+  PLANNED
+  IN_PROGRESS
+  HARVESTED
+  COMPLETED
+  CANCELLED
+  ARCHIVED
+
+  @@schema("farms")
+  @@map("cropping_cycle_status")
 }
 
 enum FarmAuditAction {
@@ -636,6 +654,7 @@ model Farm {
   stockLots         StockLot[]
   storageSites      StorageSite[]
   listings          Listing[]
+  croppingCycles    CroppingCycle[]
 
   @@index([status])
   @@index([cooperativeId])
@@ -689,6 +708,7 @@ model Plot {
   fields            Field[]
   productionUnits   ProductionUnit[]
   stockLots         StockLot[]
+  croppingCycles    CroppingCycle[]
 
   @@index([farmId])
   @@map("plots")
@@ -714,6 +734,7 @@ model Field {
 
   plot              Plot             @relation(fields: [plotId], references: [id], onDelete: Cascade)
   productionUnits   ProductionUnit[]
+  croppingCycles    CroppingCycle[]
 
   @@index([plotId])
   @@map("fields")
@@ -740,9 +761,88 @@ model ProductionUnit {
   farm            Farm               @relation(fields: [farmId], references: [id], onDelete: Cascade)
   plot            Plot?              @relation(fields: [plotId], references: [id], onDelete: SetNull)
   field           Field?             @relation(fields: [fieldId], references: [id], onDelete: SetNull)
+  croppingCycles  CroppingCycle[]
 
   @@index([farmId])
   @@map("production_units")
+  @@schema("farms")
+}
+
+model SeasonCode {
+  code        String   @id @db.VarChar(40)
+  name        String   @db.VarChar(100)
+  nameAm      String?  @map("name_am") @db.VarChar(100)
+  regionHint  String?  @map("region_hint") @db.VarChar(40)
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  croppingCycles CroppingCycle[]
+
+  @@map("season_codes")
+  @@schema("farms")
+}
+
+model CroppingCycle {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  farmId            String              @map("farm_id") @db.Uuid
+  plotId            String?             @map("plot_id") @db.Uuid
+  fieldId           String?             @map("field_id") @db.Uuid
+  productionUnitId  String?             @map("production_unit_id") @db.Uuid
+  code              String?             @db.VarChar(40)
+  name              String              @db.VarChar(150)
+  nameAm            String?             @map("name_am") @db.VarChar(150)
+  seasonYear        Int                 @map("season_year")
+  seasonCode        String              @map("season_code") @db.VarChar(40)
+  startsOn          DateTime            @map("starts_on") @db.Date
+  endsOn            DateTime            @map("ends_on") @db.Date
+  status            CroppingCycleStatus @default(DRAFT)
+  notes             String?
+  metadata          Json?
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime            @default(now()) @map("updated_at") @db.Timestamptz
+
+  farm              Farm                @relation(fields: [farmId], references: [id], onDelete: Restrict)
+  plot              Plot?               @relation(fields: [plotId], references: [id], onDelete: SetNull)
+  field             Field?              @relation(fields: [fieldId], references: [id], onDelete: SetNull)
+  productionUnit    ProductionUnit?     @relation(fields: [productionUnitId], references: [id], onDelete: SetNull)
+  season            SeasonCode          @relation(fields: [seasonCode], references: [code], onDelete: Restrict)
+  lines             CroppingCycleLine[]
+  stockLots         StockLot[]
+
+  @@index([farmId])
+  @@index([status])
+  @@index([farmId, seasonYear, seasonCode])
+  @@map("cropping_cycles")
+  @@schema("farms")
+}
+
+model CroppingCycleLine {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cycleId          String    @map("cycle_id") @db.Uuid
+  productId        String    @map("product_id") @db.Uuid
+  productVarietyId String?   @map("product_variety_id") @db.Uuid
+  plannedQty       Decimal   @map("planned_qty") @db.Decimal(14, 3)
+  unitCode         String    @map("unit_code") @db.VarChar(20)
+  plannedAreaHa    Decimal?  @map("planned_area_ha") @db.Decimal(10, 2)
+  sortOrder        Int       @default(0) @map("sort_order")
+  notes            String?
+  metadata         Json?
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  cycle            CroppingCycle  @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  product          Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productVariety   ProductVariety? @relation(fields: [productVarietyId], references: [id], onDelete: SetNull)
+  unit             Unit           @relation(fields: [unitCode], references: [code], onDelete: Restrict)
+  stockLots        StockLot[]
+
+  @@unique([cycleId, productId])
+  @@index([productId])
+  @@index([cycleId])
+  @@map("cropping_cycle_lines")
   @@schema("farms")
 }
 
@@ -857,36 +957,42 @@ model StockLot {
   productVarietyId String?       @map("product_variety_id") @db.Uuid
   farmId           String        @map("farm_id") @db.Uuid
   plotId           String?       @map("plot_id") @db.Uuid
-  storageSiteId    String?       @map("storage_site_id") @db.Uuid
-  storageLabel     String?       @map("storage_label") @db.VarChar(150)
-  unitCode         String        @map("unit_code") @db.VarChar(20)
-  quantityOnHand   Decimal       @default(0) @map("quantity_on_hand") @db.Decimal(14, 3)
-  quantityReserved Decimal       @default(0) @map("quantity_reserved") @db.Decimal(14, 3)
-  status           LotStatus     @default(AVAILABLE)
-  sourceType       LotSourceType @default(HARVEST) @map("source_type")
-  harvestDate      DateTime?     @map("harvest_date") @db.Date
-  receivedAt       DateTime      @default(now()) @map("received_at") @db.Timestamptz
-  expiresOn        DateTime?     @map("expires_on") @db.Date
-  qualityNote      String?       @map("quality_note")
-  externalRef      String?       @map("external_ref") @db.VarChar(100)
-  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime      @default(now()) @map("updated_at") @db.Timestamptz
+  storageSiteId       String?       @map("storage_site_id") @db.Uuid
+  storageLabel        String?       @map("storage_label") @db.VarChar(150)
+  unitCode            String        @map("unit_code") @db.VarChar(20)
+  quantityOnHand      Decimal       @default(0) @map("quantity_on_hand") @db.Decimal(14, 3)
+  quantityReserved    Decimal       @default(0) @map("quantity_reserved") @db.Decimal(14, 3)
+  status              LotStatus     @default(AVAILABLE)
+  sourceType          LotSourceType @default(HARVEST) @map("source_type")
+  harvestDate         DateTime?     @map("harvest_date") @db.Date
+  receivedAt          DateTime      @default(now()) @map("received_at") @db.Timestamptz
+  expiresOn           DateTime?     @map("expires_on") @db.Date
+  qualityNote         String?       @map("quality_note")
+  externalRef         String?       @map("external_ref") @db.VarChar(100)
+  croppingCycleId     String?       @map("cropping_cycle_id") @db.Uuid
+  croppingCycleLineId String?       @map("cropping_cycle_line_id") @db.Uuid
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime      @default(now()) @map("updated_at") @db.Timestamptz
 
-  product          Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
-  productVariety   ProductVariety? @relation(fields: [productVarietyId], references: [id], onDelete: SetNull)
-  farm             Farm            @relation(fields: [farmId], references: [id], onDelete: Restrict)
-  plot             Plot?           @relation(fields: [plotId], references: [id], onDelete: SetNull)
-  storageSite      StorageSite?    @relation(fields: [storageSiteId], references: [id], onDelete: SetNull)
-  unit             Unit            @relation(fields: [unitCode], references: [code], onDelete: Restrict)
-  movements        StockMovement[]
-  reservations     Reservation[]
-  listings         Listing[]
+  product             Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productVariety      ProductVariety?   @relation(fields: [productVarietyId], references: [id], onDelete: SetNull)
+  farm                Farm              @relation(fields: [farmId], references: [id], onDelete: Restrict)
+  plot                Plot?             @relation(fields: [plotId], references: [id], onDelete: SetNull)
+  storageSite         StorageSite?      @relation(fields: [storageSiteId], references: [id], onDelete: SetNull)
+  unit                Unit              @relation(fields: [unitCode], references: [code], onDelete: Restrict)
+  croppingCycle       CroppingCycle?    @relation(fields: [croppingCycleId], references: [id], onDelete: SetNull)
+  croppingCycleLine   CroppingCycleLine? @relation(fields: [croppingCycleLineId], references: [id], onDelete: SetNull)
+  movements           StockMovement[]
+  reservations        Reservation[]
+  listings            Listing[]
 
   @@unique([farmId, lotCode])
   @@index([farmId])
   @@index([productId])
   @@index([status])
   @@index([storageSiteId])
+  @@index([croppingCycleId])
+  @@index([croppingCycleLineId])
   @@map("stock_lots")
   @@schema("inventory")
 }
