@@ -1,12 +1,12 @@
 # Phase 4.2 — Inventory Design
 
-**Status:** Approved — implementation authorized  
-**Date:** 2026-07-15 (approved same day)  
+**Status:** **Closed** — implemented on staging; Farmer mobile Inventory screens validated (APK staging, 2026-07-15)  
+**Date:** 2026-07-15 (approved same day; closeout same day)  
 **Parent:** [Phase 4 — Farmer Platform](phase-4-farmer-platform-design.md) (Approved)  
 **Depends on:** Phase 3 Product Catalog · Phase 4.1 Farm Management (merged / milestone-tagged)  
-**Next after this slice:** 4.3 Warehouse readiness · 4.4 Listing↔stock (optional)
+**Next after this slice:** [4.3 Warehouse readiness](phase-4.3-warehouse-design.md) (design draft) · 4.4 Listing↔stock (optional)
 
-**Implementation gate:** Authorized — SQL → Prisma → API → Tests → Docs → Staging → Validation → Production (separate promotion)
+**Implementation gate:** Complete for staging. **Production promotion** of Nest inventory remains a **separate explicit approval**.
 
 ---
 

@@ -15,7 +15,7 @@ Expose completed Nest capabilities in the **Farmer** app first, then resume back
 | **M2** Product picker | **Done** (New / Edit listing → `GET /products`) |
 | **M3** Farm management screens | **Done** (Settings → My Farms) |
 | **M4** Inventory screens | **Done** (Settings → Inventory / receive / lot movements) |
-| Phase **4.3 Warehouse** (architecture-first) | **Next** after staging validation of M0–M4 |
+| Phase **4.3 Warehouse** (architecture-first) | **Design draft** — awaiting approval; Farmer staging APK M0–M4 **validated** |
 
 **Production:** Nest production URL and EAS `production` profile stay unchanged until new mobile functionality is validated on **staging**. Canonical Farmer notes: `nahu-buna-farmer/MOBILE_NEST.md`.
 
@@ -72,82 +72,92 @@ Expose completed Nest capabilities in the **Farmer** app first, then resume back
 | Farmer profile CRUD (`/farmers/profile`) | Done | ✅ | — | Profile setup when missing |
 | Public farmer profile / cooperatives list | Done | 🟡 | 🟡 | Cooperatives rarely used in UI |
 | Browse listings (`GET /listings`, `GET /listings/:id`) | Done | ✅ (mine/home) | ✅ | Coffee-first UX |
-| Create listing (`POST /listings`) | Done | ✅ | — | Defaults `product`/`category` to coffee when omitted |
-| Update / withdraw listing (`PATCH`/`DELETE`) | Done | 🟡 | — | Edit/delete historically incomplete in app clients |
-| Listing photo upload (`POST /uploads/listing-photo`) | Done | 🟡 | — | No upload client in inspected apps |
-| Category / product on listing (optional body fields) | Done | 🟡 | 🟡 | Additive fields; apps do not pick products yet |
+| Create listing (`POST /listings`) | Done | ✅ | — | Product chips; still coffee-heavy grade/process fields |
+| Update / withdraw listing (`PATCH`/`DELETE`) | Done | ✅ | — | EditListingScreen |
+| Listing photo upload (`POST /uploads/listing-photo`) | Done | ✅ | — | ListingPhotoPicker |
+| Category / product on listing body | Done | ✅ | 🟡 | Farmer sends codes; Buyer does not filter by product yet |
 
 ### Product Catalog
 
 | Backend | Maturity | Farmer | Buyer | Notes |
 |---------|----------|--------|-------|-------|
-| `GET /categories` | Done (Phase 2/3) | 🟡 | 🟡 | Apps do not call categories; coffee constants in UI |
-| `GET /products`, `GET /products/:codeOrId` | Done (Phase 3) | 🟡 | 🟡 | Backend defaults listing product when mobile omits `productCode` |
-| Multi-commodity sell/browse UX | Catalog ready | 🔵 | 🔵 | Wait for product picker + buyer filters when business needs a second category |
+| `GET /categories` | Done | 🟡 | 🟡 | Client helper exists on Farmer; little UI |
+| `GET /products` | Done | ✅ | 🟡 | Farmer product chips (often Coffee only today) |
+| Multi-commodity sell/browse UX | Catalog ready | 🔵 | 🔵 | Needs more ACTIVE products + Buyer filters |
 
 ### Farm Management (Phase 4.1)
 
 | Backend | Maturity | Farmer | Buyer | Notes |
 |---------|----------|--------|-------|-------|
-| Farms CRUD + `GET /farms/mine` | Done (staging) | 🟡 | — | Design explicitly API-first; no farm screens yet |
-| Plots under farm | Done (staging) | 🟡 | — | Same |
-| Hierarchy Field / PU / full GeoJSON UX | Partial API | 🔵 | — | Do not over-build UI beyond what operators need |
+| Farms CRUD + `GET /farms/mine` | Done (staging) | ✅ | — | Settings → My Farms |
+| Plots under farm | Done (staging) | ✅ | — | Farm detail / plot form |
+| Hierarchy Field / PU / full GeoJSON UX | Partial API | 🔵 | — | Deferred |
 
 ### Inventory (Phase 4.2)
 
 | Backend | Maturity | Farmer | Buyer | Notes |
 |---------|----------|--------|-------|-------|
-| Receive / movements / lots / balances | Done (staging; not production-promoted) | 🟡 | — | No inventory screens; listing↔stock bind is Phase **4.4** |
-| Reservations wired to listings | Schema stub | 🔵 | 🔵 | Wait for 4.4 before mobile “sell from lot” |
+| Receive / movements / lots / balances | Done (staging) | ✅ | — | Settings → Inventory |
+| Reservations wired to listings | Schema stub | 🔵 | 🔵 | Phase **4.4** |
 
 ### Orders
 
 | Backend | Maturity | Farmer | Buyer | Notes |
 |---------|----------|--------|-------|-------|
 | Create order | Done | — | ✅ | Checkout |
-| List my orders / get by id | Done | ✅ | ✅ | Farmer: mostly read-only list |
-| Confirm payment (escrow simulation) | Done | — | ✅ | Telebirr PIN screen → `PATCH …/confirm-payment` |
-| Confirm delivery | Done | — | ✅ | Buyer orders UI |
-| Cancel / decline / dispute / update address | Done | 🟡 | 🟡 | APIs exist; limited or no mobile actions |
+| List my orders / get by id | Done | ✅ | ✅ | |
+| Confirm payment (escrow simulation) | Done | — | ✅ | Payment screens |
+| Confirm delivery | Done | — | ✅ | |
+| Cancel / decline / dispute / update address | Done | 🟡 | 🟡 | APIs + partial client helpers |
 
 ### Payments
 
 | Backend | Maturity | Farmer | Buyer | Notes |
 |---------|----------|--------|-------|-------|
-| Escrow confirm via order endpoint | Done (simulated) | — | ✅ | Demo Telebirr flow |
-| `GET /payments/methods` | Done (static catalog) | — | 🟡 | Checkout hardcodes methods; does not load catalog |
-| Live Telebirr / CBE / webhooks | Not built | 🔵 | 🔵 | Do not design production payment UI until provider integration land |
+| Escrow confirm via order endpoint | Done (simulated) | — | ✅ | |
+| `GET /payments/methods` | Done | — | 🟡 | Client helper exists; UI may still hardcode |
+| Live Telebirr / CBE / webhooks | Not built | 🔵 | 🔵 | |
 
 ### Certificates
 
 | Backend | Maturity | Farmer | Buyer | Notes |
 |---------|----------|--------|-------|-------|
-| Certificate by order / public verify | Done | 🟡 | ✅ | Buyer certificate screen; farmer rarely surfaces certs |
+| Certificate by order / public verify | Done | 🟡 | ✅ | Buyer Certificate screen |
 
 ### AI Advisory
 
 | Backend | Maturity | Farmer | Buyer | Notes |
 |---------|----------|--------|-------|-------|
-| `POST /advisory/ask` | Done | ✅ | — | Chat UI |
-| `GET /advisory/price-alert/:region` | Done | ✅ | — | Used from advisory screen |
-| Services / weather / disease / harvest tips | Done | 🟡 | — | Not wired in inspected UI |
-| Farm/inventory-aware advisory | Future | 🔵 | — | Better after farms + stock are used in mobile |
+| `POST /advisory/ask` | Done | ✅ | — | |
+| `GET /advisory/price-alert/:region` | Done | ✅ | — | |
+| Services / weather / disease / harvest tips | Done | 🟡 | — | Helpers exist; limited UI |
+| Farm/inventory-aware advisory | Future | 🔵 | — | |
+
+### Warehouse (Phase 4.3)
+
+| Backend | Maturity | Farmer | Buyer | Notes |
+|---------|----------|--------|-------|-------|
+| Storage sites / WMS readiness | Not started | 🔵 | — | Next backend design after mobile staging validation |
 
 ---
 
-## 2. Summary matrix
+## 2. Summary matrix (current apps)
 
-| Capability | Backend | Farmer app | Buyer app |
-|------------|---------|------------|-----------|
-| Identity | Done | ✅ OTP login · 🟡 `/me` | ✅ OTP login · 🟡 `/me` |
-| Marketplace | Done | ✅ core sell flow · 🟡 edit/upload/product pick | ✅ browse + detail |
-| Product Catalog | Done (staging) | 🟡 | 🟡 |
-| Farm Management | Done (staging) | 🟡 | — |
-| Inventory | Done (staging) | 🟡 | — |
-| Orders | Done | ✅ list · 🟡 actions | ✅ create/pay/delivery · 🟡 cancel/dispute |
-| Payments | Partial (catalog + sim) | — | ✅ sim · 🔵 live |
-| Certificates | Done | 🟡 | ✅ |
-| AI Advisory | Done | ✅ ask/prices · 🟡 extras | — |
+| Backend module | Nest status | Farmer app | Buyer app | Planned role of each app |
+|----------------|-------------|------------|-----------|---------------------------|
+| **Identity** | Done | ✅ Login (+ `/me` refresh) | ✅ Login (+ `/me` refresh) | Auth for both roles |
+| **Marketplace** | Done | ✅ Sell: profile, list, edit, photos | ✅ Buy: browse, detail | Farmer = offer; Buyer = discover |
+| **Product Catalog** | Done | ✅ Product picker on listing | 🟡 No product filter yet | Farmer selects what they sell; Buyer will filter later |
+| **Farm Management** | Done (staging) | ✅ My Farms / plots | — | **Farmer-only** production place |
+| **Inventory** | Done (staging) | ✅ Stock receive / balances / lots | — | **Farmer-only** stock ops |
+| **Warehouse** | 🔵 Planned (4.3) | 🔵 | — | Later Farmer (storage sites) |
+| **Orders** | Done | ✅ See sales / some actions | ✅ Create, pay, delivery | Farmer fulfills; Buyer purchases |
+| **Payments** | Partial (sim) | — | ✅ Simulated escrow pay | **Buyer-led**; live rails later |
+| **Certificates** | Done | 🟡 | ✅ Origin cert after order | **Buyer-facing** proof; Farmer optional later |
+| **AI Advisory** | Done | ✅ Ask + prices | — | **Farmer-facing** agronomy / market advice |
+| **Uploads** | Done | ✅ Listing photos | — | Farmer media |
+
+Legend: ✅ exposed in UI · 🟡 API/helpers only or partial · 🔵 planned · — not for that role
 
 ---
 

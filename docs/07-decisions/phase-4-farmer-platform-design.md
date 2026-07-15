@@ -174,8 +174,8 @@ Phase 4 is a **program**. Ship in slices; each slice: design approve → SQL →
 |-----------|------|---------|--------|
 | **4.0** | Foundations | Schemas `farms` / `inventory` / `warehouse` stubs; module boundaries; farmer ownership rules | S |
 | **4.1** | Farm management | CRUD farms (+ optional plots); list “my farms” | M |
-| **4.2** | Inventory core | Stock lots + movements; coffee product; balance APIs | M–L |
-| **4.3** | Warehouse readiness | Storage sites; assign lots to sites; coop site type | M |
+| **4.2** | Inventory core | Stock lots + movements; coffee product; balance APIs | **Closed** (staging + Farmer APK) |
+| **4.3** | Warehouse readiness | Storage sites; assign lots to sites; coop site type | Design draft — [phase-4.3-warehouse-design.md](phase-4.3-warehouse-design.md) |
 | **4.4** | Listing ↔ stock (optional bind) | Nullable reservation; create listing can deduct/reserve | M |
 | **4.5** | Production planning | Seasons + plan lines; plan vs actual (from movements) | M |
 | **4.6** | Dashboards & analytics | Farmer home summary API; stock & sales & plan KPIs | M |
