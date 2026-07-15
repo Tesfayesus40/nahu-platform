@@ -35,6 +35,7 @@ It is the primary reference for:
 | Geography | Regions, zones, woredas, kebeles |
 | Agricultural Catalog | See below |
 | Farms (Nahu Farm) | Farm holdings, parties, plots/fields/production units (Phase 4.1) |
+| Inventory | Stock lots and movements for catalog products (Phase 4.2) |
 | Marketplace | Listings and offers |
 | Orders | Buying and selling |
 | Payments | Transactions |
@@ -79,6 +80,22 @@ Schema: `farms`
 Products remain in `catalog`. Listings reference products. Season/cropping cycles planned in Phase 4.5.
 
 Authoritative design: `docs/07-decisions/phase-4.1-farm-management-design.md`.
+
+---
+
+# Inventory (Phase 4.2)
+
+Schema: `inventory`
+
+| Table | Purpose |
+|-------|---------|
+| `stock_lots` | Traceable product batches at a farm |
+| `stock_movements` | Append-only ledger |
+| `reservations` | Soft holds (API in 4.4) |
+
+Also: `catalog.unit_conversions` for same-dimension unit factors.
+
+Authoritative design: `docs/07-decisions/phase-4.2-inventory-design.md`.
 | Logistics | Transportation |
 | Messaging | Chat system |
 | AI | Intelligent services |

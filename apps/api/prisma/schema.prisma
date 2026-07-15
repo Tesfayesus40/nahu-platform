@@ -12,7 +12,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["identity", "catalog", "marketplace", "orders", "farms"]
+  schemas  = ["identity", "catalog", "marketplace", "orders", "farms", "inventory"]
 }
 
 enum UserStatus {
@@ -215,9 +215,28 @@ model Unit {
   dimension String    @db.VarChar(20)
   sortOrder Int       @default(0) @map("sort_order") @db.SmallInt
 
-  products  Product[]
+  products          Product[]
+  conversionsFrom   UnitConversion[] @relation("ConversionFrom")
+  conversionsTo     UnitConversion[] @relation("ConversionTo")
+  stockLots         StockLot[]
+  stockMovements    StockMovement[]
+  reservations      Reservation[]
 
   @@map("units")
+  @@schema("catalog")
+}
+
+model UnitConversion {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fromUnitCode String  @map("from_unit_code") @db.VarChar(20)
+  toUnitCode   String  @map("to_unit_code") @db.VarChar(20)
+  factor       Decimal @db.Decimal(18, 6)
+
+  fromUnit     Unit    @relation("ConversionFrom", fields: [fromUnitCode], references: [code], onDelete: Restrict)
+  toUnit       Unit    @relation("ConversionTo", fields: [toUnitCode], references: [code], onDelete: Restrict)
+
+  @@unique([fromUnitCode, toUnitCode])
+  @@map("unit_conversions")
   @@schema("catalog")
 }
 
@@ -242,6 +261,7 @@ model Product {
   varieties        ProductVariety[]
   translations     ProductTranslation[]
   listings         Listing[]
+  stockLots        StockLot[]
 
   @@index([categoryId])
   @@index([status])
@@ -261,6 +281,7 @@ model ProductVariety {
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
 
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stockLots StockLot[]
 
   @@unique([productId, code])
   @@index([productId])
@@ -600,6 +621,7 @@ model Farm {
   translations      FarmTranslation[]
   partyHistory      FarmPartyHistory[]
   auditLogs         FarmAuditLog[]
+  stockLots         StockLot[]
 
   @@index([status])
   @@index([cooperativeId])
@@ -652,6 +674,7 @@ model Plot {
   farm              Farm             @relation(fields: [farmId], references: [id], onDelete: Cascade)
   fields            Field[]
   productionUnits   ProductionUnit[]
+  stockLots         StockLot[]
 
   @@index([farmId])
   @@map("plots")
@@ -763,4 +786,134 @@ model FarmAuditLog {
   @@index([entityType, entityId])
   @@map("farm_audit_log")
   @@schema("farms")
+}
+
+// ============================================================================
+// Inventory module (Phase 4.2)
+// Maps database/migrations/inventory/001..005 + catalog/009_unit_conversions
+// ============================================================================
+
+enum LotStatus {
+  RECEIVED
+  AVAILABLE
+  RESERVED
+  QUARANTINE
+  DAMAGED
+  EXPIRED
+  SOLD
+  DEPLETED
+  CANCELLED
+
+  @@schema("inventory")
+  @@map("lot_status")
+}
+
+enum MovementType {
+  RECEIVE
+  ADJUST_IN
+  ADJUST_OUT
+  TRANSFER_OUT
+  TRANSFER_IN
+  RESERVE
+  RELEASE
+  DISPATCH
+  LOSS
+  RETURN
+
+  @@schema("inventory")
+  @@map("movement_type")
+}
+
+enum LotSourceType {
+  HARVEST
+  PURCHASE
+  TRANSFER_IN
+  ADJUSTMENT_OPENING
+  OTHER
+
+  @@schema("inventory")
+  @@map("lot_source_type")
+}
+
+model StockLot {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lotCode          String        @map("lot_code") @db.VarChar(64)
+  productId        String        @map("product_id") @db.Uuid
+  productVarietyId String?       @map("product_variety_id") @db.Uuid
+  farmId           String        @map("farm_id") @db.Uuid
+  plotId           String?       @map("plot_id") @db.Uuid
+  storageSiteId    String?       @map("storage_site_id") @db.Uuid
+  storageLabel     String?       @map("storage_label") @db.VarChar(150)
+  unitCode         String        @map("unit_code") @db.VarChar(20)
+  quantityOnHand   Decimal       @default(0) @map("quantity_on_hand") @db.Decimal(14, 3)
+  quantityReserved Decimal       @default(0) @map("quantity_reserved") @db.Decimal(14, 3)
+  status           LotStatus     @default(AVAILABLE)
+  sourceType       LotSourceType @default(HARVEST) @map("source_type")
+  harvestDate      DateTime?     @map("harvest_date") @db.Date
+  receivedAt       DateTime      @default(now()) @map("received_at") @db.Timestamptz
+  expiresOn        DateTime?     @map("expires_on") @db.Date
+  qualityNote      String?       @map("quality_note")
+  externalRef      String?       @map("external_ref") @db.VarChar(100)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime      @default(now()) @map("updated_at") @db.Timestamptz
+
+  product          Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productVariety   ProductVariety? @relation(fields: [productVarietyId], references: [id], onDelete: SetNull)
+  farm             Farm            @relation(fields: [farmId], references: [id], onDelete: Restrict)
+  plot             Plot?           @relation(fields: [plotId], references: [id], onDelete: SetNull)
+  unit             Unit            @relation(fields: [unitCode], references: [code], onDelete: Restrict)
+  movements        StockMovement[]
+  reservations     Reservation[]
+
+  @@unique([farmId, lotCode])
+  @@index([farmId])
+  @@index([productId])
+  @@index([status])
+  @@map("stock_lots")
+  @@schema("inventory")
+}
+
+model StockMovement {
+  id                    String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lotId                 String       @map("lot_id") @db.Uuid
+  movementType          MovementType @map("movement_type")
+  qty                   Decimal      @db.Decimal(14, 3)
+  unitCode              String       @map("unit_code") @db.VarChar(20)
+  qtyInLotUnit          Decimal      @map("qty_in_lot_unit") @db.Decimal(14, 3)
+  reason                String?      @db.VarChar(500)
+  actorUserId           String?      @map("actor_user_id") @db.Uuid
+  listingId             String?      @map("listing_id") @db.Uuid
+  orderId               String?      @map("order_id") @db.Uuid
+  counterpartMovementId String?      @map("counterpart_movement_id") @db.Uuid
+  metadata              Json?
+  createdAt             DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  lot                   StockLot      @relation(fields: [lotId], references: [id], onDelete: Restrict)
+  unit                  Unit          @relation(fields: [unitCode], references: [code], onDelete: Restrict)
+  counterpart           StockMovement? @relation("MovementCounterpart", fields: [counterpartMovementId], references: [id], onDelete: SetNull)
+  counterparts          StockMovement[] @relation("MovementCounterpart")
+
+  @@index([lotId])
+  @@index([createdAt])
+  @@map("stock_movements")
+  @@schema("inventory")
+}
+
+model Reservation {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lotId     String   @map("lot_id") @db.Uuid
+  listingId String?  @map("listing_id") @db.Uuid
+  orderId   String?  @map("order_id") @db.Uuid
+  qty       Decimal  @db.Decimal(14, 3)
+  unitCode  String   @map("unit_code") @db.VarChar(20)
+  status    String   @default("ACTIVE") @db.VarChar(20)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  lot       StockLot @relation(fields: [lotId], references: [id], onDelete: Restrict)
+  unit      Unit     @relation(fields: [unitCode], references: [code], onDelete: Restrict)
+
+  @@index([lotId])
+  @@map("reservations")
+  @@schema("inventory")
 }

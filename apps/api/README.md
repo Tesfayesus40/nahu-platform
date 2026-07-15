@@ -35,6 +35,24 @@ phone + SMS OTP authentication flow ported from `nahu-buna-gebaya`.
 
   and it will work normally.
 
+## Phase 4.2 — Inventory
+
+Design: `docs/07-decisions/phase-4.2-inventory-design.md` (Approved).
+
+SQL: `database/migrations/catalog/009_catalog_unit_conversions.sql`, `database/migrations/inventory/001`–`005`.
+
+Routes (FARMER auth):
+- `GET /api/v1/inventory/lots`
+- `GET /api/v1/inventory/lots/:id`
+- `GET /api/v1/inventory/lots/:id/movements`
+- `GET /api/v1/inventory/balances`
+- `POST /api/v1/inventory/receive`
+- `POST /api/v1/inventory/movements` (`ADJUST_IN` / `ADJUST_OUT` / `LOSS` / `TRANSFER_OUT`)
+
+Listing/order APIs unchanged (reservation bind in 4.4).
+
+Unit tests: `pnpm --filter @nahu-platform/api test:inventory-rules`
+
 ## Phase 4.1 — Farm Management
 
 Design: `docs/07-decisions/phase-4.1-farm-management-design.md` (Approved v1.2).

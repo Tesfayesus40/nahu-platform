@@ -175,6 +175,8 @@ The Farmer and Buyer Expo apps live in a separate repository (`nahu-buna-gebaya`
 
 Both apps target `/api/v1` on the platform API. Migration from the legacy Express backend is in progress — see the [Engineering Playbook](docs/engineering-playbook.md#mobile-compatibility) for compatibility requirements.
 
+Feature coverage vs Nest backend: [Backend ↔ Mobile feature mapping](docs/backend-mobile-feature-mapping.md). Coffee demo apps are reference-only.
+
 ---
 
 ## Documentation
