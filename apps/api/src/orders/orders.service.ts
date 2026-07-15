@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PaymentsService } from '../payments/payments.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CertificatesService } from '../certificates/certificates.service';
+import { ReservationsService } from '../inventory/reservations.service';
 
 const COMMISSION_RATE = 0.02; // 2% — matches the existing Nahu Buna Gebaya commission model
 
@@ -22,6 +23,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly certificates: CertificatesService,
     private readonly payments: PaymentsService,
+    private readonly reservations: ReservationsService,
   ) {}
 
   async createOrder(buyerId: string, dto: CreateOrderDto) {
@@ -74,6 +76,14 @@ export class OrdersService {
         data: remainingKg > 0
           ? { quantityKg: remainingKg, status: 'ACTIVE' }
           : { quantityKg: 0, status: 'RESERVED' },
+      });
+
+      // Option B: listing ACTIVE hold → ORDER_HELD (on_hand unchanged)
+      await this.reservations.transferListingHoldToOrderTx(tx, {
+        listingId: listing.id,
+        orderId: created.id,
+        qty: dto.quantityKg,
+        actorUserId: buyerId,
       });
 
       return created;
@@ -146,6 +156,12 @@ export class OrdersService {
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await this.restoreListingStock(tx, order.listingId, Number(order.quantityKg));
+      await this.reservations.restoreOrderHoldToListingTx(tx, {
+        orderId,
+        listingId: order.listingId,
+        qty: Number(order.quantityKg),
+        actorUserId: buyerId,
+      });
       return tx.order.update({ where: { id: orderId }, data: { status: 'CANCELLED' } });
     });
 
@@ -178,6 +194,12 @@ export class OrdersService {
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await this.restoreListingStock(tx, order.listingId, Number(order.quantityKg));
+      await this.reservations.restoreOrderHoldToListingTx(tx, {
+        orderId,
+        listingId: order.listingId,
+        qty: Number(order.quantityKg),
+        actorUserId: userId,
+      });
       return tx.order.update({ where: { id: orderId }, data: { status: 'CANCELLED' } });
     });
 
@@ -282,7 +304,7 @@ export class OrdersService {
   }
 
   private async restoreListingStock(
-    tx: Pick<PrismaService, 'listing'>,
+    tx: { listing: PrismaService['listing'] },
     listingId: string,
     quantityKg: number,
   ) {

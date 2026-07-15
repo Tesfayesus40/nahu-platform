@@ -15,7 +15,8 @@ Expose completed Nest capabilities in the **Farmer** app first, then resume back
 | **M2** Product picker | **Done** (New / Edit listing → `GET /products`) |
 | **M3** Farm management screens | **Done** (Settings → My Farms) |
 | **M4** Inventory screens | **Done** (Settings → Inventory / receive / lot movements) |
-| Phase **4.3 Warehouse** | **Closed** — staging SQL/API smoke + Farmer M7 UI wired; production still held |
+| Phase **4.3 Warehouse** | **Complete** — staging + Farmer M7 on-device; production still held |
+| Phase **4.4 Listing ↔ stock** | **Staging smoked** — Farmer M8 wired; production held |
 
 **Production:** Nest production URL and EAS `production` profile stay unchanged until new mobile functionality is validated on **staging**. Canonical Farmer notes: `nahu-buna-farmer/MOBILE_NEST.md`.
 
@@ -99,7 +100,7 @@ Expose completed Nest capabilities in the **Farmer** app first, then resume back
 |---------|----------|--------|-------|-------|
 | Receive / movements / lots / balances | Done (staging) | ✅ | — | Settings → Inventory |
 | `storageSiteId` + `RELOCATE` | Done (staging + M7) | ✅ | — | Site chips + lot relocate |
-| Reservations wired to listings | Schema stub | 🔵 | 🔵 | Phase **4.4** |
+| Reservations wired to listings | Done (staging) | 🔵 M8 | — | Optional `stockLotId`; Option B order holds |
 
 ### Orders
 
@@ -169,9 +170,9 @@ Legend: ✅ exposed in UI · 🟡 API/helpers only or partial · 🔵 planned ·
 Principles:
 
 1. **Do not duplicate backend** — if Nest already exposes the capability, prefer mobile/client work.
-2. **Do not build mobile screens** for APIs that are still 🔵 (especially live payments, 4.4 stock↔listing, warehouse M7 until staging APIs smoke).
+2. **Do not build mobile screens** for APIs that are still 🔵 (especially live payments, **4.4 stock↔listing until approved + staging smoke**).
 3. **Prefer additive UI** that keeps coffee MVP working when fields are omitted.
-4. **Backend Phase 4.3 Warehouse** API-first, then Farmer M7.
+4. **Backend Phase 4.4 Listing↔stock** is next after Warehouse completion — design → approve → implement.
 
 ### Mobile track (Farmer / Buyer Expo)
 
@@ -185,7 +186,7 @@ Principles:
 | **M5** | Order action gaps (farmer decline; buyer cancel/dispute/address) | Both | Improves ops; independent of Nahu Farm |
 | **M6** | Advisory extras + certificates for farmer (optional) | Farmer | Nice-to-have after M3–M4 |
 | **M7** | Warehouse / storage-site UI | Farmer | **Done** against staging 4.3 API |
-| **M8** | Sell-from-stock / reservation UX | Farmer | **After** Phase 4.4 backend |
+| **M8** | Sell-from-stock / reservation UX | Farmer | **Done** against staging 4.4 (optional lot on New Listing) |
 | **M9** | Live payments UX | Buyer | **After** real provider integration (not `GET /methods` alone) |
 
 ### Backend track (stay synchronized)
@@ -193,9 +194,9 @@ Principles:
 | Order | Item | Relation to mobile |
 |------:|------|--------------------|
 | **B0** | Keep staging Nest as mobile validation target | Supports M0 |
-| **B1** | Phase **4.3 Warehouse** closed on staging (+ Farmer M7) | Production still explicit; next backend slice **4.4** |
-| **B2** | Promote 4.2 (+ later 4.3) to production when smoke-ready | Independent of Expo UI, but coordinate release notes |
-| **B3** | Phase **4.4** listing↔stock | Enables M8 |
+| **B1** | Phase **4.3 Warehouse** — complete (M7 on-device) | Done; production still explicit |
+| **B2** | Promote 4.2/4.3 (+ later 4.4) to production when smoke-ready | Independent of Expo UI; explicit gate |
+| **B3** | Phase **4.4** listing↔stock (after design approval) | Enables M8 |
 | **B4** | Phase 4.5 / 4.6 planning & dashboards | Mobile dashboards after data exists |
 | **B5** | Live payments / SMS production cutover | Ops + M9; separate gate |
 

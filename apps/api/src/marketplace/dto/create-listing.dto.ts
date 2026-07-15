@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -48,6 +49,11 @@ export class CreateListingDto {
   @IsString()
   @MaxLength(80)
   productCode?: string;
+
+  /** Optional Phase 4.4 bind — reserve this lot for the listing qty. */
+  @IsOptional()
+  @IsUUID()
+  stockLotId?: string;
 
   @IsString()
   @MaxLength(100)
