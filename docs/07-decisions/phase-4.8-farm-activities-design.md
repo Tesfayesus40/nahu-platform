@@ -12,7 +12,7 @@
 
 **Production:** Remains unchanged until an explicit production promotion.
 
-**Program notes:** Amharic UI cleanup is a **separate follow-up** (`milestone-amharic-localization-v1`). Buyer app unchanged in this phase.
+**Program notes:** Farmer Amharic UI review is **completed** as a separate follow-up (`milestone-amharic-localization-v1`). Buyer app unchanged in this phase.
 
 **§14 decisions locked at approval:**
 

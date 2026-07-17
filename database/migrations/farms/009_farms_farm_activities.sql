@@ -30,13 +30,13 @@ CREATE TABLE farms.activity_types
 );
 
 INSERT INTO farms.activity_types (code, name_en, name_am, sort_order) VALUES
-    ('PLANTING', 'Planting', 'መዝራት', 10),
+    ('PLANTING', 'Planting', 'መትከል', 10),
     ('FERTILIZER', 'Fertilizer', 'ማዳበሪያ', 20),
     ('IRRIGATION', 'Irrigation', 'መስኖ', 30),
-    ('SPRAYING', 'Spraying', 'መርጨት', 40),
-    ('WEEDING', 'Weeding', 'አረም ማጽዳት', 50),
-    ('PRUNING', 'Pruning', 'መቁረጥ', 60),
-    ('SCOUTING', 'Scouting', 'ምልከታ', 70),
+    ('SPRAYING', 'Spraying', 'ርጭት', 40),
+    ('WEEDING', 'Weeding', 'አረም ማረም', 50),
+    ('PRUNING', 'Pruning', 'ግርዛት', 60),
+    ('SCOUTING', 'Scouting', 'የማሳ ምርመራ', 70),
     ('HARVESTING_SUPPORT', 'Harvesting support', 'የመከር ድጋፍ', 80),
     ('OTHER', 'Other', 'ሌላ', 90)
 ON CONFLICT (code) DO NOTHING;

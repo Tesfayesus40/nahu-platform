@@ -21,6 +21,7 @@ Expose completed Nest capabilities in the **Farmer** app first, then resume back
 | Phase **4.6 Dashboards** | **Closed** — Nest `GET /farms/dashboard` + Farmer M11 on-device; production held |
 | Phase **4.7 Harvest management** | **Closed** — Nest harvest sessions + Farmer M12 on-device; production held |
 | Phase **4.8 Farm activities** | **Closed** — staging + Farmer M13 on-device; production held |
+| Farmer Amharic localization | **Completed** — EN/AM review applied; tag `milestone-amharic-localization-v1`; production held |
 
 **Production:** Nest production URL and EAS `production` profile stay unchanged until new mobile functionality is validated on **staging**. Canonical Farmer notes: `nahu-buna-farmer/MOBILE_NEST.md`.
 
