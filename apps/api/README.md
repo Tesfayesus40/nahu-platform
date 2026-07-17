@@ -339,6 +339,18 @@ Routes:
 - `GET /farmers/cooperatives/list` (public)
 - `GET /listings` (public) — filter by region/grade/process method, sort, paginate
 - `GET /listings/:id` (public) — full detail incl. farmer + cooperative
+
+### B2 — Buyer discovery & Seller Profile (thin API, no SQL)
+
+**Listings query (additive):**
+- `farmerId` — seller’s ACTIVE listings (Seller Profile)
+- `q` — keyword across product/category names & codes, region, variety, station/coop text, seller name
+- `variety` — free-text variety contains
+- Existing: `categoryCode`, `productCode`, `region(s)`, `grade(s)`, `processMethod`, `minKg`, `maxPrice`, `sort`, `page`, `limit`
+
+**Listing responses** always include `farmerId` for Seller Profile deep-links.
+
+**`GET /farmers/:id` (public Seller Profile):** seller identity + location, cooperative, public `farms[]`, public `certificates[]`, `activeListingsCount`, and `extensions` slots (`ratings`, `reviews`, `verifiedSellerBadge`, `responseMetrics`) for future milestones.
 - `POST /listings` (auth, FARMER) — requires a farmer profile to exist first
 - `POST /uploads/listing-photo` (auth, FARMER) — multipart `file` field (JPEG/PNG/WebP, max 5 MB); returns `{ url }` for use in `photoUrls` on create/update listing
 - `GET /uploads/files/:filename` (public, no `/api/v1` prefix) — serves uploaded images; set `PUBLIC_API_URL` in production so returned URLs are reachable
