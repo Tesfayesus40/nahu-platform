@@ -10,6 +10,7 @@ This page is the entry point for platform architecture documentation. It does no
 |----------|-------------|
 | [Architecture Principles](02-architecture/architecture-principles.md) | Ten binding design principles (markdown, active) |
 | [Nahu Farm V1 Architecture Overview](02-architecture/nahu-farm-v1-architecture-overview.md) | Reference architecture for Farmer Platform Phases 4.1–4.7 (staging) |
+| [Phase 4.8 — Farm activities design](07-decisions/phase-4.8-farm-activities-design.md) | Next ops-log slice — **Approved** (implementing); production held |
 | [Documentation index](README.md) | Full map of all platform documentation |
 
 ---

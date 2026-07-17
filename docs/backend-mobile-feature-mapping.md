@@ -20,6 +20,7 @@ Expose completed Nest capabilities in the **Farmer** app first, then resume back
 | Phase **4.5 Production planning** | **Closed** — staging + Farmer M10 on-device; Amharic packaged; production held |
 | Phase **4.6 Dashboards** | **Closed** — Nest `GET /farms/dashboard` + Farmer M11 on-device; production held |
 | Phase **4.7 Harvest management** | **Closed** — Nest harvest sessions + Farmer M12 on-device; production held |
+| Phase **4.8 Farm activities** | **Closed** — staging + Farmer M13 on-device; production held |
 
 **Production:** Nest production URL and EAS `production` profile stay unchanged until new mobile functionality is validated on **staging**. Canonical Farmer notes: `nahu-buna-farmer/MOBILE_NEST.md`.
 
@@ -195,6 +196,7 @@ Principles:
 | **M10** | Seasons / production plans UX | Farmer | **Done** — staging on-device + Amharic closeout APK |
 | **M11** | Farmer Home dashboard sections (`GET /farms/dashboard`) | Farmer | **Done** — staging on-device + APK |
 | **M12** | Harvest sessions UX (Session→Lines→Post) | Farmer | **Done** — staging on-device + APK |
+| **M13** | Farm activities UX (log / timeline / plan bind) | Farmer | **Closed** with Phase 4.8 (staging + on-device) |
 | **M9** | Live payments UX | Buyer | **After** real provider integration (not `GET /methods` alone) |
 
 ### Backend track (stay synchronized)
@@ -208,6 +210,7 @@ Principles:
 | **B4** | Phase **4.5** production planning — **closed** on staging + M10 | Done; production still explicit |
 | **B5** | Phase **4.6** dashboards — **closed** on staging + M11 | Done; production still explicit |
 | **B7** | Phase **4.7** harvest management — **closed** on staging + M12 | Done; production still explicit |
+| **B8** | Phase **4.8** farm activities — Closed on staging + M13 | Farmer M13 complete; production held |
 | **B6** | Live payments / SMS production cutover | Ops + M9; separate gate |
 
 ### Explicit “do not do yet”

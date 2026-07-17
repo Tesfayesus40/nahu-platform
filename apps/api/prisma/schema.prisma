@@ -224,6 +224,7 @@ model Unit {
   storageSites        StorageSite[]
   croppingCycleLines  CroppingCycleLine[]
   harvestLines        HarvestLine[]
+  farmActivities      FarmActivity[]
 
   @@map("units")
   @@schema("catalog")
@@ -267,6 +268,7 @@ model Product {
   stockLots          StockLot[]
   croppingCycleLines CroppingCycleLine[]
   harvestLines       HarvestLine[]
+  farmActivities     FarmActivity[]
 
   @@index([categoryId])
   @@index([status])
@@ -620,6 +622,15 @@ enum HarvestSessionStatus {
   @@map("harvest_session_status")
 }
 
+enum FarmActivityStatus {
+  PLANNED
+  COMPLETED
+  CANCELLED
+
+  @@schema("farms")
+  @@map("farm_activity_status")
+}
+
 enum FarmAuditAction {
   CREATE
   UPDATE
@@ -667,6 +678,7 @@ model Farm {
   listings          Listing[]
   croppingCycles    CroppingCycle[]
   harvestSessions   HarvestSession[]
+  farmActivities    FarmActivity[]
 
   @@index([status])
   @@index([cooperativeId])
@@ -722,6 +734,7 @@ model Plot {
   stockLots         StockLot[]
   croppingCycles    CroppingCycle[]
   harvestSessions   HarvestSession[]
+  farmActivities    FarmActivity[]
 
   @@index([farmId])
   @@map("plots")
@@ -825,6 +838,7 @@ model CroppingCycle {
   lines             CroppingCycleLine[]
   stockLots         StockLot[]
   harvestSessions   HarvestSession[]
+  farmActivities    FarmActivity[]
 
   @@index([farmId])
   @@index([status])
@@ -880,6 +894,7 @@ model HarvestSession {
   plot             Plot?                @relation(fields: [plotId], references: [id], onDelete: SetNull)
   croppingCycle    CroppingCycle?       @relation(fields: [croppingCycleId], references: [id], onDelete: SetNull)
   lines            HarvestLine[]
+  farmActivities   FarmActivity[]
 
   @@index([farmId])
   @@index([status])
@@ -919,6 +934,65 @@ model HarvestLine {
   @@index([productId])
   @@index([stockLotId])
   @@map("harvest_lines")
+  @@schema("farms")
+}
+
+model ActivityType {
+  code           String   @id @db.VarChar(40)
+  nameEn         String   @map("name_en") @db.VarChar(100)
+  nameAm         String   @map("name_am") @db.VarChar(100)
+  descriptionEn  String?  @map("description_en")
+  descriptionAm  String?  @map("description_am")
+  isActive       Boolean  @default(true) @map("is_active")
+  sortOrder      Int      @default(0) @map("sort_order") @db.SmallInt
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  activities     FarmActivity[]
+
+  @@map("activity_types")
+  @@schema("farms")
+}
+
+model FarmActivity {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  farmId            String             @map("farm_id") @db.Uuid
+  plotId            String?            @map("plot_id") @db.Uuid
+  croppingCycleId   String?            @map("cropping_cycle_id") @db.Uuid
+  harvestSessionId  String?            @map("harvest_session_id") @db.Uuid
+  activityTypeCode  String             @map("activity_type_code") @db.VarChar(40)
+  status            FarmActivityStatus @default(COMPLETED)
+  occurredOn        DateTime?          @map("occurred_on") @db.Date
+  scheduledOn       DateTime?          @map("scheduled_on") @db.Date
+  occurredAt        DateTime?          @map("occurred_at") @db.Timestamptz
+  notes             String?
+  attachmentUrls    String[]           @default([]) @map("attachment_urls")
+  measureQty        Decimal?           @map("measure_qty") @db.Decimal(14, 3)
+  measureUnitCode   String?            @map("measure_unit_code") @db.VarChar(20)
+  areaHa            Decimal?           @map("area_ha") @db.Decimal(10, 2)
+  productId         String?            @map("product_id") @db.Uuid
+  crewCount         Int?               @map("crew_count")
+  metadata          Json?
+  createdByUserId   String?            @map("created_by_user_id") @db.Uuid
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime           @default(now()) @map("updated_at") @db.Timestamptz
+
+  farm              Farm               @relation(fields: [farmId], references: [id], onDelete: Restrict)
+  plot              Plot?              @relation(fields: [plotId], references: [id], onDelete: SetNull)
+  croppingCycle     CroppingCycle?     @relation(fields: [croppingCycleId], references: [id], onDelete: SetNull)
+  harvestSession    HarvestSession?    @relation(fields: [harvestSessionId], references: [id], onDelete: SetNull)
+  activityType      ActivityType       @relation(fields: [activityTypeCode], references: [code], onDelete: Restrict)
+  measureUnit       Unit?              @relation(fields: [measureUnitCode], references: [code], onDelete: Restrict)
+  product           Product?           @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([farmId])
+  @@index([farmId, occurredOn])
+  @@index([activityTypeCode])
+  @@index([croppingCycleId])
+  @@index([plotId])
+  @@index([status])
+  @@index([harvestSessionId])
+  @@map("farm_activities")
   @@schema("farms")
 }
 

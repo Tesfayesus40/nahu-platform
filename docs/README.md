@@ -65,6 +65,8 @@ Present: `07-decisions/` (design proposals awaiting or recording approval).
 | [Phase 4.5 — Production planning design](07-decisions/phase-4.5-production-planning-design.md) | **Closed** v1.1 — staging + Farmer M10 on-device (Amharic packaged); production held |
 | [Phase 4.6 — Dashboards design](07-decisions/phase-4.6-dashboards-design.md) | **Closed** v1.3 — staging + Farmer M11 on-device; production held |
 | [Phase 4.7 — Harvest management design](07-decisions/phase-4.7-harvest-management-design.md) | **Closed** v1.1 — staging + Farmer M12 on-device; production held |
+| [Phase 4.8 — Farm activities design](07-decisions/phase-4.8-farm-activities-design.md) | **Closed** v1.0 — staging + Farmer M13 on-device; production held |
+| [Phase 4.8 — On-device smoke](08-guides/phase-4.8-on-device-smoke.md) | M13 staging smoke checklist (**passed**) |
 | [Phase 4.5 — On-device smoke](08-guides/phase-4.5-on-device-smoke.md) | M10 staging smoke checklist (passed) |
 | [Phase 4.6 — On-device smoke](08-guides/phase-4.6-on-device-smoke.md) | M11 staging smoke checklist (passed) |
 | [Phase 4.7 — On-device smoke](08-guides/phase-4.7-on-device-smoke.md) | M12 staging smoke checklist (passed) |
@@ -121,7 +123,7 @@ Incremental evolution toward the enterprise architecture (preserve existing coff
 | 1 | Repository stabilization — cleanup, documentation, CI | Done |
 | 2 | Nahu Farms generalization — multi-commodity marketplace (coffee first) | Done |
 | 3 | Product catalog | **Done** (staging validated; milestone tagged) |
-| 4 | Farmer Platform (Nahu Farm) — farms, inventory, warehouse, planning, dashboards, harvest | **4.1–4.7 closed on staging**; production Nest cutover held |
+| 4 | Farmer Platform (Nahu Farm) — farms, inventory, warehouse, planning, dashboards, harvest, activities | **4.1–4.8 closed on staging**; Amharic localization follow-up separate; production Nest cutover held |
 | 5 | Nahu Delivery | Planned |
 
 **Stable milestone:** Phase 3 Catalog + Phase 4.1 Farms + Phase 4.2 Inventory — Farmer staging APK validated 2026-07-15 (`milestone-phase-4.2`). Production Nest/mobile cutover remains held until explicit approval. See `docs/07-decisions/`.

@@ -34,7 +34,7 @@ It is the primary reference for:
 | Organizations | Cooperatives, exporters, buyers |
 | Geography | Regions, zones, woredas, kebeles |
 | Agricultural Catalog | See below |
-| Farms (Nahu Farm) | Farm holdings, parties, plots/fields/production units (Phase 4.1) |
+| Farms (Nahu Farm) | Farm holdings, parties, plots/fields/production units (4.1); cropping cycles (4.5); harvest sessions (4.7); farm activities (4.8) |
 | Inventory | Stock lots and movements for catalog products (Phase 4.2) |
 | Warehouse | Storage sites and parties (Phase 4.3 readiness) |
 | Marketplace | Listings and offers |
