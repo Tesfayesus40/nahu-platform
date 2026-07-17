@@ -1,6 +1,6 @@
 # B1 — Buyer order & certificate contract (unit-aware)
 
-**Status:** Implementing (API + SQL ready; staging apply next)  
+**Status:** Implemented & validated on staging (2026-07-17) — production unchanged  
 **Date:** 2026-07-17  
 **Parent:** `buyer-platform-architecture-roadmap.md`  
 **Depends on:** G1 listing contract  
