@@ -423,6 +423,21 @@ Routes:
 - `GET /certificates/order/:orderId` (auth, buyer or farmer on that order)
 - `GET /certificates/verify/:certNumber` (public)
 
+### B1 — unit-aware order & certificate contract (builds on G1)
+
+Migration: `database/migrations/orders/009_orders_unit_fields.sql`  
+Rules: `apps/api/src/orders/order-contract.rules.ts` (`npm run test:order-contract-rules`)
+
+**Create order** accepts either:
+- Legacy: `{ listingId, quantityKg, paymentMethod, deliveryAddress }`
+- Modern: `{ listingId, quantity, unitCode?, paymentMethod, deliveryAddress }`
+
+`unitCode` defaults to the listing unit (or `KG`). Must match the listing unit. Stock decrement dual-writes listing `quantity` + `quantityKg`.
+
+**Order responses** include additive `quantity`, `unitCode`, `pricePerUnit`, plus listing-derived `qualityGrade`, `categoryCode`, `productCode`/`productNameEn`/`productNameAm`, and `extensions.coffee` when the listing is coffee.
+
+**Certificates** dual-write `quantity`/`unitCode` with `quantityKg`, and shape the same catalog/extension fields for Buyer display.
+
 ### Two real bugs found in the original code and fixed, not ported
 
 **1. `orders.farmer_id` semantics bug.** In `nahu-buna-gebaya`, `orders.service.js`

@@ -9,6 +9,11 @@ import { PaymentsService } from '../payments/payments.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CertificatesService } from '../certificates/certificates.service';
 import { ReservationsService } from '../inventory/reservations.service';
+import {
+  OrderContractError,
+  resolveOrderQuantity,
+} from './order-contract.rules';
+import { buildCoffeeExtension } from '../marketplace/listing-contract.rules';
 
 const COMMISSION_RATE = 0.02; // 2% — matches the existing Nahu Buna Gebaya commission model
 
@@ -35,33 +40,54 @@ export class OrdersService {
 
     const listing = await this.prisma.listing.findUnique({
       where: { id: dto.listingId },
+      include: { category: true, product: { include: { defaultUnit: true } } },
     });
 
     if (!listing || listing.status !== 'ACTIVE') {
       throw new BadRequestException('Listing not found or no longer available');
     }
 
-    if (dto.quantityKg > Number(listing.quantityKg)) {
-      throw new BadRequestException(`Only ${listing.quantityKg} kg available`);
+    let resolved;
+    try {
+      resolved = resolveOrderQuantity(
+        {
+          quantity: dto.quantity,
+          unitCode: dto.unitCode,
+          quantityKg: dto.quantityKg,
+        },
+        {
+          quantity: listing.quantity != null ? Number(listing.quantity) : null,
+          unitCode: listing.unitCode,
+          quantityKg: Number(listing.quantityKg),
+          pricePerUnit: listing.pricePerUnit != null ? Number(listing.pricePerUnit) : null,
+          pricePerKg: Number(listing.pricePerKg),
+        },
+      );
+    } catch (err) {
+      if (err instanceof OrderContractError) {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
     }
 
-    const totalEtb = Number(listing.pricePerKg) * dto.quantityKg;
+    const totalEtb = resolved.totalEtb;
     const commissionEtb = totalEtb * COMMISSION_RATE;
     const farmerPayoutEtb = totalEtb - commissionEtb;
     const reference = `NBG-${Date.now().toString(16).toUpperCase().slice(-8)}`;
 
-    const remainingKg = Number(listing.quantityKg) - dto.quantityKg;
+    const available = Number(listing.quantity ?? listing.quantityKg);
+    const remaining = available - resolved.quantity;
 
     const order = await this.prisma.$transaction(async (tx) => {
       const created = await tx.order.create({
         data: {
           listingId: listing.id,
           buyerId,
-          // listing.farmerId is a farmer_profiles.id -- this is correct,
-          // unlike the original app's inconsistent use of this field (see
-          // migration 002_orders_orders.sql for the full explanation).
           farmerId: listing.farmerId,
-          quantityKg: dto.quantityKg,
+          quantity: resolved.quantity,
+          unitCode: resolved.unitCode,
+          pricePerUnit: resolved.pricePerUnit,
+          quantityKg: resolved.quantityKg,
           totalEtb,
           commissionEtb,
           farmerPayoutEtb,
@@ -73,16 +99,24 @@ export class OrdersService {
 
       await tx.listing.update({
         where: { id: listing.id },
-        data: remainingKg > 0
-          ? { quantityKg: remainingKg, status: 'ACTIVE' }
-          : { quantityKg: 0, status: 'RESERVED' },
+        data:
+          remaining > 0
+            ? {
+                quantity: remaining,
+                quantityKg: remaining,
+                status: 'ACTIVE',
+              }
+            : {
+                quantity: 0,
+                quantityKg: 0,
+                status: 'RESERVED',
+              },
       });
 
-      // Option B: listing ACTIVE hold → ORDER_HELD (on_hand unchanged)
       await this.reservations.transferListingHoldToOrderTx(tx, {
         listingId: listing.id,
         orderId: created.id,
-        qty: dto.quantityKg,
+        qty: resolved.quantity,
         actorUserId: buyerId,
       });
 
@@ -90,7 +124,7 @@ export class OrdersService {
     });
 
     return {
-      order: this.shapeOrder(order),
+      order: this.shapeOrder(order, listing),
       payment: {
         method: dto.paymentMethod,
         amount: totalEtb,
@@ -155,11 +189,11 @@ export class OrdersService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      await this.restoreListingStock(tx, order.listingId, Number(order.quantityKg));
+      await this.restoreListingStock(tx, order.listingId, Number(order.quantity ?? order.quantityKg));
       await this.reservations.restoreOrderHoldToListingTx(tx, {
         orderId,
         listingId: order.listingId,
-        qty: Number(order.quantityKg),
+        qty: Number(order.quantity ?? order.quantityKg),
         actorUserId: buyerId,
       });
       return tx.order.update({ where: { id: orderId }, data: { status: 'CANCELLED' } });
@@ -193,11 +227,11 @@ export class OrdersService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      await this.restoreListingStock(tx, order.listingId, Number(order.quantityKg));
+      await this.restoreListingStock(tx, order.listingId, Number(order.quantity ?? order.quantityKg));
       await this.reservations.restoreOrderHoldToListingTx(tx, {
         orderId,
         listingId: order.listingId,
-        qty: Number(order.quantityKg),
+        qty: Number(order.quantity ?? order.quantityKg),
         actorUserId: userId,
       });
       return tx.order.update({ where: { id: orderId }, data: { status: 'CANCELLED' } });
@@ -269,7 +303,7 @@ export class OrdersService {
       if (!profile) return [];
       const orders = await this.prisma.order.findMany({
         where: { farmerId: profile.id },
-        include: { listing: true },
+        include: { listing: { include: { category: true, product: true } } },
         orderBy: { createdAt: 'desc' },
       });
       return orders.map((o: any) => this.shapeOrder(o, o.listing));
@@ -277,7 +311,7 @@ export class OrdersService {
 
     const orders = await this.prisma.order.findMany({
       where: { buyerId: userId },
-      include: { listing: true },
+      include: { listing: { include: { category: true, product: true } } },
       orderBy: { createdAt: 'desc' },
     });
     return orders.map((o: any) => this.shapeOrder(o, o.listing));
@@ -286,7 +320,10 @@ export class OrdersService {
   async getOrderById(orderId: string, userId: string, role: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { listing: true, farmer: true },
+      include: {
+        listing: { include: { category: true, product: true } },
+        farmer: true,
+      },
     });
     if (!order) {
       throw new NotFoundException('Order not found');
@@ -306,26 +343,39 @@ export class OrdersService {
   private async restoreListingStock(
     tx: { listing: PrismaService['listing'] },
     listingId: string,
-    quantityKg: number,
+    quantity: number,
   ) {
     const listing = await tx.listing.findUnique({ where: { id: listingId } });
     if (!listing) return;
 
+    const nextQty = Number(listing.quantity ?? listing.quantityKg) + quantity;
     await tx.listing.update({
       where: { id: listingId },
       data: {
-        quantityKg: Number(listing.quantityKg) + quantityKg,
+        quantity: nextQty,
+        quantityKg: nextQty,
         status: 'ACTIVE',
       },
     });
   }
 
   private shapeOrder(order: any, listing?: any) {
+    const quantity = toNumber(order.quantity) ?? toNumber(order.quantityKg);
+    const unitCode = order.unitCode ?? 'KG';
+    const pricePerUnit =
+      toNumber(order.pricePerUnit) ??
+      (quantity && toNumber(order.totalEtb) != null
+        ? Number(order.totalEtb) / quantity
+        : null);
+
     return {
       id: order.id,
       listingId: order.listingId,
       buyerId: order.buyerId,
       farmerId: order.farmerId,
+      quantity,
+      unitCode,
+      pricePerUnit,
       quantityKg: toNumber(order.quantityKg),
       totalEtb: toNumber(order.totalEtb),
       commissionEtb: toNumber(order.commissionEtb),
@@ -342,7 +392,22 @@ export class OrdersService {
         ? {
             region: listing.region,
             grade: listing.grade,
+            qualityGrade: listing.grade ?? null,
             processMethod: listing.processMethod,
+            categoryCode: listing.category?.code ?? null,
+            productCode: listing.product?.code ?? null,
+            productNameEn: listing.product?.nameEn ?? null,
+            productNameAm: listing.product?.nameAm ?? null,
+            extensions: {
+              coffee: buildCoffeeExtension({
+                processMethod: listing.processMethod,
+                cupScore: toNumber(listing.cupScore),
+                washingStation: listing.washingStation,
+                cooperative: listing.cooperative,
+                altitudeM: toNumber(listing.altitudeM),
+                variety: listing.variety,
+              }),
+            },
           }
         : {}),
     };
