@@ -300,6 +300,7 @@ Design sources: `docs/07-decisions/phase-4*.md`. On-device checklists: `docs/08-
 | **Field / ProductionUnit UX** | Schema exists; farmer mobile deferred |
 | **Storage zones / bins** | Warehouse stub tables; no full WMS API in V1 |
 | **Coop warehouse admin APIs** | Site types exist; farmer V1 focuses ON_FARM |
+| **Phase 4.8 — Farm activities** | Field ops log (design draft) — [phase-4.8-farm-activities-design.md](../07-decisions/phase-4.8-farm-activities-design.md) |
 
 ---
 
