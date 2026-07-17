@@ -216,6 +216,7 @@ model Unit {
   sortOrder Int       @default(0) @map("sort_order") @db.SmallInt
 
   products            Product[]
+  listings            Listing[]
   conversionsFrom     UnitConversion[] @relation("ConversionFrom")
   conversionsTo       UnitConversion[] @relation("ConversionTo")
   stockLots           StockLot[]
@@ -423,6 +424,12 @@ model Listing {
   variety        String?       @db.VarChar(100)
   quantityKg     Decimal       @map("quantity_kg") @db.Decimal(8, 2)
   pricePerKg     Decimal       @map("price_per_kg") @db.Decimal(8, 2)
+  /// G1 canonical quantity — dual-written with quantityKg for KG/coffee legacy.
+  quantity       Decimal?      @db.Decimal(12, 3)
+  unitCode       String?       @map("unit_code") @db.VarChar(20)
+  pricePerUnit   Decimal?      @map("price_per_unit") @db.Decimal(12, 2)
+  packagingLabel String?       @map("packaging_label") @db.VarChar(100)
+  packagingQuantity Decimal?   @map("packaging_quantity") @db.Decimal(12, 3)
   harvestDate    DateTime      @map("harvest_date") @db.Date
   altitudeM      Decimal?      @map("altitude_m") @db.Decimal(6, 1)
   cupScore       Decimal?      @map("cup_score") @db.Decimal(4, 1)
@@ -434,6 +441,7 @@ model Listing {
   farmer         FarmerProfile @relation(fields: [farmerId], references: [id], onDelete: Cascade)
   category       Category?     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   product        Product?      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  unit           Unit?         @relation(fields: [unitCode], references: [code], onDelete: Restrict)
   stockLot       StockLot?     @relation(fields: [stockLotId], references: [id], onDelete: SetNull)
   farm           Farm?         @relation(fields: [farmId], references: [id], onDelete: SetNull)
   orders         Order[]
@@ -446,6 +454,7 @@ model Listing {
   @@index([productId])
   @@index([stockLotId])
   @@index([farmId])
+  @@index([unitCode])
   @@map("listings")
   @@schema("marketplace")
 }

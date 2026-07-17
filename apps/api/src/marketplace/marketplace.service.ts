@@ -7,11 +7,18 @@ import {
   isProductSellable,
   productCategoryConflicts,
 } from '../catalog/product-resolve.rules';
+import {
+  assertCoffeeExtensionRequirements,
+  buildCoffeeExtension,
+  ListingContractError,
+  resolveListingQuantity,
+} from './listing-contract.rules';
 import { CreateFarmerProfileDto } from './dto/create-farmer-profile.dto';
 import { UpdateFarmerProfileDto } from './dto/update-farmer-profile.dto';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { QueryListingsDto } from './dto/query-listings.dto';
+import { CoffeeGrade, ProcessMethod } from './dto/create-listing.dto';
 
 /** Prisma returns NUMERIC/DECIMAL columns as Decimal objects — flatten to plain numbers for JSON responses. */
 function toNumber(value: unknown): number | null {
@@ -141,17 +148,18 @@ export class MarketplaceService {
     }
 
     const product = await this.resolveListingProduct(dto.productCode, dto.categoryCode);
-    const { categoryCode: _c, productCode: _p, stockLotId, ...listingData } = dto;
+    const categoryCode = product.category.code.toUpperCase();
+    const listingFields = await this.buildListingWriteFields(dto, categoryCode);
 
-    if (stockLotId) {
-      const lot = await this.prisma.stockLot.findUnique({ where: { id: stockLotId } });
+    if (dto.stockLotId) {
+      const lot = await this.prisma.stockLot.findUnique({ where: { id: dto.stockLotId } });
       if (!lot) throw new BadRequestException('Stock lot not found');
       await this.farms.assertFarmAccess(userId, lot.farmId, true);
 
       const listing = await this.prisma.$transaction(async (tx) => {
         const created = await tx.listing.create({
           data: {
-            ...listingData,
+            ...listingFields,
             farmerId: farmer.id,
             categoryId: product.categoryId,
             productId: product.id,
@@ -167,7 +175,7 @@ export class MarketplaceService {
           userId,
           lotId: lot.id,
           listingId: created.id,
-          qty: dto.quantityKg,
+          qty: listingFields.quantityKg,
           expectedProductId: product.id,
         });
 
@@ -179,7 +187,7 @@ export class MarketplaceService {
 
     const listing = await this.prisma.listing.create({
       data: {
-        ...listingData,
+        ...listingFields,
         farmerId: farmer.id,
         categoryId: product.categoryId,
         productId: product.id,
@@ -350,17 +358,112 @@ export class MarketplaceService {
       }
     }
 
-    const { harvestDate, categoryCode, productCode, stockLotId: _ignoreLot, quantityKg, ...rest } =
-      dto;
+    const {
+      harvestDate,
+      categoryCode,
+      productCode,
+      stockLotId: _ignoreLot,
+      quantityKg,
+      pricePerKg,
+      quantity,
+      unitCode,
+      pricePerUnit,
+      packagingLabel,
+      packagingQuantity,
+      qualityGrade,
+      grade,
+      processMethod,
+      ...rest
+    } = dto;
+
     let productUpdate: { categoryId: string; productId: string } | undefined;
+    let categoryCodeForRules =
+      (listing as any).category?.code?.toUpperCase?.() ?? 'COFFEE';
     if (categoryCode !== undefined || productCode !== undefined) {
       const product = await this.resolveListingProduct(productCode, categoryCode);
       productUpdate = { categoryId: product.categoryId, productId: product.id };
+      categoryCodeForRules = product.category.code.toUpperCase();
+    } else if (listing.categoryId) {
+      const cat = await this.prisma.category.findUnique({ where: { id: listing.categoryId } });
+      if (cat) categoryCodeForRules = cat.code.toUpperCase();
     }
 
-    if (quantityKg !== undefined && listing.stockLotId) {
+    let quantityUpdate: Record<string, unknown> = {};
+    const touchesQuantity =
+      quantityKg !== undefined ||
+      pricePerKg !== undefined ||
+      quantity !== undefined ||
+      unitCode !== undefined ||
+      pricePerUnit !== undefined;
+    if (touchesQuantity) {
+      try {
+        const usingModern =
+          quantity !== undefined || unitCode !== undefined || pricePerUnit !== undefined;
+        const resolved = usingModern
+          ? resolveListingQuantity({
+              quantity: quantity ?? Number(listing.quantity ?? listing.quantityKg),
+              unitCode: unitCode ?? listing.unitCode ?? 'KG',
+              pricePerUnit: pricePerUnit ?? Number(listing.pricePerUnit ?? listing.pricePerKg),
+            })
+          : resolveListingQuantity({
+              quantityKg: quantityKg ?? Number(listing.quantityKg),
+              pricePerKg: pricePerKg ?? Number(listing.pricePerKg),
+            });
+        await this.assertUnitExists(resolved.unitCode);
+        quantityUpdate = {
+          quantity: resolved.quantity,
+          unitCode: resolved.unitCode,
+          pricePerUnit: resolved.pricePerUnit,
+          quantityKg: resolved.quantityKg,
+          pricePerKg: resolved.pricePerKg,
+        };
+      } catch (err) {
+        if (err instanceof ListingContractError) {
+          throw new BadRequestException(err.message);
+        }
+        throw err;
+      }
+    }
+
+    if (packagingLabel !== undefined) quantityUpdate.packagingLabel = packagingLabel || null;
+    if (packagingQuantity !== undefined) {
+      quantityUpdate.packagingQuantity = packagingQuantity ?? null;
+    }
+
+    let gradeUpdate: Record<string, unknown> = {};
+    if (qualityGrade !== undefined || grade !== undefined || processMethod !== undefined) {
+      if (categoryCodeForRules === 'COFFEE') {
+        try {
+          const coffee = assertCoffeeExtensionRequirements({
+            qualityGrade: qualityGrade ?? grade ?? listing.grade,
+            processMethod: processMethod ?? listing.processMethod,
+          });
+          gradeUpdate = {
+            grade: coffee.grade as CoffeeGrade,
+            processMethod: coffee.processMethod as ProcessMethod,
+          };
+        } catch (err) {
+          if (err instanceof ListingContractError) {
+            throw new BadRequestException(err.message);
+          }
+          throw err;
+        }
+      } else {
+        if (qualityGrade !== undefined || grade !== undefined) {
+          gradeUpdate.grade = (qualityGrade ?? grade) as CoffeeGrade;
+        }
+        if (processMethod !== undefined) gradeUpdate.processMethod = processMethod;
+      }
+    }
+
+    const nextQuantityKg =
+      quantityUpdate.quantityKg !== undefined
+        ? Number(quantityUpdate.quantityKg)
+        : Number(listing.quantityKg);
+
+    if (touchesQuantity && listing.stockLotId) {
       const currentQty = Number(listing.quantityKg);
-      const delta = quantityKg - currentQty;
+      const delta = nextQuantityKg - currentQty;
       if (Math.abs(delta) > 1e-9) {
         await this.prisma.$transaction(async (tx) => {
           if (delta > 0) {
@@ -386,9 +489,10 @@ export class MarketplaceService {
             where: { id: listingId },
             data: {
               ...rest,
+              ...quantityUpdate,
+              ...gradeUpdate,
               ...(harvestDate ? { harvestDate: new Date(harvestDate) } : {}),
               ...(productUpdate ?? {}),
-              quantityKg,
               updatedAt: new Date(),
             },
           });
@@ -406,9 +510,10 @@ export class MarketplaceService {
       where: { id: listingId },
       data: {
         ...rest,
+        ...quantityUpdate,
+        ...gradeUpdate,
         ...(harvestDate ? { harvestDate: new Date(harvestDate) } : {}),
         ...(productUpdate ?? {}),
-        ...(quantityKg !== undefined ? { quantityKg } : {}),
         updatedAt: new Date(),
       },
       include: { category: true, product: { include: { defaultUnit: true } } },
@@ -483,6 +588,79 @@ export class MarketplaceService {
     return product;
   }
 
+  private async assertUnitExists(unitCode: string) {
+    const unit = await this.prisma.unit.findUnique({ where: { code: unitCode } });
+    if (!unit) {
+      throw new BadRequestException(`Unknown unitCode: ${unitCode}`);
+    }
+  }
+
+  private async buildListingWriteFields(dto: CreateListingDto, categoryCode: string) {
+    let resolved;
+    try {
+      resolved = resolveListingQuantity({
+        quantity: dto.quantity,
+        unitCode: dto.unitCode,
+        pricePerUnit: dto.pricePerUnit,
+        quantityKg: dto.quantityKg,
+        pricePerKg: dto.pricePerKg,
+      });
+    } catch (err) {
+      if (err instanceof ListingContractError) {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
+    }
+
+    await this.assertUnitExists(resolved.unitCode);
+
+    let grade = dto.qualityGrade ?? dto.grade;
+    let processMethod = dto.processMethod;
+
+    if (categoryCode === 'COFFEE') {
+      try {
+        const coffee = assertCoffeeExtensionRequirements({
+          qualityGrade: grade,
+          processMethod,
+        });
+        grade = coffee.grade as CoffeeGrade;
+        processMethod = coffee.processMethod as ProcessMethod;
+      } catch (err) {
+        if (err instanceof ListingContractError) {
+          throw new BadRequestException(err.message);
+        }
+        throw err;
+      }
+    }
+
+    if (!grade || !processMethod) {
+      // Legacy DB columns remain NOT NULL — coffee is the only sellable path in G1.
+      throw new BadRequestException(
+        'grade/qualityGrade and processMethod are required while coffee columns remain mandatory',
+      );
+    }
+
+    return {
+      region: dto.region,
+      regionEn: dto.regionEn,
+      woreda: dto.woreda,
+      washingStation: dto.washingStation,
+      cooperative: dto.cooperative,
+      variety: dto.variety,
+      altitudeM: dto.altitudeM,
+      cupScore: dto.cupScore,
+      grade,
+      processMethod,
+      quantity: resolved.quantity,
+      unitCode: resolved.unitCode,
+      pricePerUnit: resolved.pricePerUnit,
+      quantityKg: resolved.quantityKg,
+      pricePerKg: resolved.pricePerKg,
+      packagingLabel: dto.packagingLabel,
+      packagingQuantity: dto.packagingQuantity,
+    };
+  }
+
   private shapeCategoryFields(listing: any) {
     return {
       categoryCode: listing.category?.code ?? null,
@@ -505,6 +683,11 @@ export class MarketplaceService {
     listing: any,
     opts: { includeFarmerSummary?: boolean; includeFarmerDetail?: boolean } = {},
   ) {
+    const quantity = toNumber(listing.quantity) ?? toNumber(listing.quantityKg);
+    const pricePerUnit = toNumber(listing.pricePerUnit) ?? toNumber(listing.pricePerKg);
+    const unitCode = listing.unitCode ?? 'KG';
+    const qualityGrade = listing.grade ?? null;
+
     const base = {
       id: listing.id,
       ...this.shapeCategoryFields(listing),
@@ -521,7 +704,13 @@ export class MarketplaceService {
       cooperative: listing.cooperative,
       processMethod: listing.processMethod,
       grade: listing.grade,
+      qualityGrade,
       variety: listing.variety,
+      quantity,
+      unitCode,
+      pricePerUnit,
+      packagingLabel: listing.packagingLabel ?? null,
+      packagingQuantity: toNumber(listing.packagingQuantity),
       quantityKg: toNumber(listing.quantityKg),
       pricePerKg: toNumber(listing.pricePerKg),
       harvestDate: listing.harvestDate,
@@ -530,6 +719,16 @@ export class MarketplaceService {
       photoUrls: listing.photoUrls,
       status: listing.status,
       createdAt: listing.createdAt,
+      extensions: {
+        coffee: buildCoffeeExtension({
+          processMethod: listing.processMethod,
+          cupScore: toNumber(listing.cupScore),
+          washingStation: listing.washingStation,
+          cooperative: listing.cooperative,
+          altitudeM: toNumber(listing.altitudeM),
+          variety: listing.variety,
+        }),
+      },
     };
 
     if (opts.includeFarmerSummary && listing.farmer) {

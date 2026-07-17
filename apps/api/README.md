@@ -179,20 +179,23 @@ Unit tests: `pnpm --filter @nahu-platform/api test:farms-rules`
 ## Phase 3 — Product Catalog
 
 Design: `docs/07-decisions/phase-3-product-catalog-design.md` (Approved v1.2).
+G1 listing contract: `docs/07-decisions/g1-marketplace-contract-generalization.md`.
 
-SQL migrations: `database/migrations/catalog/003`–`008`, `marketplace/010`–`011`.
+SQL migrations: `database/migrations/catalog/003`–`010`, `marketplace/010`–`012`.
 
 Routes:
 - `GET /api/v1/categories` — unchanged (Phase 2)
 - `GET /api/v1/products?categoryCode=&activeOnly=&page=&limit=` — list products (`activeOnly` default true = `status=ACTIVE`)
 - `GET /api/v1/products/:codeOrId` — UUID or product code
-- `POST /api/v1/listings` — optional `productCode`; defaults to COFFEE default `ACTIVE` product; responses include additive `productId` / `productCode` / names / `defaultUnitCode`
+- `POST /api/v1/listings` — optional `productCode`; defaults to COFFEE default `ACTIVE` product; accepts legacy `quantityKg`/`pricePerKg` **or** G1 `quantity`/`unitCode`/`pricePerUnit` (+ optional packaging); responses include dual-written unit fields, `qualityGrade`, and `extensions.coffee`
 - `GET /api/v1/listings?productCode=` — optional product filter
 
 Product statuses: `ACTIVE` | `INACTIVE` | `COMING_SOON` | `DISCONTINUED` (independent of category `is_active`).
 Additional Ethiopian languages: `catalog.product_translations` (en/am stay on product columns).
 
-Unit tests (no DB): `pnpm --filter @nahu-platform/api test:catalog-rules`
+Unit tests (no DB):
+- `pnpm --filter @nahu-platform/api test:catalog-rules`
+- `pnpm --filter @nahu-platform/api test:listing-contract-rules`
 
 ## What's included
 
