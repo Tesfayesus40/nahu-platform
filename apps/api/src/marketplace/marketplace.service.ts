@@ -19,6 +19,12 @@ import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { QueryListingsDto } from './dto/query-listings.dto';
 import { CoffeeGrade, ProcessMethod } from './dto/create-listing.dto';
+import {
+  buildListingKeywordOr,
+  sellerProfileExtensions,
+  shapePublicCertificateSummary,
+  shapePublicFarmSummary,
+} from './listing-search.rules';
 
 /** Prisma returns NUMERIC/DECIMAL columns as Decimal objects — flatten to plain numbers for JSON responses. */
 function toNumber(value: unknown): number | null {
@@ -109,7 +115,45 @@ export class MarketplaceService {
     if (!profile) {
       throw new NotFoundException('Farmer not found');
     }
-    return this.shapeProfile(profile, { includePhone: false });
+
+    const [parties, certificates, activeListingsCount] = await Promise.all([
+      this.prisma.farmParty.findMany({
+        where: {
+          farmerProfileId: profile.id,
+          status: 'ACTIVE',
+        },
+        include: { farm: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.originCertificate.findMany({
+        where: { order: { farmerId: profile.id } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      }),
+      this.prisma.listing.count({
+        where: { farmerId: profile.id, status: 'ACTIVE' },
+      }),
+    ]);
+
+    const farms = parties
+      .map((p) => shapePublicFarmSummary(p.farm))
+      .filter(Boolean)
+      .filter((farm, index, all) => all.findIndex((f) => f!.id === farm!.id) === index);
+
+    const base = this.shapeProfile(profile, { includePhone: false });
+
+    return {
+      ...base,
+      location: {
+        region: profile.region ?? null,
+        zone: profile.zone ?? null,
+        woreda: profile.woreda ?? null,
+      },
+      farms,
+      certificates: certificates.map((c) => shapePublicCertificateSummary(c)),
+      activeListingsCount,
+      extensions: sellerProfileExtensions(Boolean(profile.verified)),
+    };
   }
 
   async getCooperatives() {
@@ -219,6 +263,9 @@ export class MarketplaceService {
     const {
       categoryCode,
       productCode,
+      farmerId,
+      q,
+      variety,
       region,
       regions,
       grade,
@@ -267,15 +314,20 @@ export class MarketplaceService {
       productId = product.id;
     }
 
+    const keywordOr = buildListingKeywordOr(q);
+
     const where = {
       status: 'ACTIVE' as const,
+      ...(farmerId ? { farmerId } : {}),
       ...(categoryId ? { categoryId } : {}),
       ...(productId ? { productId } : {}),
+      ...(variety ? { variety: { contains: variety, mode: 'insensitive' as const } } : {}),
       ...(regionList?.length ? { region: { in: regionList } } : {}),
       ...(gradeList?.length ? { grade: { in: gradeList as any } } : {}),
       ...(processMethod ? { processMethod } : {}),
       ...(minKg ? { quantityKg: { gte: minKg } } : {}),
       ...(maxPrice ? { pricePerKg: { lte: maxPrice } } : {}),
+      ...(keywordOr ? { OR: keywordOr } : {}),
     };
 
     const orderBy =
@@ -287,9 +339,9 @@ export class MarketplaceService {
 
     const [listings, total] = await Promise.all([
       this.prisma.listing.findMany({
-        where,
+        where: where as any,
         include: {
-          farmer: { include: { user: true } },
+          farmer: { include: { user: true, cooperative: true } },
           category: true,
           product: { include: { defaultUnit: true } },
         },
@@ -297,7 +349,7 @@ export class MarketplaceService {
         skip: (page - 1) * limit,
         take: limit,
       }),
-      this.prisma.listing.count({ where }),
+      this.prisma.listing.count({ where: where as any }),
     ]);
 
     return {
@@ -690,6 +742,7 @@ export class MarketplaceService {
 
     const base = {
       id: listing.id,
+      farmerId: listing.farmerId ?? listing.farmer?.id ?? null,
       ...this.shapeCategoryFields(listing),
       ...this.shapeProductFields(listing),
       stockLotId: listing.stockLotId ?? null,
@@ -738,6 +791,7 @@ export class MarketplaceService {
         farmerLastName: listing.farmer.user?.lastName ?? null,
         farmAltitude: toNumber(listing.farmer.altitudeM),
         farmerVerified: listing.farmer.verified,
+        cooperativeName: listing.farmer.cooperative?.name ?? null,
       };
     }
 

@@ -1,6 +1,6 @@
 # Buyer Platform — Architecture & Roadmap
 
-**Status:** Approved 2026-07-17 (with refinements) — B1 validated on staging; B2 next
+**Status:** Approved 2026-07-17 (with refinements) — B2 implementing
 **Date:** 2026-07-17
 **Depends on:** G1 marketplace contract (`milestone-g1-marketplace-contract`)  
 **Related:** `commodity-generalization-architecture-review.md`, `g1-marketplace-contract-generalization.md`  

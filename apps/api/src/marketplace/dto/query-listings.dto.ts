@@ -1,9 +1,23 @@
 import { Type } from 'class-transformer';
-import { IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { CoffeeGrade, ProcessMethod } from './create-listing.dto';
 
 export type ListingSort = 'newest' | 'price_asc' | 'price_desc';
 
+/**
+ * B2 listing browse/search query.
+ * Additive filters stay optional so older clients keep working.
+ */
 export class QueryListingsDto {
   @IsOptional()
   @IsString()
@@ -14,6 +28,26 @@ export class QueryListingsDto {
   @IsString()
   @MaxLength(80)
   productCode?: string;
+
+  /** Seller (farmer_profiles.id) — active listings for Seller Profile. */
+  @IsOptional()
+  @IsUUID()
+  farmerId?: string;
+
+  /**
+   * Keyword search across product, category, region, variety,
+   * listing cooperative/station text, and seller name.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  q?: string;
+
+  /** Free-text variety match (Browse variety chip). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  variety?: string;
 
   @IsOptional()
   @IsString()
