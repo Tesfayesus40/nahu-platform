@@ -1,11 +1,14 @@
 # B2 — Buyer Mobile MVP Architecture
 
-**Status:** Approved 2026-07-17 (with refinements) — thin API on staging; mobile implementing  
+**Status:** Implemented — thin API + Buyer mobile MVP on staging (2026-07-17); production unchanged  
 **Date:** 2026-07-17  
 **Parent:** `buyer-platform-architecture-roadmap.md`  
 **Depends on:** G1 listing contract · B1 order/certificate contract (`milestone-buyer-b1-contract`)  
 **Constraint:** Production unchanged until explicitly approved  
-**Proposed tag:** `milestone-buyer-mvp-mobile`
+**Milestone tags:** `milestone-buyer-b2-discovery` (platform) · `milestone-buyer-mvp-mobile` (mobile)  
+**PRs:** platform [#13](https://github.com/Tesfayesus40/nahu-platform/pull/13) · mobile [#9](https://github.com/Tesfayesus40/nahu-buna-gebaya/pull/9)  
+**Staging APK:** https://expo.dev/artifacts/eas/hd_4Nf6xuXERDuDJNU9ez1se2EITyLJBbAOeNk92jPc.apk  
+**Build:** https://expo.dev/accounts/tesfayesus/projects/nahu-buna-buyer/builds/ac41794e-64d8-422c-bbd4-170fe0315f94
 
 ## Approved refinements (2026-07-17)
 
