@@ -217,6 +217,8 @@ model Unit {
 
   products            Product[]
   listings            Listing[]
+  orders              Order[]
+  originCertificates  OriginCertificate[]
   conversionsFrom     UnitConversion[] @relation("ConversionFrom")
   conversionsTo       UnitConversion[] @relation("ConversionTo")
   stockLots           StockLot[]
@@ -495,6 +497,10 @@ model Order {
   buyerId           String        @map("buyer_id") @db.Uuid
   farmerId          String        @map("farmer_id") @db.Uuid
   quantityKg        Decimal       @map("quantity_kg") @db.Decimal(10, 2)
+  /// B1 canonical quantity — dual-written with quantityKg for legacy clients.
+  quantity          Decimal?      @db.Decimal(12, 3)
+  unitCode          String?       @map("unit_code") @db.VarChar(20)
+  pricePerUnit      Decimal?      @map("price_per_unit") @db.Decimal(12, 2)
   totalEtb          Decimal       @map("total_etb") @db.Decimal(12, 2)
   commissionEtb     Decimal       @map("commission_etb") @db.Decimal(12, 2)
   farmerPayoutEtb   Decimal       @map("farmer_payout_etb") @db.Decimal(12, 2)
@@ -511,12 +517,14 @@ model Order {
   listing           Listing            @relation(fields: [listingId], references: [id], onDelete: Restrict)
   buyer             User               @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Restrict)
   farmer            FarmerProfile      @relation("FarmerOrders", fields: [farmerId], references: [id], onDelete: Restrict)
+  unit              Unit?              @relation(fields: [unitCode], references: [code], onDelete: Restrict)
   certificate       OriginCertificate?
   reservations      Reservation[]
 
   @@index([buyerId])
   @@index([farmerId])
   @@index([status])
+  @@index([unitCode])
   @@map("orders")
   @@schema("orders")
 }
@@ -534,11 +542,16 @@ model OriginCertificate {
   harvestDate    DateTime @map("harvest_date") @db.Date
   altitudeM      Decimal? @map("altitude_m") @db.Decimal(6, 1)
   quantityKg     Decimal? @map("quantity_kg") @db.Decimal(8, 2)
+  /// B1 canonical quantity — dual-written with quantityKg.
+  quantity       Decimal? @db.Decimal(12, 3)
+  unitCode       String?  @map("unit_code") @db.VarChar(20)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz
 
   order          Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  unit           Unit? @relation(fields: [unitCode], references: [code], onDelete: Restrict)
 
+  @@index([unitCode])
   @@map("origin_certificates")
   @@schema("orders")
 }

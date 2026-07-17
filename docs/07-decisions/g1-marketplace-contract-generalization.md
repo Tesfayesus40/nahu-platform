@@ -1,9 +1,11 @@
 # G1 — Marketplace Contract Generalization
 
-**Status:** Approved 2026-07-17 — implemented (SQL applied on staging; API awaiting staging deploy)  
+**Status:** Implemented & validated on staging (2026-07-17) — production unchanged  
 **Date:** 2026-07-17  
 **Phase:** Commodity generalization G1 (pre-Buyer)  
 **Parent:** `commodity-generalization-architecture-review.md`  
+**Milestone tag:** `milestone-g1-marketplace-contract`  
+**PR:** https://github.com/Tesfayesus40/nahu-platform/pull/11  
 **Constraint:** Production unchanged until explicitly approved  
 
 **Approved product direction (incorporated):**
