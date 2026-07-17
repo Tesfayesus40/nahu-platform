@@ -12,6 +12,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 export enum ProcessMethod {
@@ -80,28 +81,75 @@ export class CreateListingDto {
   @MaxLength(100)
   woreda?: string;
 
-  @IsEnum(ProcessMethod)
-  processMethod: ProcessMethod;
-
+  /**
+   * Coffee extension — required when resolved category is COFFEE.
+   * Prefer qualityGrade for new clients; grade remains for legacy.
+   */
+  @ValidateIf((o) => o.qualityGrade === undefined)
   @IsEnum(CoffeeGrade)
-  grade: CoffeeGrade;
+  grade?: CoffeeGrade;
+
+  /** Generic quality grade alias (maps to listing.grade). */
+  @ValidateIf((o) => o.grade === undefined)
+  @IsEnum(CoffeeGrade)
+  qualityGrade?: CoffeeGrade;
+
+  /** Coffee extension — required when resolved category is COFFEE. */
+  @IsOptional()
+  @IsEnum(ProcessMethod)
+  processMethod?: ProcessMethod;
 
   @IsOptional()
   @IsString()
   @MaxLength(100)
   variety?: string;
 
+  /** Canonical quantity (G1). Use with unitCode + pricePerUnit. */
+  @ValidateIf((o) => o.quantityKg === undefined)
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.01)
+  @Max(1_000_000)
+  quantity?: number;
+
+  @ValidateIf((o) => o.quantityKg === undefined)
+  @IsString()
+  @MaxLength(20)
+  unitCode?: string;
+
+  @ValidateIf((o) => o.pricePerKg === undefined)
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.01)
+  @Max(1_000_000)
+  pricePerUnit?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  packagingLabel?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0.001)
+  @Max(1_000_000)
+  packagingQuantity?: number;
+
+  /** Legacy kg quantity — dual-written to quantity/unitCode=KG when modern fields omitted. */
+  @ValidateIf((o) => o.quantity === undefined)
   @Type(() => Number)
   @IsNumber()
   @Min(0.01)
   @Max(5000)
-  quantityKg: number;
+  quantityKg?: number;
 
+  @ValidateIf((o) => o.pricePerUnit === undefined)
   @Type(() => Number)
   @IsNumber()
   @Min(0.01)
   @Max(10000)
-  pricePerKg: number;
+  pricePerKg?: number;
 
   /** Format: YYYY-MM-DD */
   @IsISO8601({ strict: true })
