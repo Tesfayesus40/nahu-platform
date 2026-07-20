@@ -36,11 +36,13 @@ export async function POST(req: NextRequest) {
     mfaEnrollmentRequired: boolean;
   };
 
-  // Keep the enrollment token server-side; the TOTP enroll routes read it back.
+  // Return Nest enrollment JWT to the client for the immediate totp call;
+  // also keep HttpOnly cookie for resilience on confirm.
   const res = NextResponse.json({
     userId: accepted.userId,
     email: accepted.email,
     mfaEnrollmentRequired: accepted.mfaEnrollmentRequired,
+    enrollmentToken: accepted.enrollmentToken,
   });
   setEnrollCookie(res, accepted.enrollmentToken);
   return res;

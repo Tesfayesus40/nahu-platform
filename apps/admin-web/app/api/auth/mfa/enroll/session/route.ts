@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { callNest, csrfFailureResponse } from "@/lib/api";
 import { setEnrollCookie } from "@/lib/session";
 
+function isJwt(value: string): boolean {
+  return value.startsWith("eyJ") && value.split(".").length === 3;
+}
+
 /**
- * Seeds the HttpOnly enrollment cookie.
- *
- * Bootstrap /enroll-mfa?token=… passes a raw invitation token (hex). We exchange
- * it via Nest for a Nest-signed enrollment JWT so verifyEnrollToken uses the
- * same JwtService/secret that signed it. Never trust a JWT signed outside Nest.
+ * Exchange invitation token (or accept Nest enrollment JWT) and return the
+ * Nest-signed enrollment JWT in the JSON body. Also sets the HttpOnly cookie
+ * for later confirm steps. Clients must use the returned JWT for /enroll/totp
+ * — never the bootstrap invitation token from the URL.
  */
 export async function POST(req: NextRequest) {
   const csrfFailure = csrfFailureResponse(req);
@@ -17,46 +20,42 @@ export async function POST(req: NextRequest) {
     enrollmentToken?: string;
     token?: string;
   };
-  // Accept either field name from the enroll-mfa page / older clients.
   const invitationOrJwt = (body.token ?? body.enrollmentToken)?.trim();
   if (!invitationOrJwt) {
     return NextResponse.json({ error: "token is required" }, { status: 400 });
   }
 
-  // Nest-signed JWTs start with eyJ. Invitation tokens are hex.
-  const looksLikeJwt = invitationOrJwt.startsWith("eyJ");
+  let enrollmentToken: string;
 
-  if (looksLikeJwt) {
-    // Accept-invite already received a Nest-signed enrollment JWT.
-    const res = NextResponse.json({ ok: true });
-    setEnrollCookie(res, invitationOrJwt);
-    return res;
+  if (isJwt(invitationOrJwt)) {
+    enrollmentToken = invitationOrJwt;
+  } else {
+    const result = await callNest("/admin/auth/invitations/enrollment-session", {
+      method: "POST",
+      body: { token: invitationOrJwt },
+    });
+
+    if (result.status >= 400) {
+      return NextResponse.json(result.body, { status: result.status });
+    }
+
+    const fromNest =
+      result.body &&
+      typeof result.body === "object" &&
+      "enrollmentToken" in result.body
+        ? String((result.body as { enrollmentToken: string }).enrollmentToken)
+        : "";
+
+    if (!isJwt(fromNest)) {
+      return NextResponse.json(
+        { error: "Enrollment session did not return a valid JWT" },
+        { status: 502 },
+      );
+    }
+    enrollmentToken = fromNest;
   }
 
-  const result = await callNest("/admin/auth/invitations/enrollment-session", {
-    method: "POST",
-    body: { token: invitationOrJwt },
-  });
-
-  if (result.status >= 400) {
-    return NextResponse.json(result.body, { status: result.status });
-  }
-
-  const enrollmentToken =
-    result.body &&
-    typeof result.body === "object" &&
-    "enrollmentToken" in result.body
-      ? String((result.body as { enrollmentToken: string }).enrollmentToken)
-      : "";
-
-  if (!enrollmentToken) {
-    return NextResponse.json(
-      { error: "Enrollment session could not be created" },
-      { status: 502 },
-    );
-  }
-
-  const res = NextResponse.json({ ok: true });
+  const res = NextResponse.json({ ok: true, enrollmentToken });
   setEnrollCookie(res, enrollmentToken);
   return res;
 }

@@ -1,20 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callNest, csrfFailureResponse, readJsonBody } from "@/lib/api";
-import { ENROLL_COOKIE } from "@/lib/session";
+import { ENROLL_COOKIE, setEnrollCookie } from "@/lib/session";
 
+function isJwt(value: string): boolean {
+  return value.startsWith("eyJ") && value.split(".").length === 3;
+}
+
+/**
+ * Prefer enrollmentToken from the JSON body (returned by /enroll/session).
+ * Fall back to the HttpOnly cookie only if it is a Nest JWT.
+ * Never forward a bootstrap invitation hex token to Nest.
+ */
 export async function POST(req: NextRequest) {
   const csrfFailure = csrfFailureResponse(req);
   if (csrfFailure) return csrfFailure;
 
-  const enrollmentToken = req.cookies.get(ENROLL_COOKIE)?.value;
+  const body = (await readJsonBody(req)) as {
+    label?: string;
+    enrollmentToken?: string;
+  };
+
+  const fromBody = body.enrollmentToken?.trim() ?? "";
+  const fromCookie = req.cookies.get(ENROLL_COOKIE)?.value?.trim() ?? "";
+
+  const enrollmentToken = isJwt(fromBody)
+    ? fromBody
+    : isJwt(fromCookie)
+      ? fromCookie
+      : "";
+
   if (!enrollmentToken) {
     return NextResponse.json(
-      { error: "Enrollment session expired; accept your invitation again" },
+      {
+        error:
+          "Missing Nest enrollment JWT. Call /api/auth/mfa/enroll/session first and pass its enrollmentToken.",
+      },
       { status: 401 },
     );
   }
 
-  const body = (await readJsonBody(req)) as { label?: string };
   const result = await callNest("/admin/auth/mfa/enroll/totp", {
     method: "POST",
     body: {
@@ -23,7 +47,10 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Body contains { factorId, otpauthUrl, secret } — the secret must be shown
-  // to the user for authenticator setup, so it is passed through here once.
-  return NextResponse.json(result.body, { status: result.status });
+  const res = NextResponse.json(result.body, { status: result.status });
+  // Refresh cookie so confirm step has the same Nest JWT.
+  if (result.status === 200 || result.status === 201) {
+    setEnrollCookie(res, enrollmentToken);
+  }
+  return res;
 }

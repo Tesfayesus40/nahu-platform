@@ -2,19 +2,34 @@ import { NextRequest, NextResponse } from "next/server";
 import { callNest, csrfFailureResponse, readJsonBody } from "@/lib/api";
 import { ENROLL_COOKIE, clearEnrollCookie } from "@/lib/session";
 
+function isJwt(value: string): boolean {
+  return value.startsWith("eyJ") && value.split(".").length === 3;
+}
+
 export async function POST(req: NextRequest) {
   const csrfFailure = csrfFailureResponse(req);
   if (csrfFailure) return csrfFailure;
 
-  const enrollmentToken = req.cookies.get(ENROLL_COOKIE)?.value;
+  const body = (await readJsonBody(req)) as {
+    totpCode?: string;
+    enrollmentToken?: string;
+  };
+
+  const fromBody = body.enrollmentToken?.trim() ?? "";
+  const fromCookie = req.cookies.get(ENROLL_COOKIE)?.value?.trim() ?? "";
+  const enrollmentToken = isJwt(fromBody)
+    ? fromBody
+    : isJwt(fromCookie)
+      ? fromCookie
+      : "";
+
   if (!enrollmentToken) {
     return NextResponse.json(
-      { error: "Enrollment session expired; accept your invitation again" },
+      { error: "Enrollment session expired; start authenticator setup again" },
       { status: 401 },
     );
   }
 
-  const body = (await readJsonBody(req)) as { totpCode?: string };
   const result = await callNest("/admin/auth/mfa/enroll/totp/confirm", {
     method: "POST",
     body: { enrollmentToken, totpCode: body.totpCode },
@@ -24,7 +39,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result.body, { status: result.status });
   }
 
-  // Body contains { verified, recoveryCodes } — recovery codes shown once.
   const res = NextResponse.json(result.body);
   clearEnrollCookie(res);
   return res;

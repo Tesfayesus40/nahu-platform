@@ -38,6 +38,7 @@ function AcceptInviteFlow() {
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
 
+  const [enrollmentJwt, setEnrollmentJwt] = useState<string | null>(null);
   const [enrollment, setEnrollment] = useState<{
     otpauthUrl: string;
     secret: string;
@@ -54,16 +55,29 @@ function AcceptInviteFlow() {
     }
     setSubmitting(true);
     try {
-      await bffPost("/api/auth/invitations/accept", {
+      const accepted = await bffPost<{
+        enrollmentToken: string;
+        userId: string;
+        email: string | null;
+        mfaEnrollmentRequired: boolean;
+      }>("/api/auth/invitations/accept", {
         token: inviteToken,
         password,
         ...(firstName ? { firstName } : {}),
         ...(lastName ? { lastName } : {}),
         ...(phone ? { phone } : {}),
       });
+      const jwt = accepted.enrollmentToken?.trim() ?? "";
+      if (!jwt.startsWith("eyJ")) {
+        throw {
+          status: 502,
+          message: "Accept invitation did not return a Nest enrollment JWT",
+        } satisfies BffError;
+      }
+      setEnrollmentJwt(jwt);
       const enrolled = await bffPost<{ otpauthUrl: string; secret: string }>(
         "/api/auth/mfa/enroll/totp",
-        {},
+        { enrollmentToken: jwt },
       );
       setEnrollment(enrolled);
       setStep("enroll");
@@ -82,7 +96,10 @@ function AcceptInviteFlow() {
       const result = await bffPost<{
         verified: boolean;
         recoveryCodes: string[];
-      }>("/api/auth/mfa/enroll/totp/confirm", { totpCode: totpCode.trim() });
+      }>("/api/auth/mfa/enroll/totp/confirm", {
+        totpCode: totpCode.trim(),
+        ...(enrollmentJwt ? { enrollmentToken: enrollmentJwt } : {}),
+      });
       setRecoveryCodes(result.recoveryCodes);
       setStep("recovery");
     } catch (err) {
