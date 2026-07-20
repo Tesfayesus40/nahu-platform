@@ -1,0 +1,16 @@
+listings_count=5
+sample_farmerId=925e450e-39a1-49e2-bb3f-ba6ef01b1e6a
+sample_has_quantity=True
+sample_unitCode=KG
+farmerId_on_listing=True
+seller_ok=True
+seller_farms=1
+seller_certs=1
+seller_active=4
+seller_ext_keys=['ratings', 'reviews', 'verifiedSellerBadge', 'responseMetrics']
+listings_by_farmer=4
+farmer_filter_ok=True
+search_q_count=10
+search_ok=True
+categories_count=13
+B2_API_SMOKE=PASS

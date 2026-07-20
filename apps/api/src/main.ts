@@ -20,6 +20,10 @@ async function bootstrap() {
     throw new Error('JWT_SECRET must be set to a strong value in production');
   }
 
+  if (nodeEnv === 'production' && !process.env.ADMIN_MFA_ENCRYPTION_KEY) {
+    throw new Error('ADMIN_MFA_ENCRYPTION_KEY must be set in production');
+  }
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   const uploadDir = process.env.UPLOAD_DIR ?? join(process.cwd(), 'uploads');

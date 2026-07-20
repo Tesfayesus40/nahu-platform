@@ -1,0 +1,11 @@
+ok=5 bad=0 total=9
+code|nameEn|nameAm|check
+PLANTING|Planting|መትከል|OK
+FERTILIZER|Fertilizer|ማዳበሪያ|OK
+IRRIGATION|Irrigation|መስኖ|OK
+SPRAYING|Spraying|ርጭት|OK
+WEEDING|Weeding|አረም ማረም|OK
+PRUNING|Pruning|ግርዛት|OK
+SCOUTING|Scouting|የማሳ ምርመራ|OK
+HARVESTING_SUPPORT|Harvesting support|የመከር ድጋፍ|OK
+OTHER|Other|ሌላ|OK

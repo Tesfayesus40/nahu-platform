@@ -1,0 +1,11 @@
+listing_id=0fc5874f-4681-4392-9b91-e7394ef0ea6a
+listing_farmerId=925e450e-39a1-49e2-bb3f-ba6ef01b1e6a
+search_found_listing=True
+seller_has_farms=True
+seller_has_certs=True
+order_qty=3
+order_unit=KG
+paid=PAID_ESCROW
+completed=COMPLETED
+cert_ok=True
+B2_E2E_SMOKE=PASS

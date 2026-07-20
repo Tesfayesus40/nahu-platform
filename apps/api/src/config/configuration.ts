@@ -32,5 +32,18 @@ export default () => {
     uploadDir: process.env.UPLOAD_DIR ?? join(process.cwd(), 'uploads'),
     publicBaseUrl,
   },
+  adminAuth: {
+    accessTokenTtl: process.env.ADMIN_ACCESS_TOKEN_TTL ?? '15m',
+    refreshAbsoluteHours: parseInt(process.env.ADMIN_REFRESH_ABSOLUTE_HOURS ?? '12', 10),
+    refreshIdleMinutes: parseInt(process.env.ADMIN_REFRESH_IDLE_MINUTES ?? '30', 10),
+    invitationTtlHours: parseInt(process.env.ADMIN_INVITATION_TTL_HOURS ?? '72', 10),
+    mfaEncryptionKey: process.env.ADMIN_MFA_ENCRYPTION_KEY,
+    failedLoginMax: parseInt(process.env.ADMIN_FAILED_LOGIN_MAX ?? '5', 10),
+    failedLoginWindowMinutes: parseInt(
+      process.env.ADMIN_FAILED_LOGIN_WINDOW_MINUTES ?? '15',
+      10,
+    ),
+    reauthWindowMinutes: parseInt(process.env.ADMIN_REAUTH_WINDOW_MINUTES ?? '5', 10),
+  },
 };
 };

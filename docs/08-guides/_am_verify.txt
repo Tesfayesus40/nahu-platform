@@ -1,0 +1,13 @@
+        code        |      name_en       | name_am  
+--------------------+--------------------+----------
+ PLANTING           | Planting           | መትከል
+ FERTILIZER         | Fertilizer         | ማዳበሪያ
+ IRRIGATION         | Irrigation         | መስኖ
+ SPRAYING           | Spraying           | ርጭት
+ WEEDING            | Weeding            | አረም ማረም
+ PRUNING            | Pruning            | ግርዛት
+ SCOUTING           | Scouting           | የማሳ ምርመራ
+ HARVESTING_SUPPORT | Harvesting support | የመከር ድጋፍ
+ OTHER              | Other              | ሌላ
+(9 rows)
+

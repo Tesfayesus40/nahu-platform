@@ -1,0 +1,18 @@
+result=PASS
+profile=existing
+farm=existing
+form_picker_ok=True
+type|PLANTING|መትከል|OK
+type|SPRAYING|ርጭት|OK
+type|WEEDING|አረም ማረም|OK
+type|PRUNING|ግርዛት|OK
+type|SCOUTING|የማሳ ምርመራ|OK
+farm_id=c38c38ef-f7b4-4f22-a1ef-406d0b721085
+activity_id=9714f0e0-7b00-446e-9bfc-01f5665554bd
+created_type_am=ርጭት
+list_type_am=ርጭት
+detail_type_am=ርጭት
+spray_match=True
+ui_form=FarmActivityFormScreen: language===am ? t.nameAm : t.nameEn
+ui_list=FarmActivitiesScreen: activityTypeNameAm
+ui_detail=FarmActivityDetailScreen: activityTypeNameAm

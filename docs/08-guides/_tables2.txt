@@ -1,0 +1,20 @@
+                  List of tables
+ Schema |         Name         | Type  |  Owner   
+--------+----------------------+-------+----------
+ farms  | activity_types       | table | postgres
+ farms  | cropping_cycle_lines | table | postgres
+ farms  | cropping_cycles      | table | postgres
+ farms  | farm_activities      | table | postgres
+ farms  | farm_audit_log       | table | postgres
+ farms  | farm_parties         | table | postgres
+ farms  | farm_party_history   | table | postgres
+ farms  | farm_translations    | table | postgres
+ farms  | farms                | table | postgres
+ farms  | fields               | table | postgres
+ farms  | harvest_lines        | table | postgres
+ farms  | harvest_sessions     | table | postgres
+ farms  | plots                | table | postgres
+ farms  | production_units     | table | postgres
+ farms  | season_codes         | table | postgres
+(15 rows)
+

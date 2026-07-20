@@ -1,0 +1,45 @@
+                                         Table "farms.farms"
+       Column        |           Type           | Collation | Nullable |           Default           
+---------------------+--------------------------+-----------+----------+-----------------------------
+ id                  | uuid                     |           | not null | gen_random_uuid()
+ code                | character varying(40)    |           |          | 
+ name                | character varying(150)   |           | not null | 
+ name_am             | character varying(150)   |           |          | 
+ tenure_type         | farms.tenure_type        |           | not null | 'OWNED'::farms.tenure_type
+ cooperative_id      | uuid                     |           |          | 
+ status              | farms.farm_status        |           | not null | 'ACTIVE'::farms.farm_status
+ region              | character varying(100)   |           | not null | 
+ region_en           | character varying(100)   |           |          | 
+ zone                | character varying(100)   |           |          | 
+ woreda              | character varying(100)   |           |          | 
+ kebele              | character varying(100)   |           |          | 
+ altitude_m          | numeric(6,1)             |           |          | 
+ size_ha             | numeric(10,2)            |           |          | 
+ centroid_lat        | numeric(9,6)             |           |          | 
+ centroid_lng        | numeric(9,6)             |           |          | 
+ boundary_geojson    | jsonb                    |           |          | 
+ boundary_source     | character varying(40)    |           |          | 
+ boundary_updated_at | timestamp with time zone |           |          | 
+ notes               | text                     |           |          | 
+ created_at          | timestamp with time zone |           | not null | now()
+ updated_at          | timestamp with time zone |           | not null | now()
+Indexes:
+    "farms_pkey" PRIMARY KEY, btree (id)
+    "idx_farms_cooperative_id" btree (cooperative_id)
+    "idx_farms_status" btree (status)
+Foreign-key constraints:
+    "fk_farms_cooperative" FOREIGN KEY (cooperative_id) REFERENCES marketplace.cooperatives(id) ON DELETE SET NULL
+Referenced by:
+    TABLE "farms.cropping_cycles" CONSTRAINT "fk_cropping_cycles_farm" FOREIGN KEY (farm_id) REFERENCES farms.farms(id) ON DELETE RESTRICT
+    TABLE "farms.farm_activities" CONSTRAINT "fk_farm_activities_farm" FOREIGN KEY (farm_id) REFERENCES farms.farms(id) ON DELETE RESTRICT
+    TABLE "farms.farm_audit_log" CONSTRAINT "fk_farm_audit_log_farm" FOREIGN KEY (farm_id) REFERENCES farms.farms(id) ON DELETE CASCADE
+    TABLE "farms.farm_parties" CONSTRAINT "fk_farm_parties_farm" FOREIGN KEY (farm_id) REFERENCES farms.farms(id) ON DELETE CASCADE
+    TABLE "farms.farm_party_history" CONSTRAINT "fk_farm_party_history_farm" FOREIGN KEY (farm_id) REFERENCES farms.farms(id) ON DELETE CASCADE
+    TABLE "farms.farm_translations" CONSTRAINT "fk_farm_translations_farm" FOREIGN KEY (farm_id) REFERENCES farms.farms(id) ON DELETE CASCADE
+    TABLE "farms.harvest_sessions" CONSTRAINT "fk_harvest_sessions_farm" FOREIGN KEY (farm_id) REFERENCES farms.farms(id) ON DELETE RESTRICT
+    TABLE "marketplace.listings" CONSTRAINT "fk_listings_farm" FOREIGN KEY (farm_id) REFERENCES farms.farms(id) ON DELETE SET NULL
+    TABLE "farms.plots" CONSTRAINT "fk_plots_farm" FOREIGN KEY (farm_id) REFERENCES farms.farms(id) ON DELETE CASCADE
+    TABLE "farms.production_units" CONSTRAINT "fk_production_units_farm" FOREIGN KEY (farm_id) REFERENCES farms.farms(id) ON DELETE CASCADE
+    TABLE "inventory.stock_lots" CONSTRAINT "fk_stock_lots_farm" FOREIGN KEY (farm_id) REFERENCES farms.farms(id) ON DELETE RESTRICT
+    TABLE "warehouse.storage_sites" CONSTRAINT "fk_storage_sites_farm" FOREIGN KEY (farm_id) REFERENCES farms.farms(id) ON DELETE RESTRICT
+

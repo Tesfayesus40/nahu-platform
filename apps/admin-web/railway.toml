@@ -1,0 +1,17 @@
+# Config-as-code for the nahu-admin-web Railway service only.
+# In Railway → nahu-admin-web → Settings → Config-as-code, set the path to:
+#   /apps/admin-web/railway.toml
+# Leave the service root / build context at the monorepo root so this Dockerfile
+# can COPY workspace files. Do not use the repo-root railway.toml for this service
+# (that file builds the Nest API).
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "apps/admin-web/Dockerfile"
+
+[deploy]
+# Login is a static auth page and returns 200 without Nest credentials.
+healthcheckPath = "/login"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

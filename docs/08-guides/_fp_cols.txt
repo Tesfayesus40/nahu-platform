@@ -1,0 +1,13 @@
+id
+user_id
+cooperative_id
+region
+zone
+woreda
+altitude_m
+farm_size_ha
+primary_language
+verified
+verification_notes
+created_at
+updated_at

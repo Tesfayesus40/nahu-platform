@@ -12,6 +12,7 @@ import { SmsService } from './sms/sms.service';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
+import { isWorkforceBlockedFromOtp } from './admin/admin-auth.rules';
 
 // Dev/staging-only universal OTP, gated behind nodeEnv below — same
 // approach as the original auth.service.js, so any phone can be tested
@@ -41,18 +42,59 @@ export class IdentityService {
     return !this.isProduction || this.config.get<boolean>('otp.devBypassEnabled') === true;
   }
 
+  /** Workforce / MFA-required users must use admin password+TOTP, never OTP. */
+  private async assertNotWorkforceOtp(userId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { userRoles: { include: { role: true } } },
+    });
+    if (!user) {
+      return;
+    }
+    const roleCodes = user.userRoles.map((ur) => ur.role.code);
+    if (
+      isWorkforceBlockedFromOtp({
+        roleCodes,
+        mfaRequired: user.mfaRequired,
+      })
+    ) {
+      throw new ForbiddenException(
+        'Workforce accounts cannot authenticate via OTP; use the Admin Portal login',
+      );
+    }
+  }
+
   async requestOtp({ phone, role }: RequestOtpDto) {
-    let user = await this.prisma.user.findUnique({ where: { phone } });
+    let user = await this.prisma.user.findUnique({
+      where: { phone },
+      include: { userRoles: { include: { role: true } } },
+    });
+
+    if (user) {
+      const roleCodes = user.userRoles.map((ur) => ur.role.code);
+      if (
+        isWorkforceBlockedFromOtp({
+          roleCodes,
+          mfaRequired: user.mfaRequired,
+        })
+      ) {
+        throw new ForbiddenException(
+          'Workforce accounts cannot use OTP registration or login',
+        );
+      }
+    }
 
     if (!user) {
       user = await this.prisma.user.create({
         data: { phone, status: 'PENDING' },
+        include: { userRoles: { include: { role: true } } },
       });
     }
 
     // Assign the requested role if the user doesn't already have it.
     // Registration is additive: requesting OTP as BUYER after already
     // being a FARMER adds the BUYER role rather than replacing anything.
+    // DTO already restricts role to FARMER|BUYER only.
     const roleRow = await this.prisma.role.findUnique({ where: { code: role } });
     if (!roleRow) {
       throw new NotFoundException(
@@ -108,6 +150,7 @@ export class IdentityService {
       if (!user) {
         throw new UnauthorizedException('Phone number not registered. Request OTP first.');
       }
+      await this.assertNotWorkforceOtp(user.id);
       this.logger.debug(`[DEV] Universal OTP used for ${phone}`);
       return this.issueSession(user.id, phone, role);
     }
@@ -128,6 +171,8 @@ export class IdentityService {
       // but fail loudly rather than issuing a token for a phantom account.
       throw new UnauthorizedException('Phone number not registered. Request OTP first.');
     }
+
+    await this.assertNotWorkforceOtp(user.id);
 
     if (!user.phoneVerified) {
       await this.prisma.user.update({
@@ -181,6 +226,8 @@ export class IdentityService {
 
   /** Signs a JWT and returns it with a minimal user summary — shared by both DEV_OTP and normal verify paths. */
   private async issueSession(userId: string, phone: string, preferredRole?: string) {
+    await this.assertNotWorkforceOtp(userId);
+
     let roleCode: string | null = null;
 
     if (preferredRole) {

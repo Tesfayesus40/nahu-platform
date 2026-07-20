@@ -12,7 +12,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["identity", "catalog", "marketplace", "orders", "farms", "inventory", "warehouse"]
+  schemas  = ["identity", "catalog", "marketplace", "orders", "farms", "inventory", "warehouse", "audit"]
 }
 
 enum UserStatus {
@@ -37,6 +37,9 @@ model User {
   status             UserStatus @default(PENDING)
   phoneVerified      Boolean   @default(false) @map("phone_verified")
   emailVerified      Boolean   @default(false) @map("email_verified")
+  authzVersion       Int       @default(1) @map("authz_version")
+  mustResetPassword  Boolean   @default(false) @map("must_reset_password")
+  mfaRequired        Boolean   @default(false) @map("mfa_required")
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime  @default(now()) @map("updated_at") @db.Timestamptz
   deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
@@ -48,6 +51,11 @@ model User {
   permissionsGranted RolePermission[] @relation("GrantedByUser")
   farmerProfile      FarmerProfile?
   buyerOrders        Order[]           @relation("BuyerOrders")
+  adminInvitationsReceived AdminInvitation[] @relation("InvitationInvitee")
+  adminInvitationsSent     AdminInvitation[] @relation("InvitationInviter")
+  mfaFactors         MfaFactor[]
+  mfaRecoveryCodes   MfaRecoveryCode[]
+  adminSessions      AdminSession[]
 
   @@map("users")
   @@schema("identity")
@@ -171,6 +179,125 @@ model OtpCode {
   @@index([phone])
   @@map("otp_codes")
   @@schema("identity")
+}
+
+model AdminInvitation {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String    @db.VarChar(255)
+  phone         String?   @db.VarChar(25)
+  invitedUserId String?   @map("invited_user_id") @db.Uuid
+  roleCodes     String[]  @map("role_codes")
+  tokenHash     String    @unique @map("token_hash")
+  invitedBy     String    @map("invited_by") @db.Uuid
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz
+  acceptedAt    DateTime? @map("accepted_at") @db.Timestamptz
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  invitedUser   User?     @relation("InvitationInvitee", fields: [invitedUserId], references: [id], onDelete: SetNull)
+  invitedByUser User      @relation("InvitationInviter", fields: [invitedBy], references: [id], onDelete: Restrict)
+
+  @@index([email])
+  @@map("admin_invitations")
+  @@schema("identity")
+}
+
+enum MfaFactorType {
+  TOTP
+
+  @@schema("identity")
+  @@map("mfa_factor_type")
+}
+
+model MfaFactor {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String        @map("user_id") @db.Uuid
+  type            MfaFactorType @default(TOTP)
+  label           String?       @db.VarChar(100)
+  secretEncrypted String        @map("secret_encrypted")
+  verifiedAt      DateTime?     @map("verified_at") @db.Timestamptz
+  disabledAt      DateTime?     @map("disabled_at") @db.Timestamptz
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("mfa_factors")
+  @@schema("identity")
+}
+
+model MfaRecoveryCode {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("mfa_recovery_codes")
+  @@schema("identity")
+}
+
+model AdminSession {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String    @map("user_id") @db.Uuid
+  refreshTokenHash    String    @map("refresh_token_hash")
+  authzVersionAtIssue Int       @map("authz_version_at_issue")
+  ip                  String?   @db.VarChar(64)
+  userAgent           String?   @map("user_agent") @db.VarChar(512)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastSeenAt          DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz
+  absoluteExpiresAt   DateTime  @map("absolute_expires_at") @db.Timestamptz
+  idleExpiresAt       DateTime  @map("idle_expires_at") @db.Timestamptz
+  revokedAt           DateTime? @map("revoked_at") @db.Timestamptz
+  revokeReason        String?   @map("revoke_reason") @db.VarChar(100)
+  replacedBySessionId String?   @map("replaced_by_session_id") @db.Uuid
+  reauthenticatedAt   DateTime? @map("reauthenticated_at") @db.Timestamptz
+
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replacedBy          AdminSession? @relation("SessionReplacement", fields: [replacedBySessionId], references: [id], onDelete: SetNull)
+  replaces            AdminSession[] @relation("SessionReplacement")
+
+  @@index([userId])
+  @@index([refreshTokenHash])
+  @@map("admin_sessions")
+  @@schema("identity")
+}
+
+enum AuditOutcome {
+  SUCCESS
+  DENIED
+  FAILED
+
+  @@schema("audit")
+  @@map("audit_outcome")
+}
+
+model AuditEvent {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  occurredAt     DateTime     @default(now()) @map("occurred_at") @db.Timestamptz
+  actorUserId    String?      @map("actor_user_id") @db.Uuid
+  actorSessionId String?      @map("actor_session_id") @db.Uuid
+  permissionCode String?      @map("permission_code") @db.VarChar(100)
+  action         String       @db.VarChar(100)
+  targetType     String?      @map("target_type") @db.VarChar(100)
+  targetId       String?      @map("target_id") @db.VarChar(100)
+  requestId      String?      @map("request_id") @db.VarChar(100)
+  reason         String?
+  outcome        AuditOutcome
+  beforeJson     Json?        @map("before_json")
+  afterJson      Json?        @map("after_json")
+  ip             String?      @db.VarChar(64)
+  userAgent      String?      @map("user_agent") @db.VarChar(512)
+  metadataJson   Json?        @map("metadata_json")
+
+  @@index([occurredAt])
+  @@index([actorUserId])
+  @@index([action])
+  @@map("events")
+  @@schema("audit")
 }
 
 // ============================================================================

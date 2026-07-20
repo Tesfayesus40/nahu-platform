@@ -79,26 +79,45 @@ See `apps/api/.env.staging.example` for optional SMS and Anthropic keys.
 
 ### 6. Apply database migrations
 
-**Fresh database** — run all migrations:
+Migrations are applied from a **manifest** with a checksum ledger. See
+`docs/08-guides/migration-manifest.md`.
+
+**Fresh or existing staging database:**
 
 ```bash
 export DATABASE_URL="postgresql://..."
-./scripts/apply-migrations.sh
+# If the DB already has pre-A1 schema applied outside the ledger:
+# export MARK_EXISTING=1
+node scripts/apply-migrations.mjs
+# or: ./scripts/apply-migrations.sh
 ```
 
-**Existing staging/production DB** (already on migrations 001–005) — run only Pack 2–4 pending files:
+Do **not** rely on recursive filename sort. Prefer the manifest runners above
+over legacy `apply-pending-migrations.sh`.
 
-```bash
-export DATABASE_URL="postgresql://..."
-./scripts/apply-pending-migrations.sh
-```
+### 6b. Admin Portal staging service (A1)
 
-On Windows (Git Bash):
+Add a separate Railway service for Admin Web (do **not** create a production
+Admin service in A1):
 
-```bash
-DATABASE_URL="postgresql://..." bash scripts/apply-pending-migrations.sh
-```
+1. Service name suggestion: `nahu-admin-web`
+2. **Config-as-code path:** `/apps/admin-web/railway.toml`  
+   (Do **not** use the repo-root `railway.toml` — that builds the Nest API.)
+3. Root directory / build context: monorepo root (`/`)
+4. Variables:
+   - `API_BASE_URL=https://nahu-api-staging.up.railway.app/api/v1`
+   - `ADMIN_WEB_ORIGIN=https://<admin-staging-host>`
+   - `NODE_ENV=production`
+   - `PORT=3001` (Railway may also inject `PORT`)
+5. On `nahu-api`, set:
+   - `ADMIN_MFA_ENCRYPTION_KEY` (`openssl rand -hex 32`)
+   - `CORS_ORIGINS` to include the Admin Web origin
+6. Bootstrap the first admins using `docs/08-guides/a1-admin-bootstrap.md`
+7. Hand the staging URL and acceptance checklist to the user:
+   `docs/08-guides/a1-staging-validation-handoff.md`
 
+Stop for **user validation** before Commit → PR → Merge → Tag.
+Production remains frozen.
 ### 7. Verify
 
 ```bash

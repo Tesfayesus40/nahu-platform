@@ -1,0 +1,14 @@
+                  List of tables
+  Schema  |        Name        | Type  |  Owner   
+----------+--------------------+-------+----------
+ identity | credentials        | table | postgres
+ identity | organizations      | table | postgres
+ identity | otp_codes          | table | postgres
+ identity | permissions        | table | postgres
+ identity | role_permissions   | table | postgres
+ identity | roles              | table | postgres
+ identity | user_organizations | table | postgres
+ identity | user_roles         | table | postgres
+ identity | users              | table | postgres
+(9 rows)
+

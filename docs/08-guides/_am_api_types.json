@@ -1,0 +1,58 @@
+{
+  "data": [
+    {
+      "code": "PLANTING",
+      "nameEn": "Planting",
+      "nameAm": "መትከል",
+      "sortOrder": 10
+    },
+    {
+      "code": "FERTILIZER",
+      "nameEn": "Fertilizer",
+      "nameAm": "ማዳበሪያ",
+      "sortOrder": 20
+    },
+    {
+      "code": "IRRIGATION",
+      "nameEn": "Irrigation",
+      "nameAm": "መስኖ",
+      "sortOrder": 30
+    },
+    {
+      "code": "SPRAYING",
+      "nameEn": "Spraying",
+      "nameAm": "ርጭት",
+      "sortOrder": 40
+    },
+    {
+      "code": "WEEDING",
+      "nameEn": "Weeding",
+      "nameAm": "አረም ማረም",
+      "sortOrder": 50
+    },
+    {
+      "code": "PRUNING",
+      "nameEn": "Pruning",
+      "nameAm": "ግርዛት",
+      "sortOrder": 60
+    },
+    {
+      "code": "SCOUTING",
+      "nameEn": "Scouting",
+      "nameAm": "የማሳ ምርመራ",
+      "sortOrder": 70
+    },
+    {
+      "code": "HARVESTING_SUPPORT",
+      "nameEn": "Harvesting support",
+      "nameAm": "የመከር ድጋፍ",
+      "sortOrder": 80
+    },
+    {
+      "code": "OTHER",
+      "nameEn": "Other",
+      "nameAm": "ሌላ",
+      "sortOrder": 90
+    }
+  ]
+}

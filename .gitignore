@@ -7,6 +7,9 @@ dist/
 .DS_Store
 *.tsbuildinfo
 
+# Temporary railway.toml swap during Admin Web CLI deploy
+railway.api.toml.bak
+
 # Stale duplicate backend tree (canonical source is apps/api/)
 apps/api/api/
 

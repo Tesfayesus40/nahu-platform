@@ -18,6 +18,8 @@ import { InventoryModule } from './inventory/inventory.module';
 import { WarehouseModule } from './warehouse/warehouse.module';
 import { HarvestModule } from './farms/harvest.module';
 import { FarmActivitiesModule } from './farms/farm-activities.module';
+import { AuditModule } from './audit/audit.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { FarmActivitiesModule } from './farms/farm-activities.module';
     JwtConfigModule,
     HealthModule,
     IdentityModule,
+    AuditModule,
+    AdminModule,
     CatalogModule,
     FarmsModule,
     InventoryModule,

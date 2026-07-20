@@ -1,0 +1,6 @@
+                  List of tables
+   Schema    |      Name       | Type  |  Owner   
+-------------+-----------------+-------+----------
+ marketplace | farmer_profiles | table | postgres
+(1 row)
+

@@ -1,3 +1,6 @@
+# Config-as-code for the nahu-api Railway service (NestJS API).
+# Admin Web must NOT use this file — see apps/admin-web/railway.toml.
+
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"

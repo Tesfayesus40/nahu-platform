@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -47,6 +48,7 @@ type RequestMeta = { ip?: string; userAgent?: string; requestId?: string };
 
 @Injectable()
 export class AdminAuthService {
+  private readonly logger = new Logger(AdminAuthService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
@@ -256,18 +258,76 @@ export class AdminAuthService {
       return existing;
     });
 
-    const enrollmentToken = this.jwt.sign(
-      {
-        sub: user.id,
-        invitationId: invitation.id,
-        typ: ADMIN_ENROLL_TYP,
-      } satisfies AdminEnrollJwtPayload,
-      { expiresIn: '1h' },
-    );
+    const enrollmentToken = this.issueEnrollmentToken(user.id, invitation.id);
 
     await this.audit.appendEvent({
       actorUserId: user.id,
       action: 'identity.invitation.accept',
+      targetType: 'admin_invitation',
+      targetId: invitation.id,
+      outcome: 'SUCCESS',
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      requestId: meta.requestId,
+    });
+
+    return {
+      enrollmentToken,
+      userId: user.id,
+      email: user.email,
+      mfaEnrollmentRequired: true,
+    };
+  }
+
+  /**
+   * Exchange a raw invitation token for a Nest-signed enrollment JWT.
+   * Bootstrap must not sign JWTs itself — only this JwtService can issue tokens
+   * that verifyEnrollToken will accept with the runtime secret.
+   */
+  async beginEnrollmentSession(
+    dto: { token: string },
+    meta: RequestMeta = {},
+  ) {
+    const invitation = await this.prisma.adminInvitation.findUnique({
+      where: { tokenHash: hashToken(dto.token) },
+    });
+    if (
+      !invitation ||
+      invitation.revokedAt ||
+      invitation.acceptedAt ||
+      invitation.expiresAt <= new Date()
+    ) {
+      throw new BadRequestException('Invalid or expired invitation');
+    }
+    if (!invitation.invitedUserId) {
+      throw new BadRequestException(
+        'Invitation has no user yet; accept the invitation first',
+      );
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: invitation.invitedUserId },
+      include: {
+        mfaFactors: {
+          where: { type: 'TOTP', verifiedAt: { not: null }, disabledAt: null },
+        },
+      },
+    });
+    if (!user) {
+      throw new BadRequestException('Invitation user not found');
+    }
+    if (user.mfaFactors.length > 0) {
+      throw new BadRequestException('MFA is already enrolled for this account');
+    }
+
+    const enrollmentToken = this.issueEnrollmentToken(
+      user.id,
+      invitation.id,
+    );
+
+    await this.audit.appendEvent({
+      actorUserId: user.id,
+      action: 'admin.mfa.enroll.session',
       targetType: 'admin_invitation',
       targetId: invitation.id,
       outcome: 'SUCCESS',
@@ -766,16 +826,46 @@ export class AdminAuthService {
     };
   }
 
+  private issueEnrollmentToken(userId: string, invitationId: string): string {
+    return this.jwt.sign(
+      {
+        sub: userId,
+        invitationId,
+        typ: ADMIN_ENROLL_TYP,
+      } satisfies AdminEnrollJwtPayload,
+      { expiresIn: '1h' },
+    );
+  }
+
   private verifyEnrollToken(token: string): AdminEnrollJwtPayload {
     let payload: AdminEnrollJwtPayload;
+
     try {
-      payload = this.jwt.verify<AdminEnrollJwtPayload>(token);
-    } catch {
-      throw new UnauthorizedException('Invalid or expired enrollment token');
+      payload = this.jwt.verify<AdminEnrollJwtPayload>(token, {
+        algorithms: ['HS256'],
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Enrollment JWT verification failed: ${
+          err instanceof Error ? err.message : 'Unknown JWT verification error'
+        }`,
+      );
+
+      throw new UnauthorizedException(
+        'Invalid or expired enrollment token',
+      );
     }
-    if (payload.typ !== ADMIN_ENROLL_TYP || !payload.sub || !payload.invitationId) {
-      throw new UnauthorizedException('Invalid enrollment token');
+
+    if (
+      payload.typ !== ADMIN_ENROLL_TYP ||
+      !payload.sub ||
+      !payload.invitationId
+    ) {
+      throw new UnauthorizedException(
+        'Invalid enrollment token',
+      );
     }
+
     return payload;
   }
 
