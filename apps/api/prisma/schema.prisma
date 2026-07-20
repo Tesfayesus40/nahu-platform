@@ -202,24 +202,19 @@ model AdminInvitation {
   @@schema("identity")
 }
 
-enum MfaFactorType {
-  TOTP
-
-  @@schema("identity")
-  @@map("mfa_factor_type")
-}
-
+// MFA type is VARCHAR + CHECK in identity/015 (not a Postgres enum).
+// Keep as String so Prisma does not cast to a missing identity.mfa_factor_type.
 model MfaFactor {
-  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId          String        @map("user_id") @db.Uuid
-  type            MfaFactorType @default(TOTP)
-  label           String?       @db.VarChar(100)
-  secretEncrypted String        @map("secret_encrypted")
-  verifiedAt      DateTime?     @map("verified_at") @db.Timestamptz
-  disabledAt      DateTime?     @map("disabled_at") @db.Timestamptz
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  type            String    @default("TOTP") @db.VarChar(20)
+  label           String?   @db.VarChar(100)
+  secretEncrypted String    @map("secret_encrypted")
+  verifiedAt      DateTime? @map("verified_at") @db.Timestamptz
+  disabledAt      DateTime? @map("disabled_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("mfa_factors")
@@ -266,32 +261,25 @@ model AdminSession {
   @@schema("identity")
 }
 
-enum AuditOutcome {
-  SUCCESS
-  DENIED
-  FAILED
-
-  @@schema("audit")
-  @@map("audit_outcome")
-}
-
+// Outcome is VARCHAR + CHECK in audit/002 (not a Postgres enum).
+// Keep as String so Prisma does not cast to a missing audit.audit_outcome.
 model AuditEvent {
-  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  occurredAt     DateTime     @default(now()) @map("occurred_at") @db.Timestamptz
-  actorUserId    String?      @map("actor_user_id") @db.Uuid
-  actorSessionId String?      @map("actor_session_id") @db.Uuid
-  permissionCode String?      @map("permission_code") @db.VarChar(100)
-  action         String       @db.VarChar(100)
-  targetType     String?      @map("target_type") @db.VarChar(100)
-  targetId       String?      @map("target_id") @db.VarChar(100)
-  requestId      String?      @map("request_id") @db.VarChar(100)
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  occurredAt     DateTime @default(now()) @map("occurred_at") @db.Timestamptz
+  actorUserId    String?  @map("actor_user_id") @db.Uuid
+  actorSessionId String?  @map("actor_session_id") @db.Uuid
+  permissionCode String?  @map("permission_code") @db.VarChar(100)
+  action         String   @db.VarChar(100)
+  targetType     String?  @map("target_type") @db.VarChar(100)
+  targetId       String?  @map("target_id") @db.VarChar(100)
+  requestId      String?  @map("request_id") @db.VarChar(100)
   reason         String?
-  outcome        AuditOutcome
-  beforeJson     Json?        @map("before_json")
-  afterJson      Json?        @map("after_json")
-  ip             String?      @db.VarChar(64)
-  userAgent      String?      @map("user_agent") @db.VarChar(512)
-  metadataJson   Json?        @map("metadata_json")
+  outcome        String   @db.VarChar(20)
+  beforeJson     Json?    @map("before_json")
+  afterJson      Json?    @map("after_json")
+  ip             String?  @db.VarChar(64)
+  userAgent      String?  @map("user_agent") @db.VarChar(512)
+  metadataJson   Json?    @map("metadata_json")
 
   @@index([occurredAt])
   @@index([actorUserId])

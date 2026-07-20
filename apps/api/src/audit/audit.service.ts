@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { AuditOutcome, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 const SECRET_KEY_PATTERN =
   /(password|token|secret|otp|recovery|refresh|authorization|cookie|mfa)/i;
+
+/** Matches audit/002 CHECK constraint (VARCHAR, not a Postgres enum). */
+export type AuditOutcome = 'SUCCESS' | 'DENIED' | 'FAILED';
 
 export type AppendAuditEventInput = {
   actorUserId?: string | null;

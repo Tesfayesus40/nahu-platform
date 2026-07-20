@@ -1,4 +1,3 @@
-import { inspect } from 'node:util';
 import {
   BadRequestException,
   ForbiddenException,
@@ -288,105 +287,134 @@ export class AdminAuthService {
     dto: { token: string },
     meta: RequestMeta = {},
   ) {
-    const invitation = await this.prisma.adminInvitation.findUnique({
-      where: { tokenHash: hashToken(dto.token) },
-    });
-    if (
-      !invitation ||
-      invitation.revokedAt ||
-      invitation.acceptedAt ||
-      invitation.expiresAt <= new Date()
-    ) {
-      throw new BadRequestException('Invalid or expired invitation');
-    }
-    if (!invitation.invitedUserId) {
-      throw new BadRequestException(
-        'Invitation has no user yet; accept the invitation first',
-      );
-    }
+    try {
+      const invitation = await this.prisma.adminInvitation.findUnique({
+        where: { tokenHash: hashToken(dto.token) },
+      });
+      if (
+        !invitation ||
+        invitation.revokedAt ||
+        invitation.acceptedAt ||
+        invitation.expiresAt <= new Date()
+      ) {
+        throw new BadRequestException('Invalid or expired invitation');
+      }
+      if (!invitation.invitedUserId) {
+        throw new BadRequestException(
+          'Invitation has no user yet; accept the invitation first',
+        );
+      }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: invitation.invitedUserId },
-      include: {
-        mfaFactors: {
-          where: { type: 'TOTP', verifiedAt: { not: null }, disabledAt: null },
+      const user = await this.prisma.user.findUnique({
+        where: { id: invitation.invitedUserId },
+        include: {
+          mfaFactors: {
+            where: {
+              type: 'TOTP',
+              verifiedAt: { not: null },
+              disabledAt: null,
+            },
+          },
         },
-      },
-    });
-    if (!user) {
-      throw new BadRequestException('Invitation user not found');
+      });
+      if (!user) {
+        throw new BadRequestException('Invitation user not found');
+      }
+      if (user.mfaFactors.length > 0) {
+        throw new BadRequestException(
+          'MFA is already enrolled for this account',
+        );
+      }
+
+      const enrollmentToken = this.issueEnrollmentToken(
+        user.id,
+        invitation.id,
+      );
+
+      await this.audit.appendEvent({
+        actorUserId: user.id,
+        action: 'admin.mfa.enroll.session',
+        targetType: 'admin_invitation',
+        targetId: invitation.id,
+        outcome: 'SUCCESS',
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        requestId: meta.requestId,
+      });
+
+      return {
+        enrollmentToken,
+        userId: user.id,
+        email: user.email,
+        mfaEnrollmentRequired: true,
+      };
+    } catch (err) {
+      if (
+        err instanceof BadRequestException ||
+        err instanceof UnauthorizedException ||
+        err instanceof ForbiddenException
+      ) {
+        throw err;
+      }
+      this.logger.error(
+        `beginEnrollmentSession failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      throw err;
     }
-    if (user.mfaFactors.length > 0) {
-      throw new BadRequestException('MFA is already enrolled for this account');
-    }
-
-    const enrollmentToken = this.issueEnrollmentToken(
-      user.id,
-      invitation.id,
-    );
-
-    await this.audit.appendEvent({
-      actorUserId: user.id,
-      action: 'admin.mfa.enroll.session',
-      targetType: 'admin_invitation',
-      targetId: invitation.id,
-      outcome: 'SUCCESS',
-      ip: meta.ip,
-      userAgent: meta.userAgent,
-      requestId: meta.requestId,
-    });
-
-    return {
-      enrollmentToken,
-      userId: user.id,
-      email: user.email,
-      mfaEnrollmentRequired: true,
-    };
   }
 
   async enrollTotp(dto: EnrollTotpDto) {
     const payload = this.verifyEnrollToken(dto.enrollmentToken);
     const secret = authenticator.generateSecret();
     const encrypted = encryptAesGcm(secret, this.mfaKey);
+    const label = dto.label ?? 'Authenticator';
+
+    const pending = await this.prisma.mfaFactor.findFirst({
+      where: {
+        userId: payload.sub,
+        type: 'TOTP',
+        disabledAt: null,
+        verifiedAt: null,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
     let factor;
-
     try {
-      factor = await this.prisma.mfaFactor.create({
-        data: {
-          userId: payload.sub,
-          type: 'TOTP',
-          label: dto.label ?? 'Authenticator',
-          secretEncrypted: encrypted,
-        },
-      });
-    } catch (err) {
-      console.error('====================================');
-      console.error('MFA CREATE FAILED');
-      console.error('====================================');
-
-      console.dir(err, { depth: null });
-      console.error(inspect(err, { depth: null, showHidden: true }));
-
-      if (err instanceof Error) {
-        console.error('Name:', err.name);
-        console.error('Message:', err.message);
-        console.error('Stack:', err.stack);
+      if (pending) {
+        // Retry-safe: rotate secret on an existing unverified factor
+        // instead of hitting the unique (user_id, type) index.
+        factor = await this.prisma.mfaFactor.update({
+          where: { id: pending.id },
+          data: { secretEncrypted: encrypted, label },
+        });
+      } else {
+        factor = await this.prisma.mfaFactor.create({
+          data: {
+            userId: payload.sub,
+            type: 'TOTP',
+            label,
+            secretEncrypted: encrypted,
+          },
+        });
       }
-
-      console.error(
-        'Own properties:',
-        Object.getOwnPropertyNames(err as object),
+    } catch (err) {
+      const code =
+        err && typeof err === 'object' && 'code' in err
+          ? String((err as { code: unknown }).code)
+          : undefined;
+      this.logger.error(
+        `enrollTotp factor persist failed${code ? ` [${code}]` : ''}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+        err instanceof Error ? err.stack : undefined,
       );
-
-      console.error(
-        'Descriptors:',
-        Object.getOwnPropertyDescriptors(err as object),
-      );
-
-      console.error('Payload:', payload);
-      console.error('Encrypted length:', encrypted.length);
-
+      if (code === 'P2002') {
+        throw new BadRequestException('MFA is already enrolled for this account');
+      }
       throw err;
     }
 

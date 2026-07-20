@@ -50,7 +50,31 @@ export class MobileCompatExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    this.logger.error(exception);
+    const err = exception instanceof Error ? exception : null;
+    const prismaCode =
+      exception &&
+      typeof exception === 'object' &&
+      'code' in exception &&
+      typeof (exception as { code: unknown }).code === 'string'
+        ? (exception as { code: string }).code
+        : undefined;
+    const prismaMeta =
+      exception &&
+      typeof exception === 'object' &&
+      'meta' in exception
+        ? (exception as { meta: unknown }).meta
+        : undefined;
+
+    this.logger.error(
+      `Unhandled exception${prismaCode ? ` [${prismaCode}]` : ''}: ${
+        err?.message ?? String(exception)
+      }`,
+      err?.stack,
+    );
+    if (prismaMeta !== undefined) {
+      this.logger.error(`Prisma meta: ${JSON.stringify(prismaMeta)}`);
+    }
+
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       error: 'Server error. Please try again later.',
     });

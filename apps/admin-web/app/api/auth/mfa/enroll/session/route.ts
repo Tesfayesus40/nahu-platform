@@ -36,6 +36,11 @@ export async function POST(req: NextRequest) {
     });
 
     if (result.status >= 400) {
+      console.error(
+        "[mfa/enroll/session] Nest enrollment-session failed",
+        result.status,
+        result.body,
+      );
       return NextResponse.json(result.body, { status: result.status });
     }
 
