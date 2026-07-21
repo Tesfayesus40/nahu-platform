@@ -898,6 +898,14 @@ export class AdminAuthService {
     return payload;
   }
 
+  /** Public re-auth gate for privileged admin mutations outside this service. */
+  async requireReauth(
+    admin: AdminRequestUser,
+    password: string,
+  ): Promise<void> {
+    return this.assertRecentReauth(admin, password);
+  }
+
   private async assertRecentReauth(
     admin: AdminRequestUser,
     password: string,

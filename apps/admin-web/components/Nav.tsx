@@ -13,6 +13,22 @@ export type NavSection = {
 
 export const NAV_SECTIONS: NavSection[] = [
   { href: "/", label: "Dashboard", permission: "admin.dashboard.read" },
+  { href: "/users", label: "Users", permission: "identity.users.read" },
+  {
+    href: "/verification",
+    label: "Verification",
+    permission: "verification.read",
+  },
+  {
+    href: "/listings",
+    label: "Listings",
+    permission: "marketplace.listings.read",
+  },
+  {
+    href: "/disputes",
+    label: "Disputes",
+    permission: "orders.disputes.read",
+  },
   { href: "/audit", label: "Audit", permission: "audit.read" },
   { href: "/system", label: "System", permission: "admin.system.health.read" },
   { href: "/account", label: "Account", permission: null },
@@ -54,7 +70,16 @@ export function Nav({
           <Link
             key={section.href}
             href={section.href}
-            className={pathname === section.href ? "active" : undefined}
+            className={
+              section.href === "/"
+                ? pathname === "/"
+                  ? "active"
+                  : undefined
+                : pathname === section.href ||
+                    pathname.startsWith(`${section.href}/`)
+                  ? "active"
+                  : undefined
+            }
           >
             {section.label}
           </Link>

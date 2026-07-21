@@ -97,3 +97,47 @@ export function filterInvitableRoleCodes(roleCodes: string[]): string[] {
   const allowed = new Set<string>(INVITABLE_ROLE_CODES);
   return roleCodes.filter((code) => allowed.has(code));
 }
+
+/** True when the actor must not operate on their own account. */
+export function isSelfTarget(actorUserId: string, targetUserId: string): boolean {
+  return actorUserId === targetUserId;
+}
+
+/**
+ * Replace only invitable workforce roles (PLATFORM_ADMIN / AUDITOR).
+ * Preserve SUPER_ADMIN and non-workforce roles (FARMER, BUYER, …).
+ */
+export function mergeAssignableWorkforceRoles(
+  currentRoleCodes: string[],
+  requestedAssignable: string[],
+): string[] {
+  const nextAssignable = filterInvitableRoleCodes(requestedAssignable);
+  const invitable = new Set<string>(INVITABLE_ROLE_CODES);
+  const preserved = currentRoleCodes.filter((code) => !invitable.has(code));
+  return [...new Set([...preserved, ...nextAssignable])].sort();
+}
+
+/** Block status/authz demotion when this would remove the last active SUPER_ADMIN. */
+export function wouldRemoveLastActiveSuperAdmin(input: {
+  targetHasSuperAdmin: boolean;
+  otherActiveSuperAdminCount: number;
+}): boolean {
+  return (
+    input.targetHasSuperAdmin && input.otherActiveSuperAdminCount === 0
+  );
+}
+
+/** Workforce security actions (MFA / password / role assign) apply to these users. */
+export function isWorkforceCapableUser(input: {
+  roleCodes: string[];
+  mfaRequired: boolean;
+  hasPassword: boolean;
+  hasMfaFactors?: boolean;
+}): boolean {
+  return (
+    input.mfaRequired ||
+    hasWorkforceRole(input.roleCodes) ||
+    input.hasPassword ||
+    Boolean(input.hasMfaFactors)
+  );
+}

@@ -3,22 +3,55 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AdminAuthGuard } from '../common/guards/admin-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
+import { AdminVerificationService } from '../marketplace/admin-verification.service';
+import { AdminListingModerationService } from '../marketplace/admin-listing-moderation.service';
+import { AdminDisputesService } from '../orders/admin-disputes.service';
 
 @Controller('admin')
 @UseGuards(AdminAuthGuard, PermissionsGuard)
 export class AdminController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly verification: AdminVerificationService,
+    private readonly listingModeration: AdminListingModerationService,
+    private readonly disputes: AdminDisputesService,
+  ) {}
 
   @Get('dashboard/summary')
   @RequirePermissions('admin.dashboard.read')
-  dashboardSummary() {
+  async dashboardSummary() {
+    const [
+      pendingVerifications,
+      byType,
+      activeListings,
+      pendingListingModeration,
+      listingsByModeration,
+      openDisputes,
+      disputesByStatus,
+    ] = await Promise.all([
+      this.verification.countPending(),
+      this.verification.countPendingByType(),
+      this.prisma.listing.count({
+        where: { status: 'ACTIVE', moderationStatus: 'APPROVED' },
+      }),
+      this.listingModeration.countActionable(),
+      this.listingModeration.countByModerationStatus(),
+      this.disputes.countOpen(),
+      this.disputes.countByStatus(),
+    ]);
+
     return {
       status: 'ok',
-      message: 'Operational queues and domain KPIs arrive in A2+',
+      message: 'Live operational queue counts.',
+      asOf: new Date().toISOString(),
       placeholders: {
-        pendingVerifications: null,
-        openDisputes: null,
-        activeListings: null,
+        pendingVerifications,
+        pendingVerificationsByType: byType,
+        openDisputes,
+        disputesByStatus,
+        activeListings,
+        pendingListingModeration,
+        listingsByModeration,
       },
     };
   }

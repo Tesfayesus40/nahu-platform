@@ -211,6 +211,7 @@ export class MarketplaceService {
             farmId: lot.farmId,
             harvestDate: new Date(dto.harvestDate),
             photoUrls: dto.photoUrls ?? [],
+            moderationStatus: 'PENDING',
           },
           include: { category: true, product: { include: { defaultUnit: true } } },
         });
@@ -237,6 +238,7 @@ export class MarketplaceService {
         productId: product.id,
         harvestDate: new Date(dto.harvestDate),
         photoUrls: dto.photoUrls ?? [],
+        moderationStatus: 'PENDING',
       },
       include: { category: true, product: { include: { defaultUnit: true } } },
     });
@@ -318,6 +320,7 @@ export class MarketplaceService {
 
     const where = {
       status: 'ACTIVE' as const,
+      moderationStatus: 'APPROVED',
       ...(farmerId ? { farmerId } : {}),
       ...(categoryId ? { categoryId } : {}),
       ...(productId ? { productId } : {}),
@@ -372,7 +375,11 @@ export class MarketplaceService {
         product: { include: { defaultUnit: true } },
       },
     });
-    if (!listing) {
+    if (
+      !listing ||
+      listing.status !== 'ACTIVE' ||
+      listing.moderationStatus !== 'APPROVED'
+    ) {
       throw new NotFoundException('Listing not found');
     }
     return this.shapeListing(listing, { includeFarmerDetail: true });

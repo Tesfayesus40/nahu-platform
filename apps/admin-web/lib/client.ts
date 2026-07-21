@@ -49,6 +49,46 @@ export async function bffPost<T>(path: string, body?: unknown): Promise<T> {
   return data as T;
 }
 
+/** PATCH to a BFF route with the double-submit CSRF header attached. */
+export async function bffPatch<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: "PATCH",
+    headers: {
+      "content-type": "application/json",
+      [CSRF_HEADER]: readCsrfCookie(),
+    },
+    body: JSON.stringify(body ?? {}),
+  });
+  const data = await parseBody(res);
+  if (!res.ok) {
+    throw {
+      status: res.status,
+      message: messageFrom(data, `Request failed (${res.status})`),
+    } satisfies BffError;
+  }
+  return data as T;
+}
+
+/** PUT to a BFF route with the double-submit CSRF header attached. */
+export async function bffPut<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: "PUT",
+    headers: {
+      "content-type": "application/json",
+      [CSRF_HEADER]: readCsrfCookie(),
+    },
+    body: JSON.stringify(body ?? {}),
+  });
+  const data = await parseBody(res);
+  if (!res.ok) {
+    throw {
+      status: res.status,
+      message: messageFrom(data, `Request failed (${res.status})`),
+    } satisfies BffError;
+  }
+  return data as T;
+}
+
 export async function bffGet<T>(path: string): Promise<T> {
   const res = await fetch(path, { headers: { accept: "application/json" } });
   const data = await parseBody(res);

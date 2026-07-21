@@ -5,12 +5,22 @@ const TONE_BY_STATUS: Record<string, Tone> = {
   up: "ok",
   success: "ok",
   active: "ok",
+  approved: "ok",
+  enrolled: "ok",
   degraded: "warn",
   pending: "warn",
   denied: "warn",
+  suspended: "warn",
+  in_review: "warn",
+  needs_info: "warn",
+  required: "warn",
+  flagged: "warn",
   down: "danger",
   failed: "danger",
   error: "danger",
+  locked: "danger",
+  deactivated: "danger",
+  rejected: "danger",
 };
 
 export function StatusBadge({

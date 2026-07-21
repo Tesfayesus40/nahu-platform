@@ -70,6 +70,13 @@
     "identity/017_identity_admin_sessions.sql",
     "audit/001_audit_schema.sql",
     "audit/002_audit_events.sql",
-    "identity/018_identity_seed_admin_roles_permissions.sql"
+    "identity/018_identity_seed_admin_roles_permissions.sql",
+    "identity/019_identity_user_management_permissions.sql",
+    "marketplace/013_marketplace_verification_workflow.sql",
+    "identity/020_identity_verification_permissions.sql",
+    "marketplace/014_marketplace_listing_moderation.sql",
+    "identity/021_identity_listing_moderation_permissions.sql",
+    "orders/010_orders_dispute_cases.sql",
+    "identity/022_identity_dispute_permissions.sql"
   ]
 }

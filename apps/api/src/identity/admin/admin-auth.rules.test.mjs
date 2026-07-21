@@ -57,6 +57,38 @@ function filterInvitableRoleCodes(roleCodes) {
   return roleCodes.filter((code) => allowed.has(code));
 }
 
+function isSelfTarget(actorUserId, targetUserId) {
+  return actorUserId === targetUserId;
+}
+
+function mergeAssignableWorkforceRoles(currentRoleCodes, requestedAssignable) {
+  const nextAssignable = filterInvitableRoleCodes(requestedAssignable);
+  const invitable = new Set(INVITABLE_ROLE_CODES);
+  const preserved = currentRoleCodes.filter((code) => !invitable.has(code));
+  return [...new Set([...preserved, ...nextAssignable])].sort();
+}
+
+function wouldRemoveLastActiveSuperAdmin({
+  targetHasSuperAdmin,
+  otherActiveSuperAdminCount,
+}) {
+  return targetHasSuperAdmin && otherActiveSuperAdminCount === 0;
+}
+
+function isWorkforceCapableUser({
+  roleCodes,
+  mfaRequired,
+  hasPassword,
+  hasMfaFactors,
+}) {
+  return (
+    mfaRequired ||
+    hasWorkforceRole(roleCodes) ||
+    hasPassword ||
+    Boolean(hasMfaFactors)
+  );
+}
+
 describe('resolvePermissionCodes', () => {
   it('unions permissions across roles', () => {
     const codes = resolvePermissionCodes([
@@ -165,6 +197,80 @@ describe('filterInvitableRoleCodes', () => {
     assert.deepEqual(
       filterInvitableRoleCodes(['SUPER_ADMIN', 'PLATFORM_ADMIN', 'AUDITOR']),
       ['PLATFORM_ADMIN', 'AUDITOR'],
+    );
+  });
+});
+
+describe('isSelfTarget', () => {
+  it('detects self operations', () => {
+    assert.equal(isSelfTarget('u1', 'u1'), true);
+    assert.equal(isSelfTarget('u1', 'u2'), false);
+  });
+});
+
+describe('mergeAssignableWorkforceRoles', () => {
+  it('preserves SUPER_ADMIN and FARMER while replacing assignable roles', () => {
+    assert.deepEqual(
+      mergeAssignableWorkforceRoles(
+        ['SUPER_ADMIN', 'PLATFORM_ADMIN', 'FARMER'],
+        ['AUDITOR'],
+      ),
+      ['AUDITOR', 'FARMER', 'SUPER_ADMIN'],
+    );
+  });
+
+  it('strips SUPER_ADMIN from requested assignable set', () => {
+    assert.deepEqual(
+      mergeAssignableWorkforceRoles(['FARMER'], ['SUPER_ADMIN', 'PLATFORM_ADMIN']),
+      ['FARMER', 'PLATFORM_ADMIN'],
+    );
+  });
+});
+
+describe('wouldRemoveLastActiveSuperAdmin', () => {
+  it('blocks when target is the last active SUPER_ADMIN', () => {
+    assert.equal(
+      wouldRemoveLastActiveSuperAdmin({
+        targetHasSuperAdmin: true,
+        otherActiveSuperAdminCount: 0,
+      }),
+      true,
+    );
+    assert.equal(
+      wouldRemoveLastActiveSuperAdmin({
+        targetHasSuperAdmin: true,
+        otherActiveSuperAdminCount: 1,
+      }),
+      false,
+    );
+  });
+});
+
+describe('isWorkforceCapableUser', () => {
+  it('recognizes password, MFA flag, roles, and factors', () => {
+    assert.equal(
+      isWorkforceCapableUser({
+        roleCodes: ['FARMER'],
+        mfaRequired: false,
+        hasPassword: false,
+      }),
+      false,
+    );
+    assert.equal(
+      isWorkforceCapableUser({
+        roleCodes: ['FARMER'],
+        mfaRequired: false,
+        hasPassword: true,
+      }),
+      true,
+    );
+    assert.equal(
+      isWorkforceCapableUser({
+        roleCodes: ['PLATFORM_ADMIN'],
+        mfaRequired: false,
+        hasPassword: false,
+      }),
+      true,
     );
   });
 });

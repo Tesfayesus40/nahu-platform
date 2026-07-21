@@ -4,8 +4,14 @@
 **Status:** Awaiting hosted staging deployment by you (Option A), then your acceptance testing  
 **Production:** Frozen — do not create or change production Admin Web / A1 auth  
 
-This handoff is the workflow stop after implementation. Complete hosted staging
-deployment, then the acceptance checklist, before commit / PR / merge / tag / A2.
+For the **A2–A5** staging batch (users, verification, listings, disputes), use:
+
+- [`a2-a5-staging-deployment-checklist.md`](./a2-a5-staging-deployment-checklist.md)
+- [`a2-a5-migration-summary.md`](./a2-a5-migration-summary.md)
+- [`a3-a5-staging-validation-plan.md`](./a3-a5-staging-validation-plan.md)
+
+This handoff remains the A1 runbook and acceptance baseline. Complete hosted staging
+deployment, then the acceptance checklist, before merge / tag for production paths.
 
 ---
 
@@ -256,11 +262,11 @@ Choose a strong temporary password. Keep password, enroll URL, and recovery code
 
 ## 3. Test roles and expected capabilities
 
-| Role | Expected nav | Can invite | Can revoke others' sessions |
+| Role | Expected nav | Can invite | Users write actions |
 |---|---|---|---|
-| `SUPER_ADMIN` | Dashboard, Audit, System, Account | Yes | Yes |
-| `PLATFORM_ADMIN` | Dashboard, Audit, System, Account | Yes | Yes |
-| `AUDITOR` | Dashboard, Audit, System, Account | No | No |
+| `SUPER_ADMIN` | Dashboard, Users, Audit, System, Account | Yes | Status, roles, MFA/password reset, revoke sessions |
+| `PLATFORM_ADMIN` | Dashboard, Users, Audit, System, Account | Yes | Status, roles, MFA/password reset, revoke sessions |
+| `AUDITOR` | Dashboard, Users, Audit, System, Account | No | Read-only users (no status/roles/MFA/password/sessions) |
 
 Unauthorized sections must be **omitted** from nav; direct API calls return 401/403.
 
@@ -281,6 +287,51 @@ Unauthorized sections must be **omitted** from nav; direct API calls return 401/
 11. [ ] UI/UX, responsive behavior, accessibility, and Nahu branding are acceptable
 12. [ ] Farmer and Buyer staging behavior remains unaffected
 
+### A2 Users slice (after `identity/019` + redeploy)
+
+13. [ ] Users nav appears for roles with `identity.users.read`
+14. [ ] List supports search, status/role filters, sort, pagination
+15. [ ] User detail shows profile, credential summary, MFA summary (no secrets)
+16. [ ] Status change works with reauth; audit row `identity.user.status.change`
+17. [ ] Role assign preserves SUPER_ADMIN / FARMER/BUYER; cannot self-edit
+18. [ ] MFA reset returns one-time enroll token; enroll flow works
+19. [ ] Password reset returns one-time temp password; sessions revoked
+20. [ ] AUDITOR can read users but not mutate
+21. [ ] Last active SUPER_ADMIN cannot be locked/deactivated
+
+### A3 Verification (after `marketplace/013` + `identity/020` + redeploy)
+
+22. [ ] Verification nav appears for `verification.read`
+23. [ ] Dashboard “Pending verifications” shows a live count and links to `/verification?queue=pending`
+24. [ ] Per-type counts link to farmer/buyer/merchant/organization queues
+25. [ ] Case detail shows subject payload, documents, and decision history
+26. [ ] Approve / reject / request info / suspend require reauth and write audit events
+27. [ ] Farmer/merchant decisions sync `verified` + `verification_status` on domain rows
+28. [ ] AUDITOR can read queues but cannot decide
+29. [ ] MARKETPLACE_MODERATOR can decide farmers/merchants only
+
+### A4 Listing moderation (after `marketplace/014` + `identity/021` + redeploy)
+
+30. [ ] Listings nav appears for `marketplace.listings.read`
+31. [ ] Dashboard pending listing moderation count links to `/listings?queue=pending`
+32. [ ] Queues filter pending / approved / rejected / suspended / flagged
+33. [ ] Detail supports approve, reject, suspend, flag, clear-flag, notes
+34. [ ] Bulk actions work for selected rows (with reauth)
+35. [ ] Rejected/suspended listings leave public buyer search
+36. [ ] New farmer listings enter PENDING until approved
+37. [ ] AUDITOR can read but not moderate
+
+### A5 Dispute management (after `orders/010` + `identity/022` + redeploy — when ready)
+
+38. [ ] Disputes nav appears for `orders.disputes.read`
+39. [ ] Dashboard open disputes count links to `/disputes?queue=open`
+40. [ ] Status filters: Open, Under Review, Resolved, Closed, Escalated
+41. [ ] Detail shows buyer/seller, order, evidence, timeline, internal notes
+42. [ ] Actions: start review, request info, refund intent, resolve, reject, close, escalate (reauth + audit)
+43. [ ] Bulk assign works for selected rows
+44. [ ] Raising a dispute from the apps creates/reopens a case
+45. [ ] AUDITOR can read but not manage; SUPPORT_AGENT can manage
+
 ---
 
 ## 5. Security notes
@@ -288,14 +339,15 @@ Unauthorized sections must be **omitted** from nav; direct API calls return 401/
 - OTP `123456` / `OTP_DEV_BYPASS` must **not** authenticate workforce admins.
 - Never paste live passwords, TOTP secrets, recovery codes, or invite tokens into
   chat. Share credentials out-of-band.
-- Do not create or modify a **production** Admin Web service for A1.
+- Do not create or modify a **production** Admin Web service for A1/A2.
 
 ---
 
 ## 6. Known A1 limitations
 
-- No People, Participants, Catalog, Marketplace, Orders, or Inventory screens.
-- Dashboard operational queues are explicit placeholders for A2+.
+- Organizations and farmer verification queues remain deferred (see
+  `docs/07-decisions/a2-admin-users-design.md`).
+- Dashboard operational queues are explicit placeholders for later slices.
 - Invite email delivery is not required on staging; use bootstrap / invite links.
 - Organization / region scopes are not stored yet (GLOBAL grants only).
 

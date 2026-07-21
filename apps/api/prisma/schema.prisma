@@ -485,6 +485,8 @@ model Cooperative {
   zone           String?   @db.VarChar(100)
   licenseNumber  String?   @map("license_number") @db.VarChar(50)
   verified       Boolean   @default(false)
+  verificationStatus String @default("PENDING") @map("verification_status") @db.VarChar(20)
+  verificationNotes String? @map("verification_notes") @db.VarChar(500)
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime  @default(now()) @map("updated_at") @db.Timestamptz
 
@@ -509,6 +511,7 @@ model FarmerProfile {
   farmSizeHa         Decimal?  @map("farm_size_ha") @db.Decimal(6, 2)
   primaryLanguage    String    @default("am") @map("primary_language") @db.VarChar(200)
   verified           Boolean   @default(false)
+  verificationStatus String    @default("PENDING") @map("verification_status") @db.VarChar(20)
   verificationNotes  String?   @map("verification_notes") @db.VarChar(500)
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime  @default(now()) @map("updated_at") @db.Timestamptz
@@ -521,6 +524,66 @@ model FarmerProfile {
   warehouseParties   WarehouseParty[]
 
   @@map("farmer_profiles")
+  @@schema("marketplace")
+}
+
+// Participant verification workflow (A3). Status/decision stored as VARCHAR + CHECK in SQL.
+model VerificationCase {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subjectType        String    @map("subject_type") @db.VarChar(20)
+  subjectId          String    @map("subject_id") @db.Uuid
+  status             String    @default("PENDING") @db.VarChar(20)
+  displayName        String?   @map("display_name") @db.VarChar(255)
+  region             String?   @db.VarChar(100)
+  reviewerUserId     String?   @map("reviewer_user_id") @db.Uuid
+  reviewerNotes      String?   @map("reviewer_notes")
+  infoRequestMessage String?   @map("info_request_message")
+  submittedAt        DateTime  @default(now()) @map("submitted_at") @db.Timestamptz
+  updatedAt          DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+  decidedAt          DateTime? @map("decided_at") @db.Timestamptz
+
+  decisions          VerificationDecision[]
+  documents          VerificationDocument[]
+
+  @@unique([subjectType, subjectId])
+  @@index([status])
+  @@index([subjectType, status])
+  @@index([submittedAt])
+  @@map("verification_cases")
+  @@schema("marketplace")
+}
+
+model VerificationDecision {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  caseId      String   @map("case_id") @db.Uuid
+  decision    String   @db.VarChar(20)
+  fromStatus  String?  @map("from_status") @db.VarChar(20)
+  toStatus    String   @map("to_status") @db.VarChar(20)
+  reason      String?
+  notes       String?
+  actorUserId String   @map("actor_user_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  case        VerificationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@map("verification_decisions")
+  @@schema("marketplace")
+}
+
+model VerificationDocument {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  caseId           String   @map("case_id") @db.Uuid
+  label            String   @db.VarChar(200)
+  fileUrl          String   @map("file_url")
+  contentType      String?  @map("content_type") @db.VarChar(100)
+  uploadedByUserId String?  @map("uploaded_by_user_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  case             VerificationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@map("verification_documents")
   @@schema("marketplace")
 }
 
@@ -552,6 +615,10 @@ model Listing {
   cupScore       Decimal?      @map("cup_score") @db.Decimal(4, 1)
   photoUrls      String[]      @default([]) @map("photo_urls")
   status         ListingStatus @default(ACTIVE)
+  moderationStatus String      @default("APPROVED") @map("moderation_status") @db.VarChar(20)
+  moderationNotes  String?     @map("moderation_notes")
+  moderatedAt      DateTime?   @map("moderated_at") @db.Timestamptz
+  moderatedByUserId String?    @map("moderated_by_user_id") @db.Uuid
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime      @default(now()) @map("updated_at") @db.Timestamptz
 
@@ -563,16 +630,36 @@ model Listing {
   farm           Farm?         @relation(fields: [farmId], references: [id], onDelete: SetNull)
   orders         Order[]
   reservations   Reservation[]
+  moderationDecisions ListingModerationDecision[]
 
   @@index([region])
   @@index([grade])
   @@index([status])
+  @@index([moderationStatus])
   @@index([categoryId])
   @@index([productId])
   @@index([stockLotId])
   @@index([farmId])
   @@index([unitCode])
   @@map("listings")
+  @@schema("marketplace")
+}
+
+model ListingModerationDecision {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  listingId   String   @map("listing_id") @db.Uuid
+  decision    String   @db.VarChar(20)
+  fromStatus  String?  @map("from_status") @db.VarChar(20)
+  toStatus    String   @map("to_status") @db.VarChar(20)
+  reason      String?
+  notes       String?
+  actorUserId String   @map("actor_user_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  listing     Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@map("listing_moderation_decisions")
   @@schema("marketplace")
 }
 
@@ -635,12 +722,95 @@ model Order {
   unit              Unit?              @relation(fields: [unitCode], references: [code], onDelete: Restrict)
   certificate       OriginCertificate?
   reservations      Reservation[]
+  disputeCase       DisputeCase?
 
   @@index([buyerId])
   @@index([farmerId])
   @@index([status])
   @@index([unitCode])
   @@map("orders")
+  @@schema("orders")
+}
+
+model DisputeCase {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId            String    @unique @map("order_id") @db.Uuid
+  status             String    @default("OPEN") @db.VarChar(20)
+  openedByUserId     String?   @map("opened_by_user_id") @db.Uuid
+  openedByRole       String?   @map("opened_by_role") @db.VarChar(20)
+  assignedToUserId   String?   @map("assigned_to_user_id") @db.Uuid
+  reasonCode         String?   @map("reason_code") @db.VarChar(50)
+  summary            String?
+  resolutionCode     String?   @map("resolution_code") @db.VarChar(50)
+  resolutionNotes    String?   @map("resolution_notes")
+  infoRequestMessage String?   @map("info_request_message")
+  refundStatus       String    @default("NONE") @map("refund_status") @db.VarChar(30)
+  refundAmountEtb    Decimal?  @map("refund_amount_etb") @db.Decimal(12, 2)
+  refundNotes        String?   @map("refund_notes")
+  escalatedAt        DateTime? @map("escalated_at") @db.Timestamptz
+  resolvedAt         DateTime? @map("resolved_at") @db.Timestamptz
+  closedAt           DateTime? @map("closed_at") @db.Timestamptz
+  openedAt           DateTime  @default(now()) @map("opened_at") @db.Timestamptz
+  updatedAt          DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  order              Order            @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  events             DisputeEvent[]
+  evidence           DisputeEvidence[]
+  notes              DisputeNote[]
+
+  @@index([status])
+  @@index([assignedToUserId])
+  @@index([openedAt])
+  @@map("dispute_cases")
+  @@schema("orders")
+}
+
+model DisputeEvent {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  disputeId   String   @map("dispute_id") @db.Uuid
+  eventType   String   @map("event_type") @db.VarChar(40)
+  fromStatus  String?  @map("from_status") @db.VarChar(20)
+  toStatus    String?  @map("to_status") @db.VarChar(20)
+  message     String?
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  metadataJson Json?   @map("metadata_json")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  dispute     DisputeCase @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([disputeId])
+  @@map("dispute_events")
+  @@schema("orders")
+}
+
+model DisputeEvidence {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  disputeId        String   @map("dispute_id") @db.Uuid
+  label            String   @db.VarChar(200)
+  fileUrl          String   @map("file_url")
+  contentType      String?  @map("content_type") @db.VarChar(100)
+  uploadedByUserId String?  @map("uploaded_by_user_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  dispute          DisputeCase @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([disputeId])
+  @@map("dispute_evidence")
+  @@schema("orders")
+}
+
+model DisputeNote {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  disputeId    String   @map("dispute_id") @db.Uuid
+  body         String
+  isInternal   Boolean  @default(true) @map("is_internal")
+  authorUserId String   @map("author_user_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  dispute      DisputeCase @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([disputeId])
+  @@map("dispute_notes")
   @@schema("orders")
 }
 

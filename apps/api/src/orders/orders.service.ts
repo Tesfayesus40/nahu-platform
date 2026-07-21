@@ -267,9 +267,63 @@ export class OrdersService {
       );
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: 'DISPUTED' },
+    const openedByRole = isBuyer ? 'BUYER' : 'FARMER';
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.update({
+        where: { id: orderId },
+        data: { status: 'DISPUTED' },
+      });
+
+      const existingCase = await tx.disputeCase.findUnique({
+        where: { orderId },
+      });
+      if (existingCase) {
+        if (existingCase.status === 'CLOSED' || existingCase.status === 'RESOLVED') {
+          await tx.disputeCase.update({
+            where: { id: existingCase.id },
+            data: {
+              status: 'OPEN',
+              openedByUserId: userId,
+              openedByRole,
+              resolvedAt: null,
+              closedAt: null,
+              updatedAt: new Date(),
+            },
+          });
+          await tx.disputeEvent.create({
+            data: {
+              disputeId: existingCase.id,
+              eventType: 'OPENED',
+              fromStatus: existingCase.status,
+              toStatus: 'OPEN',
+              message: 'Dispute re-opened by party',
+              actorUserId: userId,
+            },
+          });
+        }
+      } else {
+        const created = await tx.disputeCase.create({
+          data: {
+            orderId,
+            status: 'OPEN',
+            openedByUserId: userId,
+            openedByRole,
+            summary: 'Raised by party from order',
+          },
+        });
+        await tx.disputeEvent.create({
+          data: {
+            disputeId: created.id,
+            eventType: 'OPENED',
+            fromStatus: null,
+            toStatus: 'OPEN',
+            message: 'Dispute opened',
+            actorUserId: userId,
+          },
+        });
+      }
+
+      return order;
     });
 
     return this.shapeOrder(updated);

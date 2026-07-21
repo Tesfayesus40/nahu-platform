@@ -91,3 +91,48 @@ This mode is accepted only when `public.schema_migrations` is empty and
 `identity.users` already exists. It records checksums for the 62 pre-A1
 migrations without executing them, then applies the A1 migrations normally.
 Do not use this mode for a new or partially migrated database.
+
+## A2 User Management
+
+After A1 migrations are applied, ensure
+`identity/019_identity_user_management_permissions.sql` is listed in
+`manifest.json` (already present in-repo) and run `node scripts/apply-migrations.mjs`
+so SUPER_ADMIN / PLATFORM_ADMIN receive:
+
+- `identity.users.status.write`
+- `identity.roles.assign`
+- `identity.users.mfa.reset`
+- `identity.users.password.reset`
+
+## A3 Verification
+
+Apply (in manifest order) after A2:
+
+- `marketplace/013_marketplace_verification_workflow.sql`
+- `identity/020_identity_verification_permissions.sql`
+
+Same laptop procedure with `DATABASE_PUBLIC_URL` — do not use `railway.internal`.
+
+## A4 Listing moderation
+
+Apply after A3:
+
+- `marketplace/014_marketplace_listing_moderation.sql`
+- `identity/021_identity_listing_moderation_permissions.sql`
+
+## A5 Dispute management
+
+Apply after A4:
+
+- `orders/010_orders_dispute_cases.sql`
+- `identity/022_identity_dispute_permissions.sql`
+
+---
+
+## Staging batch handoff (A2–A5)
+
+When deploying A2–A5 together on staging:
+
+1. Checklist (order + deploy steps): [`a2-a5-staging-deployment-checklist.md`](./a2-a5-staging-deployment-checklist.md)
+2. Migration explanations: [`a2-a5-migration-summary.md`](./a2-a5-migration-summary.md)
+3. E2E validation (A3–A5): [`a3-a5-staging-validation-plan.md`](./a3-a5-staging-validation-plan.md)
