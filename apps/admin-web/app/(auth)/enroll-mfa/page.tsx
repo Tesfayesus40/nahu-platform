@@ -3,7 +3,16 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import QRCode from "qrcode";
 import { bffPost, type BffError } from "@/lib/client";
+
+function secretFromOtpauth(otpauthUrl: string): string {
+  try {
+    return new URL(otpauthUrl).searchParams.get("secret") ?? "";
+  } catch {
+    return "";
+  }
+}
 
 function EnrollMfaFlow() {
   const searchParams = useSearchParams();
@@ -18,6 +27,7 @@ function EnrollMfaFlow() {
   const [enrollment, setEnrollment] = useState<{
     otpauthUrl: string;
     secret: string;
+    qrCodeDataUrl: string;
   } | null>(null);
   const [totpCode, setTotpCode] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
@@ -40,11 +50,27 @@ function EnrollMfaFlow() {
       }
       setEnrollmentJwt(jwt);
 
-      const enrolled = await bffPost<{ otpauthUrl: string; secret: string }>(
+      const enrolled = await bffPost<{ otpauthUrl: string; secret?: string }>(
         "/api/auth/mfa/enroll/totp",
         { enrollmentToken: jwt },
       );
-      setEnrollment(enrolled);
+
+      const otpauthUrl = enrolled.otpauthUrl?.trim() ?? "";
+      if (!otpauthUrl.startsWith("otpauth://")) {
+        throw {
+          status: 502,
+          message: "Enrollment did not return a valid otpauth URL",
+        } satisfies BffError;
+      }
+
+      const secret =
+        enrolled.secret?.trim() || secretFromOtpauth(otpauthUrl);
+      const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl, {
+        width: 220,
+        margin: 2,
+      });
+
+      setEnrollment({ otpauthUrl, secret, qrCodeDataUrl });
       setReady(true);
     } catch (err) {
       setError((err as BffError).message);
@@ -122,11 +148,23 @@ function EnrollMfaFlow() {
   return (
     <div className="auth-card">
       <h1>Add authenticator</h1>
-      <p className="muted">Scan or enter this secret in your TOTP app, then confirm a code.</p>
-      <p className="mono wrap">
-        <a href={enrollment.otpauthUrl}>{enrollment.otpauthUrl}</a>
-      </p>
-      <div className="secret-box">{enrollment.secret}</div>
+      <p className="muted">Scan the QR code with your TOTP app, or enter the secret manually.</p>
+      <div className="qr-wrap">
+        <img
+          src={enrollment.qrCodeDataUrl}
+          alt="Authenticator QR Code"
+          width={220}
+          height={220}
+        />
+      </div>
+      {enrollment.secret ? (
+        <>
+          <p className="muted" style={{ marginBottom: 6 }}>
+            Manual entry secret
+          </p>
+          <div className="secret-box">{enrollment.secret}</div>
+        </>
+      ) : null}
       {error ? <p className="form-error">{error}</p> : null}
       <form onSubmit={handleConfirm}>
         <label>

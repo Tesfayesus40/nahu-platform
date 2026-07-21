@@ -431,6 +431,7 @@ export class AdminAuthService {
     return {
       factorId: factor.id,
       otpauthUrl,
+      secret,
     };
   }
   

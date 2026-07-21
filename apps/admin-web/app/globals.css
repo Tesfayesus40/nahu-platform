@@ -537,6 +537,18 @@ table.data-table {
 
 /* ---------- Misc ---------- */
 
+.qr-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0 18px;
+}
+
+.qr-wrap img {
+  display: block;
+  border-radius: 8px;
+  background: #fff;
+}
+
 .secret-box {
   background: var(--cream-dark);
   border: 1px dashed var(--brown-300);
