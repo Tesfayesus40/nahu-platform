@@ -42,6 +42,11 @@ export default function DashboardPage() {
     "marketplace.cooperatives.read",
   );
   const canReadUsers = capabilities.permissions.includes("identity.users.read");
+  const canReadNotifications = capabilities.permissions.includes(
+    "notifications.read",
+  );
+  const canReadMonitoring = capabilities.permissions.includes("monitoring.read");
+  const canReadReports = capabilities.permissions.includes("reports.read");
 
   const [health, setHealth] = useState<SystemHealthResponse | null>(null);
   const [summary, setSummary] = useState<DashboardSummaryResponse | null>(null);
@@ -195,6 +200,30 @@ export default function DashboardPage() {
                 href="/delivery?queue=exceptions"
                 allowed={canReadDelivery}
               />
+            </dd>
+            <dt>Unread notifications</dt>
+            <dd>
+              <QueueLink
+                value={queues?.unreadNotifications}
+                href="/notifications?unreadOnly=true"
+                allowed={canReadNotifications}
+              />
+            </dd>
+            <dt>Alert breaches</dt>
+            <dd>
+              <QueueLink
+                value={queues?.alertBreaches}
+                href="/monitoring"
+                allowed={canReadMonitoring}
+              />
+            </dd>
+            <dt>Reports</dt>
+            <dd>
+              {canReadReports ? (
+                <Link href="/reports">Open catalog</Link>
+              ) : (
+                "—"
+              )}
             </dd>
           </dl>
         </div>

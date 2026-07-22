@@ -86,6 +86,10 @@
     "delivery/001_delivery_schema.sql",
     "delivery/002_delivery_fulfillment_cases.sql",
     "marketplace/015_marketplace_promotions.sql",
-    "identity/024_identity_batch3_permissions.sql"
+    "identity/024_identity_batch3_permissions.sql",
+    "ops/003_ops_report_jobs.sql",
+    "ops/004_ops_admin_notifications.sql",
+    "ops/005_ops_alert_thresholds.sql",
+    "identity/025_identity_batch4_permissions.sql"
   ]
 }

@@ -303,6 +303,61 @@ model FeatureFlag {
   @@schema("ops")
 }
 
+model ReportJob {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reportType         String    @map("report_type") @db.VarChar(80)
+  status             String    @default("PENDING") @db.VarChar(20)
+  filtersJson        Json?     @map("filters_json")
+  requestedByUserId  String    @map("requested_by_user_id") @db.Uuid
+  rowCount           Int?      @map("row_count")
+  artifactCsv        String?   @map("artifact_csv")
+  errorMessage       String?   @map("error_message")
+  startedAt          DateTime? @map("started_at") @db.Timestamptz
+  completedAt        DateTime? @map("completed_at") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([requestedByUserId, createdAt])
+  @@index([reportType, status])
+  @@map("report_jobs")
+  @@schema("ops")
+}
+
+model AdminNotification {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipientUserId  String?   @map("recipient_user_id") @db.Uuid
+  audience         String    @default("BROADCAST") @db.VarChar(20)
+  audienceRole     String?   @map("audience_role") @db.VarChar(50)
+  severity         String    @default("INFO") @db.VarChar(20)
+  title            String    @db.VarChar(200)
+  body             String
+  linkPath         String?   @map("link_path") @db.VarChar(300)
+  sourceModule     String    @default("platform") @map("source_module") @db.VarChar(50)
+  dedupeKey        String?   @map("dedupe_key") @db.VarChar(120)
+  readAt           DateTime? @map("read_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([recipientUserId, createdAt])
+  @@map("admin_notifications")
+  @@schema("ops")
+}
+
+model AlertThreshold {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code             String    @unique @db.VarChar(80)
+  displayName      String    @map("display_name") @db.VarChar(200)
+  description      String?
+  metricKey        String    @map("metric_key") @db.VarChar(80)
+  warnAbove        Decimal?  @map("warn_above") @db.Decimal(12, 2)
+  criticalAbove    Decimal?  @map("critical_above") @db.Decimal(12, 2)
+  enabled          Boolean   @default(true)
+  updatedByUserId  String?   @map("updated_by_user_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@map("alert_thresholds")
+  @@schema("ops")
+}
+
 model FulfillmentCase {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   orderId          String    @unique @map("order_id") @db.Uuid

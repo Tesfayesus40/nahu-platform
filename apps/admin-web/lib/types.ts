@@ -59,6 +59,8 @@ export type DashboardSummaryResponse = {
     stalledEscrowOrders?: number | null;
     openFulfillments?: number | null;
     deliveryExceptions?: number | null;
+    unreadNotifications?: number | null;
+    alertBreaches?: number | null;
   };
   kpis?: {
     activeApprovedListings: number | null;
@@ -68,6 +70,8 @@ export type DashboardSummaryResponse = {
     trendOrders14d: number | null;
     activePromotions?: number | null;
     verifiedCooperatives?: number | null;
+    unreadNotifications?: number | null;
+    alertBreaches?: number | null;
   };
   sections?: {
     users: {
@@ -669,4 +673,93 @@ export type CooperativeDetail = Omit<CooperativeListItem, "farmerCount"> & {
     };
     _count?: { listings: number; orders: number };
   }>;
+};
+
+export type ReportCatalogType = {
+  type: string;
+  label: string;
+  description: string;
+};
+
+export type ReportCatalogResponse = {
+  types: ReportCatalogType[];
+  rowCap: number;
+  note: string;
+};
+
+export type ReportJob = {
+  id: string;
+  reportType: string;
+  label: string;
+  status: string;
+  rowCount: number | null;
+  errorMessage?: string | null;
+  createdAt: string;
+  completedAt?: string | null;
+};
+
+export type ReportJobsResponse = {
+  page: number;
+  limit: number;
+  total: number;
+  items: ReportJob[];
+};
+
+export type ReportExportResult = {
+  id: string;
+  reportType: string;
+  label: string;
+  status: string;
+  rowCount: number | null;
+  completedAt?: string | null;
+  artifactCsv?: string | null;
+};
+
+export type AdminNotification = {
+  id: string;
+  recipientUserId: string | null;
+  audience: string;
+  audienceRole: string | null;
+  severity: string;
+  title: string;
+  body: string;
+  linkPath: string | null;
+  sourceModule: string;
+  dedupeKey: string | null;
+  readAt: string | null;
+  createdAt: string;
+};
+
+export type NotificationsListResponse = {
+  page: number;
+  limit: number;
+  total: number;
+  unreadCount: number;
+  items: AdminNotification[];
+};
+
+export type MonitoringAlert = {
+  id: string;
+  code: string;
+  displayName: string;
+  description: string | null;
+  metricKey: string;
+  value: number;
+  warnAbove: number | null;
+  criticalAbove: number | null;
+  enabled: boolean;
+  level: "OK" | "WARN" | "CRITICAL";
+};
+
+export type MonitoringSnapshotResponse = {
+  asOf: string;
+  health: SystemHealthResponse;
+  metrics: Record<string, number>;
+  alerts: MonitoringAlert[];
+  summary: {
+    breachCount: number;
+    criticalCount: number;
+    okCount: number;
+  };
+  extensibility: string;
 };

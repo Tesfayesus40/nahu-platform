@@ -42,6 +42,17 @@ export const NAV_SECTIONS: NavSection[] = [
     permission: "marketplace.cooperatives.read",
   },
   { href: "/audit", label: "Audit", permission: "audit.read" },
+  { href: "/reports", label: "Reports", permission: "reports.read" },
+  {
+    href: "/notifications",
+    label: "Notifications",
+    permission: "notifications.read",
+  },
+  {
+    href: "/monitoring",
+    label: "Monitoring",
+    permission: "monitoring.read",
+  },
   { href: "/system", label: "System", permission: "admin.system.health.read" },
   { href: "/account", label: "Account", permission: null },
 ];

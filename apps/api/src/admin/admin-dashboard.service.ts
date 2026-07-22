@@ -9,6 +9,7 @@ import {
   fillDailySeries,
   sumSeries,
 } from './dashboard.rules';
+import { evaluateThreshold } from './monitoring.rules';
 
 type DayCountRow = { day: Date; count: bigint };
 
@@ -38,6 +39,8 @@ export class AdminDashboardService {
     );
     const canAudit = admin.permissions.includes('audit.read');
     const canHealth = admin.permissions.includes('admin.system.health.read');
+    const canNotifications = admin.permissions.includes('notifications.read');
+    const canMonitoring = admin.permissions.includes('monitoring.read');
 
     const [
       users,
@@ -52,6 +55,8 @@ export class AdminDashboardService {
       delivery,
       promotions,
       cooperatives,
+      unreadNotifications,
+      alertBreaches,
     ] = await Promise.all([
       canUsers ? this.userStats(since7d, since30d) : null,
       canVerification ? this.verificationStats() : null,
@@ -69,6 +74,8 @@ export class AdminDashboardService {
       canDelivery ? this.deliveryStats() : null,
       canPromotions ? this.promotionStats() : null,
       canCoops ? this.cooperativeStats() : null,
+      canNotifications ? this.unreadNotificationCount(admin) : null,
+      canMonitoring ? this.alertBreachCount() : null,
     ]);
 
     const queues = {
@@ -81,6 +88,8 @@ export class AdminDashboardService {
       stalledEscrowOrders: commerce?.stalledEscrow ?? null,
       openFulfillments: delivery?.open ?? null,
       deliveryExceptions: delivery?.exceptions ?? null,
+      unreadNotifications,
+      alertBreaches,
     };
 
     const kpis = {
@@ -91,6 +100,8 @@ export class AdminDashboardService {
       trendOrders14d: sumSeries(trends.ordersCreated),
       activePromotions: promotions?.byStatus?.ACTIVE ?? null,
       verifiedCooperatives: cooperatives?.verified ?? null,
+      unreadNotifications,
+      alertBreaches,
     };
 
     // Backward-compatible placeholders used by earlier dashboard cards.
@@ -487,5 +498,67 @@ export class AdminDashboardService {
         ? fillDailySeries(verificationRows, DASHBOARD_TREND_DAYS, asOf)
         : [],
     };
+  }
+
+  private async unreadNotificationCount(admin: AdminRequestUser) {
+    return this.prisma.adminNotification.count({
+      where: {
+        readAt: null,
+        OR: [
+          { audience: 'BROADCAST' },
+          { audience: 'USER', recipientUserId: admin.userId },
+          ...(admin.roles.length
+            ? [
+                {
+                  audience: 'ROLE' as const,
+                  audienceRole: { in: admin.roles },
+                },
+              ]
+            : []),
+        ],
+      },
+    });
+  }
+
+  private async alertBreachCount() {
+    const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const escrowCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    const [
+      thresholds,
+      auditDenied7d,
+      stalledEscrow,
+      deliveryExceptions,
+      verificationPending,
+    ] = await Promise.all([
+      this.prisma.alertThreshold.findMany({ where: { enabled: true } }),
+      this.prisma.auditEvent.count({
+        where: { outcome: 'DENIED', occurredAt: { gte: since7d } },
+      }),
+      this.prisma.order.count({
+        where: { status: 'PAID_ESCROW', paidAt: { lte: escrowCutoff } },
+      }),
+      this.prisma.fulfillmentCase.count({ where: { status: 'EXCEPTION' } }),
+      this.prisma.verificationCase.count({
+        where: { status: { in: ['PENDING', 'INFO_REQUESTED'] } },
+      }),
+    ]);
+
+    const metrics: Record<string, number> = {
+      'audit.denied_7d': auditDenied7d,
+      'orders.stalled_escrow': stalledEscrow,
+      'delivery.exceptions': deliveryExceptions,
+      'verification.pending': verificationPending,
+    };
+
+    let breaches = 0;
+    for (const t of thresholds) {
+      const level = evaluateThreshold(
+        metrics[t.metricKey] ?? 0,
+        t.warnAbove != null ? Number(t.warnAbove) : null,
+        t.criticalAbove != null ? Number(t.criticalAbove) : null,
+      );
+      if (level === 'WARN' || level === 'CRITICAL') breaches += 1;
+    }
+    return breaches;
   }
 }
