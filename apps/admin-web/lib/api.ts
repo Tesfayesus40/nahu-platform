@@ -105,6 +105,14 @@ export async function proxyAuthed(
 /** Convert a NestResult into a NextResponse, persisting rotated cookies. */
 export function toResponse(result: NestResult): NextResponse {
   const res = NextResponse.json(result.body ?? null, { status: result.status });
+  return applySessionCookies(res, result);
+}
+
+/** Apply rotated cookies / session expiry onto any response (including file downloads). */
+export function applySessionCookies(
+  res: NextResponse,
+  result: NestResult,
+): NextResponse {
   if (result.rotatedTokens) {
     setTokenCookies(res, result.rotatedTokens);
   }

@@ -93,6 +93,17 @@ export function hasAllPermissions(
   return required.every((code) => set.has(code));
 }
 
+export function hasAnyPermission(
+  held: string[],
+  candidates: string[],
+): boolean {
+  if (candidates.length === 0) {
+    return false;
+  }
+  const set = new Set(held);
+  return candidates.some((code) => set.has(code));
+}
+
 export function filterInvitableRoleCodes(roleCodes: string[]): string[] {
   const allowed = new Set<string>(INVITABLE_ROLE_CODES);
   return roleCodes.filter((code) => allowed.has(code));

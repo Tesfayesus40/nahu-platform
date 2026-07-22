@@ -101,4 +101,8 @@ export class DisputeEvidenceDto {
   @IsOptional()
   @IsString()
   contentType?: string;
+
+  @IsString()
+  @MinLength(8)
+  reauthPassword: string;
 }

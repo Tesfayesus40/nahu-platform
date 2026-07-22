@@ -25,6 +25,7 @@ export default function NotificationsPage() {
   const { capabilities } = usePortal();
   const canRead = capabilities.permissions.includes("notifications.read");
   const canManage = capabilities.permissions.includes("notifications.manage");
+  const canMarkRead = capabilities.permissions.includes("notifications.read");
 
   const [data, setData] = useState<NotificationsListResponse | null>(null);
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -59,14 +60,22 @@ export default function NotificationsPage() {
   }, [load]);
 
   async function markRead(id: string) {
-    await bffPost(`/api/notifications/${id}/read`);
-    await load();
+    try {
+      await bffPost(`/api/notifications/${id}/read`);
+      await load();
+    } catch (err) {
+      setError((err as BffError).message);
+    }
   }
 
   async function markAll() {
-    await bffPost("/api/notifications/read-all");
-    setFlash("All visible notifications marked read.");
-    await load();
+    try {
+      await bffPost("/api/notifications/read-all");
+      setFlash("All visible notifications marked read.");
+      await load();
+    } catch (err) {
+      setError((err as BffError).message);
+    }
   }
 
   async function publish(input: { reauthPassword: string; reason?: string }) {
@@ -104,23 +113,23 @@ export default function NotificationsPage() {
               />{" "}
               Unread only
             </label>
+            {canMarkRead ? (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => void markAll()}
+              >
+                Mark all read
+              </button>
+            ) : null}
             {canManage ? (
-              <>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => void markAll()}
-                >
-                  Mark all read
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => setShowForm(true)}
-                >
-                  Publish
-                </button>
-              </>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setShowForm(true)}
+              >
+                Publish
+              </button>
             ) : null}
             <button
               type="button"
@@ -241,7 +250,7 @@ export default function NotificationsPage() {
                     <Link href={n.linkPath}>{n.linkPath}</Link>
                   ) : null}
                 </div>
-                {canManage && !n.readAt ? (
+                {canMarkRead && !n.readAt ? (
                   <button
                     type="button"
                     className="btn btn-secondary"

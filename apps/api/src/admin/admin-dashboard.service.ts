@@ -10,6 +10,7 @@ import {
   sumSeries,
 } from './dashboard.rules';
 import { evaluateThreshold } from './monitoring.rules';
+import { PENDING_VERIFICATION_STATUSES } from '../marketplace/verification.rules';
 
 type DayCountRow = { day: Date; count: bigint };
 
@@ -62,13 +63,14 @@ export class AdminDashboardService {
       canVerification ? this.verificationStats() : null,
       canListings ? this.listingStats() : null,
       canDisputes ? this.disputeStats() : null,
-      this.marketplaceStats(since7d, since30d),
+      canOrders ? this.marketplaceStats(since7d, since30d) : null,
       canAudit ? this.securityStats(since7d) : null,
       canHealth ? this.healthSnapshot() : null,
       this.trendSeries(sinceTrend, asOf, {
         users: canUsers,
         verification: canVerification,
         disputes: canDisputes,
+        orders: canOrders,
       }),
       canOrders ? this.commerceStats() : null,
       canDelivery ? this.deliveryStats() : null,
@@ -442,16 +444,23 @@ export class AdminDashboardService {
   private async trendSeries(
     since: Date,
     asOf: Date,
-    opts: { users: boolean; verification: boolean; disputes: boolean },
+    opts: {
+      users: boolean;
+      verification: boolean;
+      disputes: boolean;
+      orders: boolean;
+    },
   ) {
-    const ordersRows = await this.prisma.$queryRaw<DayCountRow[]>`
+    const ordersRows = opts.orders
+      ? await this.prisma.$queryRaw<DayCountRow[]>`
       SELECT date_trunc('day', created_at AT TIME ZONE 'UTC') AS day,
              COUNT(*)::bigint AS count
       FROM orders.orders
       WHERE created_at >= ${since}
       GROUP BY 1
       ORDER BY 1
-    `;
+    `
+      : [];
 
     const usersRows = opts.users
       ? await this.prisma.$queryRaw<DayCountRow[]>`
@@ -487,7 +496,9 @@ export class AdminDashboardService {
       : [];
 
     return {
-      ordersCreated: fillDailySeries(ordersRows, DASHBOARD_TREND_DAYS, asOf),
+      ordersCreated: opts.orders
+        ? fillDailySeries(ordersRows, DASHBOARD_TREND_DAYS, asOf)
+        : [],
       usersCreated: opts.users
         ? fillDailySeries(usersRows, DASHBOARD_TREND_DAYS, asOf)
         : [],
@@ -539,7 +550,7 @@ export class AdminDashboardService {
       }),
       this.prisma.fulfillmentCase.count({ where: { status: 'EXCEPTION' } }),
       this.prisma.verificationCase.count({
-        where: { status: { in: ['PENDING', 'INFO_REQUESTED'] } },
+        where: { status: { in: [...PENDING_VERIFICATION_STATUSES] } },
       }),
     ]);
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DataTable, type Column } from "@/components/DataTable";
@@ -22,15 +23,25 @@ const STATUS_OPTIONS = [
 
 type SortKey = "createdAt" | "email" | "status" | "updatedAt";
 
-export default function UsersPage() {
+function UsersQueue() {
+  const searchParams = useSearchParams();
   const { capabilities } = usePortal();
   const canRead = capabilities.permissions.includes("identity.users.read");
+  const initialStatus = searchParams.get("status") ?? "";
 
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<SortKey>("createdAt");
   const [order, setOrder] = useState<"asc" | "desc">("desc");
-  const [filters, setFilters] = useState({ q: "", status: "", role: "" });
-  const [applied, setApplied] = useState({ q: "", status: "", role: "" });
+  const [filters, setFilters] = useState({
+    q: "",
+    status: initialStatus,
+    role: "",
+  });
+  const [applied, setApplied] = useState({
+    q: "",
+    status: initialStatus,
+    role: "",
+  });
   const [roles, setRoles] = useState<RolesListResponse | null>(null);
   const [data, setData] = useState<UsersListResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -257,5 +268,13 @@ export default function UsersPage() {
         </>
       ) : null}
     </div>
+  );
+}
+
+export default function UsersPage() {
+  return (
+    <Suspense fallback={<p className="muted">Loading users…</p>}>
+      <UsersQueue />
+    </Suspense>
   );
 }

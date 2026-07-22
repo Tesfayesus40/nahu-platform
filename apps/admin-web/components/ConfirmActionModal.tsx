@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 export function ConfirmActionModal({
   open,
@@ -25,6 +25,7 @@ export function ConfirmActionModal({
   }) => Promise<void>;
 }) {
   const titleId = useId();
+  const passwordRef = useRef<HTMLInputElement>(null);
   const [reauthPassword, setReauthPassword] = useState("");
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -36,8 +37,18 @@ export function ConfirmActionModal({
       setReason("");
       setError(null);
       setSubmitting(false);
+      return;
     }
-  }, [open]);
+    const t = window.setTimeout(() => passwordRef.current?.focus(), 0);
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !submitting) onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose, submitting]);
 
   if (!open) return null;
 
@@ -63,7 +74,13 @@ export function ConfirmActionModal({
   }
 
   return (
-    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onClick={() => {
+        if (!submitting) onClose();
+      }}
+    >
       <div
         className="modal-card"
         role="dialog"
@@ -77,6 +94,7 @@ export function ConfirmActionModal({
           <label className="field">
             Your password (re-authenticate)
             <input
+              ref={passwordRef}
               type="password"
               autoComplete="current-password"
               required

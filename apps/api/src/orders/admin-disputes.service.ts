@@ -534,6 +534,7 @@ export class AdminDisputesService {
     meta: RequestMeta = {},
   ) {
     this.assertCanManage(admin);
+    await this.adminAuth.requireReauth(admin, dto.reauthPassword);
 
     const existing = await this.prisma.disputeCase.findUnique({
       where: { id: disputeId },

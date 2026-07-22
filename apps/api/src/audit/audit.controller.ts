@@ -7,6 +7,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { Request } from 'express';
 import { AuditService } from './audit.service';
 import { AdminAuthGuard } from '../common/guards/admin-auth.guard';
@@ -15,9 +16,10 @@ import { RequirePermissions } from '../common/decorators/require-permissions.dec
 import { CurrentAdmin } from '../common/decorators/current-admin.decorator';
 import { AdminRequestUser } from '../common/admin/admin-request.types';
 import { QueryAuditEventsDto } from './dto/query-audit-events.dto';
+import { adminRequestMeta } from '../common/admin/admin-request-meta';
 
 @Controller('admin/audit')
-@UseGuards(AdminAuthGuard, PermissionsGuard)
+@UseGuards(ThrottlerGuard, AdminAuthGuard, PermissionsGuard)
 export class AuditController {
   constructor(private readonly audit: AuditService) {}
 
@@ -63,11 +65,7 @@ export class AuditController {
         from: query.from,
         to: query.to,
       },
-      {
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-        requestId: req.headers['x-request-id'] as string | undefined,
-      },
+      adminRequestMeta(req),
     );
   }
 

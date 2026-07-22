@@ -14,29 +14,29 @@ import { Request } from 'express';
 import { AdminVerificationService } from './admin-verification.service';
 import { AdminAuthGuard } from '../common/guards/admin-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
+import { RequireAnyPermissions } from '../common/decorators/require-permissions.decorator';
 import { CurrentAdmin } from '../common/decorators/current-admin.decorator';
 import { AdminRequestUser } from '../common/admin/admin-request.types';
+import { adminRequestMeta } from '../common/admin/admin-request-meta';
 import { ListVerificationQueryDto } from './dto/list-verification-query.dto';
 import { VerificationDecisionDto } from './dto/verification-decision.dto';
 import { AddVerificationDocumentDto } from './dto/add-verification-document.dto';
 import { AddReviewerNoteDto } from './dto/add-reviewer-note.dto';
+
+const VERIFY_ANY = [
+  'farmers.verify',
+  'buyers.verify',
+  'marketplace.merchants.verify',
+  'identity.organizations.verify',
+] as const;
 
 @Controller('admin/verification')
 @UseGuards(ThrottlerGuard, AdminAuthGuard, PermissionsGuard)
 export class AdminVerificationController {
   constructor(private readonly verification: AdminVerificationService) {}
 
-  private meta(req: Request) {
-    return {
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      requestId: req.headers['x-request-id'] as string | undefined,
-    };
-  }
-
   @Get('cases')
-  @RequirePermissions('verification.read')
+  @RequireAnyPermissions('verification.read', ...VERIFY_ANY)
   list(
     @CurrentAdmin() admin: AdminRequestUser,
     @Query() query: ListVerificationQueryDto,
@@ -45,7 +45,7 @@ export class AdminVerificationController {
   }
 
   @Get('cases/:id')
-  @RequirePermissions('verification.read')
+  @RequireAnyPermissions('verification.read', ...VERIFY_ANY)
   get(
     @CurrentAdmin() admin: AdminRequestUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -54,7 +54,7 @@ export class AdminVerificationController {
   }
 
   @Post('cases/:id/decisions')
-  @RequirePermissions('verification.read')
+  @RequireAnyPermissions(...VERIFY_ANY)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   decide(
     @CurrentAdmin() admin: AdminRequestUser,
@@ -62,12 +62,11 @@ export class AdminVerificationController {
     @Body() dto: VerificationDecisionDto,
     @Req() req: Request,
   ) {
-    // Subject-specific decide permission enforced in service.
-    return this.verification.decide(admin, id, dto, this.meta(req));
+    return this.verification.decide(admin, id, dto, adminRequestMeta(req));
   }
 
   @Post('cases/:id/notes')
-  @RequirePermissions('verification.read')
+  @RequireAnyPermissions(...VERIFY_ANY)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   addNote(
     @CurrentAdmin() admin: AdminRequestUser,
@@ -75,11 +74,11 @@ export class AdminVerificationController {
     @Body() dto: AddReviewerNoteDto,
     @Req() req: Request,
   ) {
-    return this.verification.addNote(admin, id, dto, this.meta(req));
+    return this.verification.addNote(admin, id, dto, adminRequestMeta(req));
   }
 
   @Post('cases/:id/documents')
-  @RequirePermissions('verification.read')
+  @RequireAnyPermissions(...VERIFY_ANY)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   addDocument(
     @CurrentAdmin() admin: AdminRequestUser,
@@ -87,6 +86,6 @@ export class AdminVerificationController {
     @Body() dto: AddVerificationDocumentDto,
     @Req() req: Request,
   ) {
-    return this.verification.addDocument(admin, id, dto, this.meta(req));
+    return this.verification.addDocument(admin, id, dto, adminRequestMeta(req));
   }
 }

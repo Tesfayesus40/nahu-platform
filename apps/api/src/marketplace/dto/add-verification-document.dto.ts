@@ -13,4 +13,8 @@ export class AddVerificationDocumentDto {
   @IsOptional()
   @IsString()
   contentType?: string;
+
+  @IsString()
+  @MinLength(8)
+  reauthPassword: string;
 }

@@ -63,7 +63,7 @@ export class AdminNotificationsService {
     await this.audit.appendEvent({
       actorUserId: admin.userId,
       actorSessionId: admin.sessionId,
-      permissionCode: 'notifications.manage',
+      permissionCode: 'notifications.read',
       action: 'notifications.mark_read',
       targetType: 'admin_notification',
       targetId: id,
@@ -85,7 +85,7 @@ export class AdminNotificationsService {
     await this.audit.appendEvent({
       actorUserId: admin.userId,
       actorSessionId: admin.sessionId,
-      permissionCode: 'notifications.manage',
+      permissionCode: 'notifications.read',
       action: 'notifications.mark_all_read',
       targetType: 'admin_notification',
       outcome: 'SUCCESS',

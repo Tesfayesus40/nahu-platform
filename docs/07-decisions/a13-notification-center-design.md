@@ -20,9 +20,11 @@ Publish requires re-auth + audit. Mark-read is audited.
 ## API
 
 - `GET /admin/notifications`
-- `POST /admin/notifications/read-all`
-- `POST /admin/notifications/publish`
-- `POST /admin/notifications/:id/read`
+- `POST /admin/notifications/read-all` (`notifications.read`)
+- `POST /admin/notifications/:id/read` (`notifications.read`)
+- `POST /admin/notifications/publish` (`notifications.manage` + reauth)
+
+Mark-read is inbox UX; publish remains privileged.
 
 ## Admin Web
 

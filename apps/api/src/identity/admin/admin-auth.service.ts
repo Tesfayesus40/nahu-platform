@@ -850,6 +850,8 @@ export class AdminAuthService {
     dto: LogoutAllDto,
     meta: RequestMeta = {},
   ) {
+    await this.requireReauth(admin, dto.reauthPassword);
+
     const targetUserId = dto.targetUserId ?? admin.userId;
     if (
       targetUserId !== admin.userId &&

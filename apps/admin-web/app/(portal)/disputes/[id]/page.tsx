@@ -37,6 +37,7 @@ export default function DisputeDetailPage() {
   const [refundAmount, setRefundAmount] = useState("");
   const [evidenceLabel, setEvidenceLabel] = useState("");
   const [evidenceUrl, setEvidenceUrl] = useState("");
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -108,23 +109,25 @@ export default function DisputeDetailPage() {
     await load();
   }
 
-  async function addEvidence() {
+  async function addEvidence(input: {
+    reauthPassword: string;
+    reason?: string;
+  }) {
     if (!evidenceLabel.trim() || !evidenceUrl.trim()) {
       setError("Evidence label and URL are required");
-      return;
+      throw { message: "Evidence label and URL are required" };
     }
-    try {
-      await bffPost(`/api/disputes/${id}/evidence`, {
-        label: evidenceLabel.trim(),
-        fileUrl: evidenceUrl.trim(),
-      });
-      setEvidenceLabel("");
-      setEvidenceUrl("");
-      setFlash("Evidence added.");
-      await load();
-    } catch (err) {
-      setError((err as BffError).message);
-    }
+    await bffPost(`/api/disputes/${id}/evidence`, {
+      label: evidenceLabel.trim(),
+      fileUrl: evidenceUrl.trim(),
+      reauthPassword: input.reauthPassword,
+      reason: input.reason,
+    });
+    setEvidenceLabel("");
+    setEvidenceUrl("");
+    setEvidenceOpen(false);
+    setFlash("Evidence added.");
+    await load();
   }
 
   if (loading) return <p className="muted">Loading dispute…</p>;
@@ -409,9 +412,10 @@ export default function DisputeDetailPage() {
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={() => void addEvidence()}
+                onClick={() => setEvidenceOpen(true)}
+                disabled={!evidenceLabel.trim() || !evidenceUrl.trim()}
               >
-                Add evidence
+                Add evidence…
               </button>
             </div>
           ) : null}
@@ -473,6 +477,15 @@ export default function DisputeDetailPage() {
         confirmLabel="Assign"
         onClose={() => setAssignOpen(false)}
         onConfirm={runAssign}
+      />
+
+      <ConfirmActionModal
+        open={evidenceOpen}
+        title="Add evidence"
+        requireReason
+        confirmLabel="Add evidence"
+        onClose={() => setEvidenceOpen(false)}
+        onConfirm={addEvidence}
       />
     </div>
   );

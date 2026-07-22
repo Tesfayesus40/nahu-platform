@@ -20,6 +20,7 @@ const PAGE_SIZE = 20;
 function AuditCenter() {
   const searchParams = useSearchParams();
   const { capabilities } = usePortal();
+  const canRead = capabilities.permissions.includes("audit.read");
   const canExport = capabilities.permissions.includes("audit.export");
 
   const [page, setPage] = useState(1);
@@ -108,8 +109,17 @@ function AuditCenter() {
   );
 
   useEffect(() => {
-    void load(1);
-  }, [load]);
+    if (canRead) void load(1);
+  }, [canRead, load]);
+
+  if (!canRead) {
+    return (
+      <>
+        <PageHeader title="Audit Center" subtitle="Privileged action history" />
+        <p className="form-error">Missing audit.read permission.</p>
+      </>
+    );
+  }
 
   async function openDetail(id: string) {
     try {

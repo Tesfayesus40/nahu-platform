@@ -74,7 +74,8 @@ export class AdminAuthController {
   }
 
   @Post('logout-all')
-  @UseGuards(AdminAuthGuard, PermissionsGuard)
+  @UseGuards(AdminAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   logoutAll(
     @CurrentAdmin() admin: AdminRequestUser,
     @Body() dto: LogoutAllDto,

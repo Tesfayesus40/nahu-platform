@@ -57,9 +57,21 @@ async function bootstrap() {
     .filter(Boolean);
 
   if (corsOrigins?.length) {
-    app.enableCors({ origin: corsOrigins });
+    app.enableCors({
+      origin: corsOrigins,
+      credentials: true,
+    });
+  } else if (nodeEnv === 'production') {
+    throw new Error(
+      'CORS_ORIGINS must be set in production (comma-separated allowlist)',
+    );
   } else {
-    app.enableCors();
+    // Local/dev only: reflect request origin so admin-web BFF and mobile tools work.
+    Logger.warn(
+      'CORS_ORIGINS unset — reflecting request origin (non-production only)',
+      'Bootstrap',
+    );
+    app.enableCors({ origin: true, credentials: true });
   }
 
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;

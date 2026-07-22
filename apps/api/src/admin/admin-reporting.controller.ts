@@ -71,14 +71,20 @@ export class AdminReportingController {
 
   @Get('jobs/:id')
   @RequirePermissions('reports.read')
-  getJob(@Param('id', ParseUUIDPipe) id: string) {
-    return this.reports.getJob(id, false);
+  getJob(
+    @CurrentAdmin() admin: AdminRequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.reports.getJob(admin, id, false);
   }
 
   @Get('jobs/:id/download')
   @RequirePermissions('reports.read')
-  async download(@Param('id', ParseUUIDPipe) id: string) {
-    const job = await this.reports.getJob(id, true);
+  async download(
+    @CurrentAdmin() admin: AdminRequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const job = await this.reports.getJob(admin, id, true);
     if (!job.artifactCsv) {
       throw new NotFoundException('No artifact available');
     }

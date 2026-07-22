@@ -5,7 +5,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { usePortal } from "@/components/PortalShell";
-import { bffGet, type BffError } from "@/lib/client";
+import { bffGet, bffPost, type BffError } from "@/lib/client";
 import type { MonitoringSnapshotResponse } from "@/lib/types";
 
 export default function MonitoringPage() {
@@ -14,27 +14,40 @@ export default function MonitoringPage() {
   const [data, setData] = useState<MonitoringSnapshotResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [emitNotices, setEmitNotices] = useState(false);
+  const [emitting, setEmitting] = useState(false);
 
   const load = useCallback(async () => {
     if (!canRead) return;
     setLoading(true);
     setError(null);
     try {
-      const params = emitNotices ? "?emitNotices=true" : "";
-      setData(
-        await bffGet<MonitoringSnapshotResponse>(`/api/monitoring${params}`),
-      );
+      setData(await bffGet<MonitoringSnapshotResponse>(`/api/monitoring`));
     } catch (err) {
       setError((err as BffError).message);
     } finally {
       setLoading(false);
     }
-  }, [canRead, emitNotices]);
+  }, [canRead]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function emitNotices() {
+    setEmitting(true);
+    setError(null);
+    try {
+      setData(
+        await bffPost<MonitoringSnapshotResponse>(
+          "/api/monitoring/emit-notices",
+        ),
+      );
+    } catch (err) {
+      setError((err as BffError).message);
+    } finally {
+      setEmitting(false);
+    }
+  }
 
   if (!canRead) {
     return <p className="form-error">Missing monitoring.read permission.</p>;
@@ -47,14 +60,14 @@ export default function MonitoringPage() {
         subtitle="Live health, metrics, and alert threshold evaluation"
         actions={
           <div className="action-row">
-            <label className="muted">
-              <input
-                type="checkbox"
-                checked={emitNotices}
-                onChange={(e) => setEmitNotices(e.target.checked)}
-              />{" "}
-              Emit alert notices
-            </label>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => void emitNotices()}
+              disabled={loading || emitting}
+            >
+              {emitting ? "Emitting…" : "Emit alert notices"}
+            </button>
             <button
               type="button"
               className="btn btn-secondary"

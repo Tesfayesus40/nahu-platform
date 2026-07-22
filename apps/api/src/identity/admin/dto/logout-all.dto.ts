@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
 export class LogoutAllDto {
   @IsOptional()
@@ -8,4 +8,8 @@ export class LogoutAllDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  @IsString()
+  @MinLength(8)
+  reauthPassword: string;
 }

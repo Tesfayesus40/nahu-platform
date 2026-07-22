@@ -53,9 +53,22 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Monitoring",
     permission: "monitoring.read",
   },
-  { href: "/system", label: "System", permission: "admin.system.health.read" },
+  {
+    href: "/system",
+    label: "System",
+    permission: "admin.system.health.read",
+  },
   { href: "/account", label: "Account", permission: null },
 ];
+
+/** System is useful with health, config, or invite capability. */
+export function canSeeSystem(permissions: string[]): boolean {
+  return (
+    permissions.includes("admin.system.health.read") ||
+    permissions.includes("admin.system.config.read") ||
+    permissions.includes("identity.users.invite")
+  );
+}
 
 export function Nav({
   permissions,
@@ -67,10 +80,12 @@ export function Nav({
   const pathname = usePathname();
   const router = useRouter();
 
-  const visible = NAV_SECTIONS.filter(
-    (section) =>
-      section.permission === null || permissions.includes(section.permission),
-  );
+  const visible = NAV_SECTIONS.filter((section) => {
+    if (section.href === "/system") return canSeeSystem(permissions);
+    return (
+      section.permission === null || permissions.includes(section.permission)
+    );
+  });
 
   async function handleLogout() {
     try {
@@ -101,6 +116,16 @@ export function Nav({
                 : pathname === section.href ||
                     pathname.startsWith(`${section.href}/`)
                   ? "active"
+                  : undefined
+            }
+            aria-current={
+              section.href === "/"
+                ? pathname === "/"
+                  ? "page"
+                  : undefined
+                : pathname === section.href ||
+                    pathname.startsWith(`${section.href}/`)
+                  ? "page"
                   : undefined
             }
           >

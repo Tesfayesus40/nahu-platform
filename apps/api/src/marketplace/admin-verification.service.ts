@@ -328,6 +328,7 @@ export class AdminVerificationService {
     dto: AddVerificationDocumentDto,
     meta: RequestMeta = {},
   ) {
+    await this.adminAuth.requireReauth(admin, dto.reauthPassword);
     this.assertCanRead(admin);
     const existing = await this.prisma.verificationCase.findUnique({
       where: { id: caseId },

@@ -52,6 +52,12 @@ function hasAllPermissions(held, required) {
   return required.every((code) => set.has(code));
 }
 
+function hasAnyPermission(held, candidates) {
+  if (candidates.length === 0) return false;
+  const set = new Set(held);
+  return candidates.some((code) => set.has(code));
+}
+
 function filterInvitableRoleCodes(roleCodes) {
   const allowed = new Set(INVITABLE_ROLE_CODES);
   return roleCodes.filter((code) => allowed.has(code));
@@ -189,6 +195,14 @@ describe('permissions AND check', () => {
       true,
     );
     assert.equal(hasAllPermissions(['a'], ['a', 'b']), false);
+  });
+});
+
+describe('permissions OR check', () => {
+  it('accepts any listed code', () => {
+    assert.equal(hasAnyPermission(['farmers.verify'], ['farmers.verify', 'buyers.verify']), true);
+    assert.equal(hasAnyPermission(['audit.read'], ['farmers.verify', 'buyers.verify']), false);
+    assert.equal(hasAnyPermission(['a'], []), false);
   });
 });
 

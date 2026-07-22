@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminRequestUser } from '../common/admin/admin-request.types';
+import { toCsv } from '../admin/reporting.rules';
 
 const SECRET_KEY_PATTERN =
   /(password|token|secret|otp|recovery|refresh|authorization|cookie|mfa)/i;
@@ -196,28 +197,26 @@ export class AuditService {
       'reason',
       'ip',
     ];
-    const lines = [header.join(',')];
-    for (const row of items) {
-      lines.push(
-        [
-          row.id,
-          row.occurredAt.toISOString(),
-          row.action,
-          row.outcome,
-          row.actorUserId ?? '',
-          row.permissionCode ?? '',
-          row.targetType ?? '',
-          row.targetId ?? '',
-          row.requestId ?? '',
-          csvEscape(row.reason ?? ''),
-          row.ip ?? '',
-        ].join(','),
-      );
-    }
+    const body = toCsv(
+      header,
+      items.map((row) => [
+        row.id,
+        row.occurredAt.toISOString(),
+        row.action,
+        row.outcome,
+        row.actorUserId ?? '',
+        row.permissionCode ?? '',
+        row.targetType ?? '',
+        row.targetId ?? '',
+        row.requestId ?? '',
+        row.reason ?? '',
+        row.ip ?? '',
+      ]),
+    );
     return {
       filename: `audit-events-${new Date().toISOString().slice(0, 10)}.csv`,
       contentType: 'text/csv; charset=utf-8',
-      body: lines.join('\n'),
+      body,
       rowCount: items.length,
     };
   }
@@ -254,11 +253,4 @@ export class AuditService {
     }
     return out;
   }
-}
-
-function csvEscape(value: string): string {
-  if (/[",\n]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
 }

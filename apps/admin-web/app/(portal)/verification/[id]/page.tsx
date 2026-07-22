@@ -30,6 +30,7 @@ export default function VerificationDetailPage() {
   const [modal, setModal] = useState<DecisionModal>(null);
   const [docLabel, setDocLabel] = useState("");
   const [docUrl, setDocUrl] = useState("");
+  const [docOpen, setDocOpen] = useState(false);
   const [noteModal, setNoteModal] = useState(false);
 
   const load = useCallback(async () => {
@@ -85,21 +86,24 @@ export default function VerificationDetailPage() {
     await load();
   }
 
-  async function addDocument(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    try {
-      await bffPost(`/api/verification/cases/${caseId}/documents`, {
-        label: docLabel.trim(),
-        fileUrl: docUrl.trim(),
-      });
-      setDocLabel("");
-      setDocUrl("");
-      setFlash("Document reference added.");
-      await load();
-    } catch (err) {
-      setError((err as BffError).message);
+  async function addDocument(input: {
+    reauthPassword: string;
+    reason?: string;
+  }) {
+    if (!docLabel.trim() || !docUrl.trim()) {
+      throw { message: "Document label and URL are required" };
     }
+    await bffPost(`/api/verification/cases/${caseId}/documents`, {
+      label: docLabel.trim(),
+      fileUrl: docUrl.trim(),
+      reauthPassword: input.reauthPassword,
+      reason: input.reason,
+    });
+    setDocLabel("");
+    setDocUrl("");
+    setDocOpen(false);
+    setFlash("Document reference added.");
+    await load();
   }
 
   if (loading) return <p className="muted">Loading case…</p>;
@@ -254,7 +258,7 @@ export default function VerificationDetailPage() {
             </button>
           </div>
 
-          <form onSubmit={addDocument} className="doc-form">
+          <div className="doc-form">
             <h3>Attach document reference</h3>
             <p className="muted">
               Store a label + URL (for example an uploaded file under
@@ -266,7 +270,6 @@ export default function VerificationDetailPage() {
               <input
                 value={docLabel}
                 onChange={(e) => setDocLabel(e.target.value)}
-                required
               />
             </label>
             <label className="field">
@@ -274,13 +277,17 @@ export default function VerificationDetailPage() {
               <input
                 value={docUrl}
                 onChange={(e) => setDocUrl(e.target.value)}
-                required
               />
             </label>
-            <button type="submit" className="btn btn-secondary">
-              Add document
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={!docLabel.trim() || !docUrl.trim()}
+              onClick={() => setDocOpen(true)}
+            >
+              Add document…
             </button>
-          </form>
+          </div>
         </section>
       ) : (
         <p className="muted" style={{ marginTop: 16 }}>
@@ -349,6 +356,15 @@ export default function VerificationDetailPage() {
         confirmLabel="Save note"
         onClose={() => setNoteModal(false)}
         onConfirm={runNote}
+      />
+
+      <ConfirmActionModal
+        open={docOpen}
+        title="Attach document reference"
+        requireReason
+        confirmLabel="Add document"
+        onClose={() => setDocOpen(false)}
+        onConfirm={addDocument}
       />
     </div>
   );

@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AdminRequestUser } from '../common/admin/admin-request.types';
 import { ACTIONABLE_MODERATION_STATUSES } from '../marketplace/listing-moderation.rules';
+import { PENDING_VERIFICATION_STATUSES } from '../marketplace/verification.rules';
 import {
   isKnownReportType,
   REPORT_TYPES,
@@ -78,9 +79,17 @@ export class AdminReportingService {
     };
   }
 
-  async getJob(id: string, includeArtifact = false) {
+  async getJob(
+    admin: AdminRequestUser,
+    id: string,
+    includeArtifact = false,
+  ) {
     const job = await this.prisma.reportJob.findUnique({ where: { id } });
     if (!job) throw new NotFoundException('Report job not found');
+    const canExport = admin.permissions.includes('reports.export');
+    if (job.requestedByUserId !== admin.userId && !canExport) {
+      throw new NotFoundException('Report job not found');
+    }
     return {
       id: job.id,
       reportType: job.reportType,
@@ -339,7 +348,9 @@ export class AdminReportingService {
 
   private async verificationPending() {
     const rows = await this.prisma.verificationCase.findMany({
-      where: { status: { in: ['PENDING', 'INFO_REQUESTED'] } },
+      where: {
+        status: { in: [...PENDING_VERIFICATION_STATUSES] },
+      },
       orderBy: { submittedAt: 'asc' },
       take: EXPORT_ROW_CAP,
       select: {

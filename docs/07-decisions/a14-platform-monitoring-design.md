@@ -25,7 +25,8 @@ Metric keys are a registry; Farms / Delivery / AI add collectors without DDL.
 
 ## API
 
-- `GET /admin/monitoring?emitNotices=`
+- `GET /admin/monitoring` — read-only snapshot
+- `POST /admin/monitoring/emit-notices` — writes deduped operational notices + audit (RC1: no longer a mutating GET)
 
 ## Admin Web
 

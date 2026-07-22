@@ -32,6 +32,7 @@
     "test:admin-dashboard-rules": "node --test src/admin/dashboard.rules.test.mjs",
     "test:reporting-rules": "node --test src/admin/reporting.rules.test.mjs",
     "test:monitoring-rules": "node --test src/admin/monitoring.rules.test.mjs",
+    "test:rc1-rules": "node --test src/admin/rc1-stabilization.rules.test.mjs",
     "test:order-admin-rules": "node --test src/orders/order-admin.rules.test.mjs",
     "test:fulfillment-rules": "node --test src/delivery/fulfillment.rules.test.mjs",
     "prisma:generate": "prisma generate",

@@ -107,7 +107,7 @@ export class AdminNotificationsController {
   }
 
   @Post('read-all')
-  @RequirePermissions('notifications.manage')
+  @RequirePermissions('notifications.read')
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   markAllRead(@CurrentAdmin() admin: AdminRequestUser, @Req() req: Request) {
     return this.notifications.markAllRead(admin, {
@@ -133,7 +133,7 @@ export class AdminNotificationsController {
   }
 
   @Post(':id/read')
-  @RequirePermissions('notifications.manage')
+  @RequirePermissions('notifications.read')
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   markRead(
     @CurrentAdmin() admin: AdminRequestUser,
