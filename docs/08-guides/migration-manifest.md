@@ -127,12 +127,13 @@ Apply after A4:
 - `orders/010_orders_dispute_cases.sql`
 - `identity/022_identity_dispute_permissions.sql`
 
----
+## A6–A8 Batch 2 (dashboard / audit / system)
 
-## Staging batch handoff (A2–A5)
+Apply after A5:
 
-When deploying A2–A5 together on staging:
+- `ops/001_ops_schema.sql`
+- `ops/002_ops_feature_flags.sql`
+- `audit/003_audit_events_filter_indexes.sql`
+- `identity/023_identity_batch2_permissions.sql`
 
-1. Checklist (order + deploy steps): [`a2-a5-staging-deployment-checklist.md`](./a2-a5-staging-deployment-checklist.md)
-2. Migration explanations: [`a2-a5-migration-summary.md`](./a2-a5-migration-summary.md)
-3. E2E validation (A3–A5): [`a3-a5-staging-validation-plan.md`](./a3-a5-staging-validation-plan.md)
+Handoff: [`a6-a8-staging-deployment-checklist.md`](./a6-a8-staging-deployment-checklist.md)

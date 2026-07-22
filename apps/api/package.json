@@ -29,6 +29,7 @@
     "test:verification-rules": "node --test src/marketplace/verification.rules.test.mjs",
     "test:listing-moderation-rules": "node --test src/marketplace/listing-moderation.rules.test.mjs",
     "test:dispute-rules": "node --test src/orders/dispute.rules.test.mjs",
+    "test:admin-dashboard-rules": "node --test src/admin/dashboard.rules.test.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "db:reset-staging": "node scripts/reset-test-data.mjs",

@@ -77,6 +77,10 @@
     "marketplace/014_marketplace_listing_moderation.sql",
     "identity/021_identity_listing_moderation_permissions.sql",
     "orders/010_orders_dispute_cases.sql",
-    "identity/022_identity_dispute_permissions.sql"
+    "identity/022_identity_dispute_permissions.sql",
+    "ops/001_ops_schema.sql",
+    "ops/002_ops_feature_flags.sql",
+    "audit/003_audit_events_filter_indexes.sql",
+    "identity/023_identity_batch2_permissions.sql"
   ]
 }

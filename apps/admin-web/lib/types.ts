@@ -22,6 +22,7 @@ export type DashboardSummaryResponse = {
   status: string;
   message: string;
   asOf?: string;
+  trendDays?: number;
   placeholders: {
     pendingVerifications: number | null;
     pendingVerificationsByType?: {
@@ -48,13 +49,93 @@ export type DashboardSummaryResponse = {
       FLAGGED: number;
     };
   };
+  queues?: {
+    pendingVerifications: number | null;
+    pendingListingModeration: number | null;
+    openDisputes: number | null;
+    lockedUsers: number | null;
+    recentDeniedActions: number | null;
+  };
+  kpis?: {
+    activeApprovedListings: number | null;
+    activeUsers: number | null;
+    ordersLast7d: number | null;
+    disputePressure: number | null;
+    trendOrders14d: number | null;
+  };
+  sections?: {
+    users: {
+      total: number;
+      byStatus: Record<string, number>;
+      locked: number;
+      workforce: number;
+      created7d: number;
+      created30d: number;
+    } | null;
+    verification: {
+      pending: number;
+      byStatus: Record<string, number>;
+      pendingByType: Record<string, number>;
+    } | null;
+    listings: {
+      actionable: number;
+      activeApproved: number;
+      byModeration: Record<string, number>;
+      byCommercial: Record<string, number>;
+    } | null;
+    disputes: {
+      open: number;
+      byStatus: Record<string, number>;
+    } | null;
+    marketplace: {
+      byOrderStatus: Record<string, number>;
+      ordersCreated7d: number;
+      ordersCreated30d: number;
+      disputedOrders: number;
+    } | null;
+    security: {
+      denied7d: number;
+      failed7d: number;
+      byOutcome7d: Record<string, number>;
+    } | null;
+    health: { status: string; database: string } | null;
+  };
+  trends?: {
+    ordersCreated: Array<{ date: string; count: number }>;
+    usersCreated: Array<{ date: string; count: number }>;
+    disputesOpened: Array<{ date: string; count: number }>;
+    verificationsSubmitted: Array<{ date: string; count: number }>;
+  };
 };
 
 export type SystemHealthResponse = {
   status: "ok" | "degraded";
   service: string;
   timestamp: string;
+  version?: string;
+  nodeEnv?: string;
+  uptimeSeconds?: number;
   dependencies: { database: "up" | "down" };
+};
+
+export type SystemOverviewResponse = {
+  health: SystemHealthResponse;
+  activeAdminSessions: number;
+  pendingInvitations: number;
+  featureFlags: Array<{
+    id: string;
+    code: string;
+    displayName: string;
+    description: string | null;
+    enabled: boolean;
+    updatedAt: string;
+    updatedByUserId: string | null;
+  }>;
+  migrations: {
+    appliedCount: number;
+    latestFilename: string | null;
+    latestAppliedAt: string | null;
+  };
 };
 
 export type AuditEvent = {
@@ -71,6 +152,16 @@ export type AuditEvent = {
   outcome: "SUCCESS" | "FAILED" | "DENIED";
   ip: string | null;
   userAgent: string | null;
+  beforeJson?: unknown;
+  afterJson?: unknown;
+  metadataJson?: unknown;
+};
+
+export type AuditSummaryResponse = {
+  days: number;
+  since: string;
+  byOutcome: Record<string, number>;
+  topActions: Array<{ action: string; count: number }>;
 };
 
 export type AuditEventsResponse = {

@@ -12,7 +12,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["identity", "catalog", "marketplace", "orders", "farms", "inventory", "warehouse", "audit"]
+  schemas  = ["identity", "catalog", "marketplace", "orders", "farms", "inventory", "warehouse", "audit", "ops"]
 }
 
 enum UserStatus {
@@ -286,6 +286,21 @@ model AuditEvent {
   @@index([action])
   @@map("events")
   @@schema("audit")
+}
+
+model FeatureFlag {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code            String    @unique @db.VarChar(100)
+  displayName     String    @map("display_name") @db.VarChar(200)
+  description     String?
+  enabled         Boolean   @default(false)
+  updatedByUserId String?   @map("updated_by_user_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@index([enabled])
+  @@map("feature_flags")
+  @@schema("ops")
 }
 
 // ============================================================================

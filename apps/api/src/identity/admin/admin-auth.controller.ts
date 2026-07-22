@@ -2,12 +2,15 @@ import {
   Body,
   Controller,
   Get,
+  Param,
+  ParseUUIDPipe,
   Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { Request } from 'express';
+import { IsOptional, IsString, MinLength } from 'class-validator';
 import { AdminAuthService } from './admin-auth.service';
 import { AdminAuthGuard } from '../../common/guards/admin-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -22,6 +25,16 @@ import { RefreshSessionDto } from './dto/refresh-session.dto';
 import { EnrollTotpDto, ConfirmTotpDto } from './dto/enroll-totp.dto';
 import { LogoutAllDto } from './dto/logout-all.dto';
 import { BeginEnrollmentSessionDto } from './dto/begin-enrollment-session.dto';
+
+class RevokeInvitationDto {
+  @IsString()
+  @MinLength(8)
+  reauthPassword: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
 
 @Controller('admin/auth')
 @UseGuards(ThrottlerGuard)
@@ -70,6 +83,13 @@ export class AdminAuthController {
     return this.adminAuth.logoutAll(admin, dto, this.meta(req));
   }
 
+  @Get('invitations')
+  @UseGuards(AdminAuthGuard, PermissionsGuard)
+  @RequirePermissions('identity.users.invite')
+  listInvitations() {
+    return this.adminAuth.listInvitations();
+  }
+
   @Post('invitations')
   @UseGuards(AdminAuthGuard, PermissionsGuard)
   @RequirePermissions('identity.users.invite')
@@ -80,6 +100,19 @@ export class AdminAuthController {
     @Req() req: Request,
   ) {
     return this.adminAuth.createInvitation(admin, dto, this.meta(req));
+  }
+
+  @Post('invitations/:id/revoke')
+  @UseGuards(AdminAuthGuard, PermissionsGuard)
+  @RequirePermissions('identity.users.invite')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  revokeInvitation(
+    @CurrentAdmin() admin: AdminRequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RevokeInvitationDto,
+    @Req() req: Request,
+  ) {
+    return this.adminAuth.revokeInvitation(admin, id, dto, this.meta(req));
   }
 
   @Post('invitations/accept')

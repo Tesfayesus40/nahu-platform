@@ -158,6 +158,79 @@ export class AdminAuthService {
     };
   }
 
+  async listInvitations() {
+    const items = await this.prisma.adminInvitation.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        roleCodes: true,
+        invitedBy: true,
+        expiresAt: true,
+        acceptedAt: true,
+        revokedAt: true,
+        createdAt: true,
+      },
+    });
+    return {
+      items: items.map((i) => ({
+        ...i,
+        status: i.revokedAt
+          ? 'REVOKED'
+          : i.acceptedAt
+            ? 'ACCEPTED'
+            : i.expiresAt <= new Date()
+              ? 'EXPIRED'
+              : 'PENDING',
+      })),
+    };
+  }
+
+  async revokeInvitation(
+    admin: AdminRequestUser,
+    invitationId: string,
+    dto: { reauthPassword: string; reason?: string },
+    meta: RequestMeta = {},
+  ) {
+    await this.assertRecentReauth(admin, dto.reauthPassword);
+    const invitation = await this.prisma.adminInvitation.findUnique({
+      where: { id: invitationId },
+    });
+    if (!invitation) {
+      throw new BadRequestException('Invitation not found');
+    }
+    if (invitation.acceptedAt) {
+      throw new BadRequestException('Invitation already accepted');
+    }
+    if (invitation.revokedAt) {
+      return { ok: true, id: invitationId, alreadyRevoked: true };
+    }
+
+    await this.prisma.adminInvitation.update({
+      where: { id: invitationId },
+      data: { revokedAt: new Date() },
+    });
+
+    await this.audit.appendEvent({
+      actorUserId: admin.userId,
+      actorSessionId: admin.sessionId,
+      permissionCode: 'identity.users.invite',
+      action: 'identity.invitation.revoke',
+      targetType: 'admin_invitation',
+      targetId: invitationId,
+      reason: dto.reason ?? null,
+      outcome: 'SUCCESS',
+      afterJson: { email: invitation.email },
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      requestId: meta.requestId,
+    });
+
+    return { ok: true, id: invitationId };
+  }
+
   async acceptInvitation(dto: AcceptInvitationDto, meta: RequestMeta = {}) {
     const invitation = await this.prisma.adminInvitation.findUnique({
       where: { tokenHash: hashToken(dto.token) },
