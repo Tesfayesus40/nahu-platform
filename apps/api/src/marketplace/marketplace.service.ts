@@ -778,6 +778,9 @@ export class MarketplaceService {
       cupScore: toNumber(listing.cupScore),
       photoUrls: listing.photoUrls,
       status: listing.status,
+      moderationStatus: listing.moderationStatus ?? 'APPROVED',
+      moderationNotes: listing.moderationNotes ?? null,
+      moderatedAt: listing.moderatedAt ?? null,
       createdAt: listing.createdAt,
       extensions: {
         coffee: buildCoffeeExtension({
