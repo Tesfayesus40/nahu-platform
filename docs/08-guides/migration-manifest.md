@@ -136,4 +136,14 @@ Apply after A5:
 - `audit/003_audit_events_filter_indexes.sql`
 - `identity/023_identity_batch2_permissions.sql`
 
-Handoff: [`a6-a8-staging-deployment-checklist.md`](./a6-a8-staging-deployment-checklist.md)
+## A9–A11 Batch 3 (commerce & operations)
+
+Apply after A8:
+
+- `orders/011_orders_admin_notes.sql`
+- `delivery/001_delivery_schema.sql`
+- `delivery/002_delivery_fulfillment_cases.sql`
+- `marketplace/015_marketplace_promotions.sql`
+- `identity/024_identity_batch3_permissions.sql`
+
+Handoff: [`a9-a11-staging-deployment-checklist.md`](./a9-a11-staging-deployment-checklist.md)

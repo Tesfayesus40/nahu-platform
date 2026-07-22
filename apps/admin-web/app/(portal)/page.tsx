@@ -33,6 +33,14 @@ export default function DashboardPage() {
   const canReadDisputes = capabilities.permissions.includes(
     "orders.disputes.read",
   );
+  const canReadOrders = capabilities.permissions.includes("orders.read");
+  const canReadDelivery = capabilities.permissions.includes("delivery.read");
+  const canReadPromotions = capabilities.permissions.includes(
+    "marketplace.promotions.read",
+  );
+  const canReadCooperatives = capabilities.permissions.includes(
+    "marketplace.cooperatives.read",
+  );
   const canReadUsers = capabilities.permissions.includes("identity.users.read");
 
   const [health, setHealth] = useState<SystemHealthResponse | null>(null);
@@ -97,6 +105,18 @@ export default function DashboardPage() {
             value={kpis?.disputePressure}
             href={canReadDisputes ? "/disputes?queue=open" : undefined}
           />
+          <Kpi
+            label="Active promotions"
+            value={kpis?.activePromotions}
+            href={canReadPromotions ? "/promotions?status=ACTIVE" : undefined}
+          />
+          <Kpi
+            label="Verified coops"
+            value={kpis?.verifiedCooperatives}
+            href={
+              canReadCooperatives ? "/cooperatives?verified=true" : undefined
+            }
+          />
         </div>
       ) : null}
 
@@ -142,6 +162,38 @@ export default function DashboardPage() {
                 value={queues?.recentDeniedActions}
                 href="/audit?outcome=DENIED"
                 allowed={canReadAudit}
+              />
+            </dd>
+            <dt>Pending payment</dt>
+            <dd>
+              <QueueLink
+                value={queues?.pendingPaymentOrders}
+                href="/orders?queue=pending_payment"
+                allowed={canReadOrders}
+              />
+            </dd>
+            <dt>Stalled escrow</dt>
+            <dd>
+              <QueueLink
+                value={queues?.stalledEscrowOrders}
+                href="/orders?queue=stalled_escrow"
+                allowed={canReadOrders}
+              />
+            </dd>
+            <dt>Open fulfillments</dt>
+            <dd>
+              <QueueLink
+                value={queues?.openFulfillments}
+                href="/delivery?queue=open"
+                allowed={canReadDelivery}
+              />
+            </dd>
+            <dt>Delivery exceptions</dt>
+            <dd>
+              <QueueLink
+                value={queues?.deliveryExceptions}
+                href="/delivery?queue=exceptions"
+                allowed={canReadDelivery}
               />
             </dd>
           </dl>
@@ -269,6 +321,66 @@ export default function DashboardPage() {
               </dd>
               <dt>Disputed orders</dt>
               <dd>{sections.marketplace.disputedOrders}</dd>
+            </dl>
+          </div>
+        ) : null}
+
+        {sections?.commerce ? (
+          <div className="card">
+            <h2>Commerce (orders)</h2>
+            <SimpleBarChart
+              items={Object.entries(sections.commerce.byStatus).map(
+                ([label, value]) => ({ label, value }),
+              )}
+            />
+            <dl className="kv" style={{ marginTop: 12 }}>
+              <dt>Pending payment</dt>
+              <dd>{sections.commerce.pendingPayment}</dd>
+              <dt>Stalled escrow</dt>
+              <dd>{sections.commerce.stalledEscrow}</dd>
+            </dl>
+          </div>
+        ) : null}
+
+        {sections?.delivery ? (
+          <div className="card">
+            <h2>Delivery</h2>
+            <SimpleBarChart
+              items={Object.entries(sections.delivery.byStatus).map(
+                ([label, value]) => ({ label, value }),
+              )}
+            />
+            <dl className="kv" style={{ marginTop: 12 }}>
+              <dt>Open</dt>
+              <dd>{sections.delivery.open}</dd>
+              <dt>Exceptions</dt>
+              <dd>{sections.delivery.exceptions}</dd>
+            </dl>
+          </div>
+        ) : null}
+
+        {sections?.promotions ? (
+          <div className="card">
+            <h2>Promotions</h2>
+            <SimpleBarChart
+              items={Object.entries(sections.promotions.byStatus).map(
+                ([label, value]) => ({ label, value }),
+              )}
+            />
+            <p className="muted" style={{ marginTop: 8 }}>
+              Not applied at checkout yet.
+            </p>
+          </div>
+        ) : null}
+
+        {sections?.cooperatives ? (
+          <div className="card">
+            <h2>Cooperatives</h2>
+            <dl className="kv">
+              <dt>Total</dt>
+              <dd>{sections.cooperatives.total}</dd>
+              <dt>Verified</dt>
+              <dd>{sections.cooperatives.verified}</dd>
             </dl>
           </div>
         ) : null}

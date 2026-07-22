@@ -81,6 +81,11 @@
     "ops/001_ops_schema.sql",
     "ops/002_ops_feature_flags.sql",
     "audit/003_audit_events_filter_indexes.sql",
-    "identity/023_identity_batch2_permissions.sql"
+    "identity/023_identity_batch2_permissions.sql",
+    "orders/011_orders_admin_notes.sql",
+    "delivery/001_delivery_schema.sql",
+    "delivery/002_delivery_fulfillment_cases.sql",
+    "marketplace/015_marketplace_promotions.sql",
+    "identity/024_identity_batch3_permissions.sql"
   ]
 }

@@ -10,6 +10,14 @@ import { AdminVerificationController } from './admin-verification.controller';
 import { AdminVerificationService } from './admin-verification.service';
 import { AdminListingModerationController } from './admin-listing-moderation.controller';
 import { AdminListingModerationService } from './admin-listing-moderation.service';
+import {
+  AdminCooperativesController,
+  AdminPromotionsController,
+} from './admin-promotions.controller';
+import {
+  AdminCooperativesService,
+  AdminPromotionsService,
+} from './admin-promotions.service';
 import { AdminAuthGuard } from '../common/guards/admin-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 
@@ -20,11 +28,15 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
     ListingsController,
     AdminVerificationController,
     AdminListingModerationController,
+    AdminPromotionsController,
+    AdminCooperativesController,
   ],
   providers: [
     MarketplaceService,
     AdminVerificationService,
     AdminListingModerationService,
+    AdminPromotionsService,
+    AdminCooperativesService,
     AdminAuthGuard,
     PermissionsGuard,
   ],
@@ -32,6 +44,8 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
     MarketplaceService,
     AdminVerificationService,
     AdminListingModerationService,
+    AdminPromotionsService,
+    AdminCooperativesService,
   ],
 })
 export class MarketplaceModule {}

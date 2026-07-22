@@ -28,6 +28,14 @@ export class AdminDashboardService {
     const canVerification = admin.permissions.includes('verification.read');
     const canListings = admin.permissions.includes('marketplace.listings.read');
     const canDisputes = admin.permissions.includes('orders.disputes.read');
+    const canOrders = admin.permissions.includes('orders.read');
+    const canDelivery = admin.permissions.includes('delivery.read');
+    const canPromotions = admin.permissions.includes(
+      'marketplace.promotions.read',
+    );
+    const canCoops = admin.permissions.includes(
+      'marketplace.cooperatives.read',
+    );
     const canAudit = admin.permissions.includes('audit.read');
     const canHealth = admin.permissions.includes('admin.system.health.read');
 
@@ -40,6 +48,10 @@ export class AdminDashboardService {
       security,
       health,
       trends,
+      commerce,
+      delivery,
+      promotions,
+      cooperatives,
     ] = await Promise.all([
       canUsers ? this.userStats(since7d, since30d) : null,
       canVerification ? this.verificationStats() : null,
@@ -53,6 +65,10 @@ export class AdminDashboardService {
         verification: canVerification,
         disputes: canDisputes,
       }),
+      canOrders ? this.commerceStats() : null,
+      canDelivery ? this.deliveryStats() : null,
+      canPromotions ? this.promotionStats() : null,
+      canCoops ? this.cooperativeStats() : null,
     ]);
 
     const queues = {
@@ -61,6 +77,10 @@ export class AdminDashboardService {
       openDisputes: disputes?.open ?? null,
       lockedUsers: users?.locked ?? null,
       recentDeniedActions: security?.denied7d ?? null,
+      pendingPaymentOrders: commerce?.pendingPayment ?? null,
+      stalledEscrowOrders: commerce?.stalledEscrow ?? null,
+      openFulfillments: delivery?.open ?? null,
+      deliveryExceptions: delivery?.exceptions ?? null,
     };
 
     const kpis = {
@@ -69,6 +89,8 @@ export class AdminDashboardService {
       ordersLast7d: marketplace?.ordersCreated7d ?? null,
       disputePressure: disputes ? disputePressure(disputes.byStatus) : null,
       trendOrders14d: sumSeries(trends.ordersCreated),
+      activePromotions: promotions?.byStatus?.ACTIVE ?? null,
+      verifiedCooperatives: cooperatives?.verified ?? null,
     };
 
     // Backward-compatible placeholders used by earlier dashboard cards.
@@ -93,6 +115,10 @@ export class AdminDashboardService {
         listings,
         disputes,
         marketplace,
+        commerce,
+        delivery,
+        promotions,
+        cooperatives,
         security,
         health,
       },
@@ -294,6 +320,71 @@ export class AdminDashboardService {
       ordersCreated30d,
       disputedOrders: disputed,
     };
+  }
+
+  private async commerceStats() {
+    const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    const [pendingPayment, stalledEscrow, byStatusRows] = await Promise.all([
+      this.prisma.order.count({ where: { status: 'PENDING_PAYMENT' } }),
+      this.prisma.order.count({
+        where: { status: 'PAID_ESCROW', paidAt: { lte: cutoff } },
+      }),
+      this.prisma.order.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+      }),
+    ]);
+    const byStatus: Record<string, number> = {};
+    for (const row of byStatusRows) byStatus[row.status] = row._count._all;
+    return { pendingPayment, stalledEscrow, byStatus };
+  }
+
+  private async deliveryStats() {
+    const [open, exceptions, byStatusRows] = await Promise.all([
+      this.prisma.fulfillmentCase.count({
+        where: {
+          status: { in: ['PENDING_HANDOFF', 'READY', 'IN_TRANSIT'] },
+        },
+      }),
+      this.prisma.fulfillmentCase.count({ where: { status: 'EXCEPTION' } }),
+      this.prisma.fulfillmentCase.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+      }),
+    ]);
+    const byStatus: Record<string, number> = {
+      PENDING_HANDOFF: 0,
+      READY: 0,
+      IN_TRANSIT: 0,
+      DELIVERED: 0,
+      EXCEPTION: 0,
+      CLOSED: 0,
+    };
+    for (const row of byStatusRows) byStatus[row.status] = row._count._all;
+    return { open, exceptions, byStatus };
+  }
+
+  private async promotionStats() {
+    const rows = await this.prisma.promotion.groupBy({
+      by: ['status'],
+      _count: { _all: true },
+    });
+    const byStatus: Record<string, number> = {
+      DRAFT: 0,
+      ACTIVE: 0,
+      PAUSED: 0,
+      ENDED: 0,
+    };
+    for (const row of rows) byStatus[row.status] = row._count._all;
+    return { byStatus };
+  }
+
+  private async cooperativeStats() {
+    const [total, verified] = await Promise.all([
+      this.prisma.cooperative.count(),
+      this.prisma.cooperative.count({ where: { verified: true } }),
+    ]);
+    return { total, verified };
   }
 
   private async securityStats(since7d: Date) {

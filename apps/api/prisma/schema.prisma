@@ -12,7 +12,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["identity", "catalog", "marketplace", "orders", "farms", "inventory", "warehouse", "audit", "ops"]
+  schemas  = ["identity", "catalog", "marketplace", "orders", "farms", "inventory", "warehouse", "audit", "ops", "delivery"]
 }
 
 enum UserStatus {
@@ -301,6 +301,75 @@ model FeatureFlag {
   @@index([enabled])
   @@map("feature_flags")
   @@schema("ops")
+}
+
+model FulfillmentCase {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId          String    @unique @map("order_id") @db.Uuid
+  status           String    @default("PENDING_HANDOFF") @db.VarChar(30)
+  assignedToUserId String?   @map("assigned_to_user_id") @db.Uuid
+  carrierCode      String?   @map("carrier_code") @db.VarChar(50)
+  trackingRef      String?   @map("tracking_ref") @db.VarChar(100)
+  pickupNotes      String?   @map("pickup_notes")
+  deliveryNotes    String?   @map("delivery_notes")
+  exceptionCode    String?   @map("exception_code") @db.VarChar(50)
+  exceptionNotes   String?   @map("exception_notes")
+  readyAt          DateTime? @map("ready_at") @db.Timestamptz
+  shippedAt        DateTime? @map("shipped_at") @db.Timestamptz
+  deliveredAt      DateTime? @map("delivered_at") @db.Timestamptz
+  closedAt         DateTime? @map("closed_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  order            Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  events           FulfillmentEvent[]
+
+  @@index([status])
+  @@index([assignedToUserId])
+  @@map("fulfillment_cases")
+  @@schema("delivery")
+}
+
+model FulfillmentEvent {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fulfillmentId String   @map("fulfillment_id") @db.Uuid
+  eventType     String   @map("event_type") @db.VarChar(40)
+  fromStatus    String?  @map("from_status") @db.VarChar(30)
+  toStatus      String?  @map("to_status") @db.VarChar(30)
+  message       String?
+  actorUserId   String?  @map("actor_user_id") @db.Uuid
+  metadataJson  Json?    @map("metadata_json")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  fulfillment   FulfillmentCase @relation(fields: [fulfillmentId], references: [id], onDelete: Cascade)
+
+  @@index([fulfillmentId])
+  @@map("fulfillment_events")
+  @@schema("delivery")
+}
+
+model Promotion {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code             String    @unique @db.VarChar(50)
+  name             String    @db.VarChar(200)
+  description      String?
+  status           String    @default("DRAFT") @db.VarChar(20)
+  scopeType        String    @default("PLATFORM") @map("scope_type") @db.VarChar(20)
+  scopeRef         String?   @map("scope_ref") @db.VarChar(100)
+  discountType     String?   @map("discount_type") @db.VarChar(20)
+  discountValue    Decimal?  @map("discount_value") @db.Decimal(12, 2)
+  startsAt         DateTime? @map("starts_at") @db.Timestamptz
+  endsAt           DateTime? @map("ends_at") @db.Timestamptz
+  metadataJson     Json?     @map("metadata_json")
+  createdByUserId  String?   @map("created_by_user_id") @db.Uuid
+  updatedByUserId  String?   @map("updated_by_user_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@index([status])
+  @@index([scopeType, scopeRef])
+  @@map("promotions")
+  @@schema("marketplace")
 }
 
 // ============================================================================
@@ -738,12 +807,28 @@ model Order {
   certificate       OriginCertificate?
   reservations      Reservation[]
   disputeCase       DisputeCase?
+  adminNotes        OrderAdminNote[]
+  fulfillmentCase   FulfillmentCase?
 
   @@index([buyerId])
   @@index([farmerId])
   @@index([status])
   @@index([unitCode])
   @@map("orders")
+  @@schema("orders")
+}
+
+model OrderAdminNote {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId      String   @map("order_id") @db.Uuid
+  body         String
+  authorUserId String   @map("author_user_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_admin_notes")
   @@schema("orders")
 }
 

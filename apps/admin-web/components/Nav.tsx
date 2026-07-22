@@ -29,6 +29,18 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Disputes",
     permission: "orders.disputes.read",
   },
+  { href: "/orders", label: "Orders", permission: "orders.read" },
+  { href: "/delivery", label: "Delivery", permission: "delivery.read" },
+  {
+    href: "/promotions",
+    label: "Promotions",
+    permission: "marketplace.promotions.read",
+  },
+  {
+    href: "/cooperatives",
+    label: "Cooperatives",
+    permission: "marketplace.cooperatives.read",
+  },
   { href: "/audit", label: "Audit", permission: "audit.read" },
   { href: "/system", label: "System", permission: "admin.system.health.read" },
   { href: "/account", label: "Account", permission: null },

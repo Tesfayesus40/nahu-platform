@@ -3,6 +3,8 @@ import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 import { AdminDisputesController } from './admin-disputes.controller';
 import { AdminDisputesService } from './admin-disputes.service';
+import { AdminOrdersController } from './admin-orders.controller';
+import { AdminOrdersService } from './admin-orders.service';
 import { CertificatesModule } from '../certificates/certificates.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { InventoryModule } from '../inventory/inventory.module';
@@ -19,13 +21,18 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
     AuditModule,
     IdentityModule,
   ],
-  controllers: [OrdersController, AdminDisputesController],
+  controllers: [
+    OrdersController,
+    AdminDisputesController,
+    AdminOrdersController,
+  ],
   providers: [
     OrdersService,
     AdminDisputesService,
+    AdminOrdersService,
     AdminAuthGuard,
     PermissionsGuard,
   ],
-  exports: [OrdersService, AdminDisputesService],
+  exports: [OrdersService, AdminDisputesService, AdminOrdersService],
 })
 export class OrdersModule {}
