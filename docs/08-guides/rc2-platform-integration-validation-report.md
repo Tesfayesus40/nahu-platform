@@ -23,10 +23,10 @@ RC2 exercised cross-app workflows against staging and found **real marketplace i
 | Buyer order → escrow → dispute | **PASS** |
 | Farmer dashboard / profile | **PASS** |
 | Admin unauthenticated RBAC (401) | **PASS** |
-| Admin authenticated A6–A14 workflows | **BLOCKED** (MFA bootstrap credentials not available in this session) |
+| Admin authenticated A6–A14 workflows | **PASS** (MFA smoke 2026-07-23; see §6) |
 | Farmer / Buyer mobile RC1 app builds | **PARTIAL** (code ready locally / PRs; not fully merged as store builds) |
 
-**Production readiness:** Staging marketplace integrity is restored for moderation ↔ commerce. **Do not promote production** until Admin MFA-authenticated A12–A14 smoke is completed and mobile RC1 branches are merged + validated on device.
+**Production readiness:** Staging marketplace integrity is restored for moderation ↔ commerce, and Admin MFA API smoke is green. **Do not promote production** until mobile RC1 branches are merged + validated on device and staging deploy pipeline is reliable (`railway up` or GitHub auto-deploy).
 
 ---
 
@@ -122,19 +122,24 @@ RC2 exercised cross-app workflows against staging and found **real marketplace i
 
 ---
 
-## 6. Admin Portal A6–A14 (gated)
+## 6. Admin Portal A6–A14 (MFA smoke — completed)
 
-Unauthenticated API RBAC is healthy (401). Full validation of reporting jobs, notification publish, monitoring emit-notices, and audit CSV requires an enrolled SUPER_ADMIN (email/password + TOTP) per `a1-admin-bootstrap.md`.
+**Date:** 2026-07-23  
+**Method:** Bootstrap staging `SUPER_ADMIN` via `bootstrap-admin.cjs` + TOTP enroll/login against Nest (not Admin Web UI click-through). List endpoints use `{ items, page, total }` (not `data`).
 
-**Manual checklist (operator):**
-1. Bootstrap or use existing staging admin; complete TOTP.
-2. Dashboard summary loads; deep-link Users `?status=`.
-3. Approve a PENDING listing; confirm it appears in buyer browse.
-4. Open dispute case for a DISPUTED order; add note (reauth if required).
-5. Run a report catalog export; download as requester.
-6. Publish a test notification; mark read.
-7. `GET /admin/monitoring`; optional `POST emit-notices` with reauth.
-8. Audit events list + CSV with `audit.read`.
+| Step | Result |
+|------|--------|
+| `GET /admin/auth/me` (SUPER_ADMIN) | PASS |
+| `GET /admin/dashboard/summary` | PASS |
+| `GET /admin/users?status=ACTIVE` | PASS |
+| Approve PENDING listing → buyer `GET /listings/:id` APPROVED | PASS |
+| Dispute note + `START_REVIEW` → UNDER_REVIEW | PASS |
+| Reports catalog + export `listings.moderation` + download | PASS |
+| Notifications publish (BROADCAST) + mark read | PASS |
+| `GET /admin/monitoring` + `POST emit-notices` | PASS |
+| `GET /admin/audit/events` + `GET /admin/system/health` | PASS |
+
+**Note:** Staging bootstrap account `rc2.validation.admin@nahu.local` was created for this smoke. Rotate or disable after use; do not reuse the temp password outside staging.
 
 ---
 
@@ -157,13 +162,14 @@ Recommend wiring GitHub auto-deploy from `main` or documenting `railway up` as t
 
 | Priority | Issue | Recommendation |
 |----------|-------|----------------|
-| P0 | Admin MFA E2E not run this session | Operator completes §6 checklist before prod |
 | P0 | Confirm GitHub→Railway auto-deploy or always `railway up` | Prevent stale staging |
 | P1 | Merge Farmer RC1 PR + Buyer RC1 branch; staging APK smoke | Device checklist in app RC1 docs |
-| P1 | Staging leftover orders from defect repro (PENDING ordered before fix) | Cancel unpaid / resolve disputes in admin |
+| P1 | Staging leftover orders from defect repro (PENDING ordered before fix) | Cancel unpaid / resolve remaining disputes in admin |
+| P1 | Disable/rotate `rc2.validation.admin@nahu.local` after smoke | Staging hygiene |
 | P2 | Invite-create UI, export reauth (RC1 debt) | Track from RC1 report |
 | P2 | Live payments / notifications inbox / delivery tracking | Deferred product work |
 | P3 | Brand string inconsistencies across Buyer screens | Non-blocking polish |
+| P3 | Admin Web UI click-through (browser) not run | API MFA smoke passed; optional UI pass |
 
 ---
 
