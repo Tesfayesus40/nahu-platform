@@ -54,4 +54,12 @@ describe('requiresModerationReason / visibility', () => {
     assert.equal(isPubliclyVisibleModeration('APPROVED'), true);
     assert.equal(isPubliclyVisibleModeration('PENDING'), false);
   });
+
+  it('createOrder should reject non-visible moderation (same gate)', () => {
+    const canOrder = (status, moderation) =>
+      status === 'ACTIVE' && isPubliclyVisibleModeration(moderation ?? 'APPROVED');
+    assert.equal(canOrder('ACTIVE', 'APPROVED'), true);
+    assert.equal(canOrder('ACTIVE', 'PENDING'), false);
+    assert.equal(canOrder('RESERVED', 'APPROVED'), false);
+  });
 });

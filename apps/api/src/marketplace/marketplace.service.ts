@@ -366,7 +366,7 @@ export class MarketplaceService {
     };
   }
 
-  async getListingById(id: string) {
+  async getListingById(id: string, viewerUserId?: string) {
     const listing = await this.prisma.listing.findUnique({
       where: { id },
       include: {
@@ -375,8 +375,19 @@ export class MarketplaceService {
         product: { include: { defaultUnit: true } },
       },
     });
+    if (!listing) {
+      throw new NotFoundException('Listing not found');
+    }
+
+    const isOwner =
+      Boolean(viewerUserId) && listing.farmer?.userId === viewerUserId;
+
+    if (isOwner) {
+      // Owners may inspect their own listings regardless of moderation.
+      return this.shapeListing(listing, { includeFarmerDetail: true });
+    }
+
     if (
-      !listing ||
       listing.status !== 'ACTIVE' ||
       listing.moderationStatus !== 'APPROVED'
     ) {

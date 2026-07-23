@@ -6,6 +6,7 @@ import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { QueryListingsDto } from './dto/query-listings.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { RolesGuard, Roles } from '../common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../common/jwt-payload.interface';
@@ -64,10 +65,14 @@ export class ListingsController {
     return this.marketplace.getMyListings(user.userId);
   }
 
-  // Public — view a single listing
+  // Public — view a single listing (owners may view their own pending listings)
   @Get(':id')
-  getListingById(@Param('id') id: string) {
-    return this.marketplace.getListingById(id);
+  @UseGuards(OptionalJwtAuthGuard)
+  getListingById(
+    @Param('id') id: string,
+    @CurrentUser() user?: JwtPayload,
+  ) {
+    return this.marketplace.getListingById(id, user?.userId);
   }
 
   @Post()

@@ -14,6 +14,7 @@ import {
   resolveOrderQuantity,
 } from './order-contract.rules';
 import { buildCoffeeExtension } from '../marketplace/listing-contract.rules';
+import { isPubliclyVisibleModeration } from '../marketplace/listing-moderation.rules';
 
 const COMMISSION_RATE = 0.02; // 2% — matches the existing Nahu Buna Gebaya commission model
 
@@ -44,6 +45,10 @@ export class OrdersService {
     });
 
     if (!listing || listing.status !== 'ACTIVE') {
+      throw new BadRequestException('Listing not found or no longer available');
+    }
+
+    if (!isPubliclyVisibleModeration(listing.moderationStatus ?? 'APPROVED')) {
       throw new BadRequestException('Listing not found or no longer available');
     }
 
