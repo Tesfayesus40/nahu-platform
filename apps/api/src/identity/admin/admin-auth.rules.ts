@@ -4,6 +4,9 @@ export const WORKFORCE_ROLE_CODES = [
   'AUDITOR',
 ] as const;
 
+/** Roles that may authenticate via phone OTP (Farmer / Buyer / Courier apps). */
+export const OTP_MOBILE_ROLE_CODES = ['FARMER', 'BUYER', 'COURIER'] as const;
+
 export const INVITABLE_ROLE_CODES = ['PLATFORM_ADMIN', 'AUDITOR'] as const;
 
 export type RolePermissionSource = {
@@ -36,11 +39,88 @@ export function hasWorkforceRole(roleCodes: string[]): boolean {
   );
 }
 
+export function isOtpMobileRole(role: string | null | undefined): boolean {
+  if (!role) {
+    return false;
+  }
+  return (OTP_MOBILE_ROLE_CODES as readonly string[]).includes(role);
+}
+
+/**
+ * Whether phone OTP must be rejected for this identity.
+ *
+ * Multi-role users (e.g. SUPER_ADMIN + FARMER + BUYER) are legitimate:
+ * Admin Portal uses password+MFA; Farmer/Buyer/Courier apps use OTP for the
+ * *requested* mobile role. Do not treat "has a workforce role" as "phone is
+ * OTP-banned" — that broke shared-phone / dual-hat accounts.
+ *
+ * Block only when:
+ * - no mobile login role was requested, AND the account is workforce / MFA, OR
+ * - a non-mobile role was requested via OTP (not allowed).
+ */
 export function isWorkforceBlockedFromOtp(input: {
   roleCodes: string[];
   mfaRequired: boolean;
+  /** App-requested role on request-otp / verify-otp (FARMER | BUYER | COURIER). */
+  requestedRole?: string | null;
 }): boolean {
+  if (input.requestedRole) {
+    if (isOtpMobileRole(input.requestedRole)) {
+      return false;
+    }
+    // OTP must never mint SUPER_ADMIN / PLATFORM_ADMIN / etc.
+    return true;
+  }
   return input.mfaRequired || hasWorkforceRole(input.roleCodes);
+}
+
+/**
+ * Pick the JWT `role` claim for an OTP session.
+ * Prefers the requested mobile role; never silently falls back to a workforce role.
+ */
+export function resolveOtpSessionRole(input: {
+  roleCodes: string[];
+  requestedRole?: string | null;
+  /** Role codes ordered by assignedAt ascending (oldest first). */
+  roleCodesByAssignedAt: string[];
+}): { ok: true; role: string } | { ok: false; reason: string } {
+  const { requestedRole, roleCodes, roleCodesByAssignedAt } = input;
+  const held = new Set(roleCodes);
+
+  if (requestedRole) {
+    if (!isOtpMobileRole(requestedRole)) {
+      return {
+        ok: false,
+        reason: 'OTP login is only available for FARMER, BUYER, and COURIER',
+      };
+    }
+    if (!held.has(requestedRole)) {
+      return {
+        ok: false,
+        reason: `Account does not have role ${requestedRole}`,
+      };
+    }
+    return { ok: true, role: requestedRole };
+  }
+
+  const mobileInOrder = roleCodesByAssignedAt.filter((c) => isOtpMobileRole(c));
+  if (mobileInOrder.length > 0) {
+    return { ok: true, role: mobileInOrder[0] };
+  }
+
+  if (hasWorkforceRole(roleCodes)) {
+    return {
+      ok: false,
+      reason:
+        'Workforce accounts cannot authenticate via OTP without a mobile role; use the Admin Portal login',
+    };
+  }
+
+  const fallback = roleCodesByAssignedAt[0];
+  if (!fallback) {
+    return { ok: false, reason: 'Account has no roles' };
+  }
+  return { ok: true, role: fallback };
 }
 
 export function authzVersionMatches(
@@ -116,7 +196,7 @@ export function isSelfTarget(actorUserId: string, targetUserId: string): boolean
 
 /**
  * Replace only invitable workforce roles (PLATFORM_ADMIN / AUDITOR).
- * Preserve SUPER_ADMIN and non-workforce roles (FARMER, BUYER, …).
+ * Preserve SUPER_ADMIN and non-workforce roles (FARMER, BUYER, COURIER, …).
  */
 export function mergeAssignableWorkforceRoles(
   currentRoleCodes: string[],

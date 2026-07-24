@@ -976,3 +976,153 @@ table.data-table {
   font-size: 12px;
   color: var(--brown-500);
 }
+
+.subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.subnav-link {
+  font-size: 0.9rem;
+  color: var(--brown-500);
+  text-decoration: none;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+}
+
+.subnav-link:hover {
+  background: var(--paper);
+  color: var(--brown-900);
+}
+
+/* D9 — delivery ops */
+.delivery-progress-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.delivery-progress-step {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.delivery-progress-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: var(--paper);
+  flex-shrink: 0;
+}
+
+.delivery-progress-dot.done {
+  background: var(--accent);
+}
+
+.delivery-progress-line {
+  flex: 1;
+  height: 2px;
+  background: var(--border);
+  margin: 0 2px;
+}
+
+.delivery-progress-line.done {
+  background: var(--accent);
+}
+
+.shipment-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-left: 2px solid var(--border);
+}
+
+.shipment-timeline-item {
+  position: relative;
+  padding: 0.65rem 0 0.65rem 1rem;
+  margin-left: 0.35rem;
+}
+
+.shipment-timeline-item::before {
+  content: "";
+  position: absolute;
+  left: -0.45rem;
+  top: 1rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.shipment-timeline-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.shipment-timeline-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.shipment-timeline-payload {
+  margin-top: 0.35rem;
+}
+
+.shipment-timeline-payload pre {
+  font-size: 11px;
+  max-height: 160px;
+  overflow: auto;
+  background: var(--cream-dark);
+  padding: 0.5rem;
+  border-radius: 6px;
+}
+
+.ops-alerts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ops-alert {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.ops-alert-warn {
+  background: var(--warn-soft);
+  border-color: var(--warn);
+}
+
+.ops-alert-critical {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+
+.bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}

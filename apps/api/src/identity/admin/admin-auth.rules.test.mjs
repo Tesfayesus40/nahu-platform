@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 /** Mirrors apps/api/src/identity/admin/admin-auth.rules.ts */
 
 const WORKFORCE_ROLE_CODES = ['SUPER_ADMIN', 'PLATFORM_ADMIN', 'AUDITOR'];
+const OTP_MOBILE_ROLE_CODES = ['FARMER', 'BUYER', 'COURIER'];
 const INVITABLE_ROLE_CODES = ['PLATFORM_ADMIN', 'AUDITOR'];
 
 function resolvePermissionCodes(userRoles) {
@@ -20,8 +21,58 @@ function hasWorkforceRole(roleCodes) {
   return roleCodes.some((code) => WORKFORCE_ROLE_CODES.includes(code));
 }
 
-function isWorkforceBlockedFromOtp({ roleCodes, mfaRequired }) {
+function isOtpMobileRole(role) {
+  if (!role) return false;
+  return OTP_MOBILE_ROLE_CODES.includes(role);
+}
+
+function isWorkforceBlockedFromOtp({ roleCodes, mfaRequired, requestedRole }) {
+  if (requestedRole) {
+    if (isOtpMobileRole(requestedRole)) {
+      return false;
+    }
+    return true;
+  }
   return mfaRequired || hasWorkforceRole(roleCodes);
+}
+
+function resolveOtpSessionRole({ roleCodes, requestedRole, roleCodesByAssignedAt }) {
+  const held = new Set(roleCodes);
+
+  if (requestedRole) {
+    if (!isOtpMobileRole(requestedRole)) {
+      return {
+        ok: false,
+        reason: 'OTP login is only available for FARMER, BUYER, and COURIER',
+      };
+    }
+    if (!held.has(requestedRole)) {
+      return {
+        ok: false,
+        reason: `Account does not have role ${requestedRole}`,
+      };
+    }
+    return { ok: true, role: requestedRole };
+  }
+
+  const mobileInOrder = roleCodesByAssignedAt.filter((c) => isOtpMobileRole(c));
+  if (mobileInOrder.length > 0) {
+    return { ok: true, role: mobileInOrder[0] };
+  }
+
+  if (hasWorkforceRole(roleCodes)) {
+    return {
+      ok: false,
+      reason:
+        'Workforce accounts cannot authenticate via OTP without a mobile role; use the Admin Portal login',
+    };
+  }
+
+  const fallback = roleCodesByAssignedAt[0];
+  if (!fallback) {
+    return { ok: false, reason: 'Account has no roles' };
+  }
+  return { ok: true, role: fallback };
 }
 
 function authzVersionMatches(tokenVersion, currentVersion) {
@@ -163,7 +214,7 @@ describe('classifyRefreshPresentation', () => {
 });
 
 describe('OTP workforce block', () => {
-  it('blocks SUPER_ADMIN / PLATFORM_ADMIN / AUDITOR and mfaRequired', () => {
+  it('blocks SUPER_ADMIN / PLATFORM_ADMIN / AUDITOR and mfaRequired when no mobile role requested', () => {
     assert.equal(
       isWorkforceBlockedFromOtp({
         roleCodes: ['SUPER_ADMIN'],
@@ -185,6 +236,88 @@ describe('OTP workforce block', () => {
       }),
       false,
     );
+  });
+
+  it('allows OTP for mobile roles even when user also has SUPER_ADMIN / mfaRequired', () => {
+    assert.equal(
+      isWorkforceBlockedFromOtp({
+        roleCodes: ['SUPER_ADMIN', 'FARMER', 'BUYER'],
+        mfaRequired: true,
+        requestedRole: 'FARMER',
+      }),
+      false,
+    );
+    assert.equal(
+      isWorkforceBlockedFromOtp({
+        roleCodes: ['SUPER_ADMIN', 'FARMER', 'BUYER'],
+        mfaRequired: true,
+        requestedRole: 'BUYER',
+      }),
+      false,
+    );
+    assert.equal(
+      isWorkforceBlockedFromOtp({
+        roleCodes: ['SUPER_ADMIN', 'COURIER'],
+        mfaRequired: true,
+        requestedRole: 'COURIER',
+      }),
+      false,
+    );
+  });
+
+  it('still blocks OTP when a non-mobile role is requested', () => {
+    assert.equal(
+      isWorkforceBlockedFromOtp({
+        roleCodes: ['SUPER_ADMIN', 'FARMER'],
+        mfaRequired: true,
+        requestedRole: 'SUPER_ADMIN',
+      }),
+      true,
+    );
+  });
+});
+
+describe('resolveOtpSessionRole', () => {
+  it('selects the requested mobile role, not the first-assigned SUPER_ADMIN', () => {
+    const resolved = resolveOtpSessionRole({
+      roleCodes: ['SUPER_ADMIN', 'FARMER', 'BUYER'],
+      roleCodesByAssignedAt: ['SUPER_ADMIN', 'FARMER', 'BUYER'],
+      requestedRole: 'BUYER',
+    });
+    assert.equal(resolved.ok, true);
+    if (resolved.ok) {
+      assert.equal(resolved.role, 'BUYER');
+    }
+  });
+
+  it('falls back to first mobile role when request omits role', () => {
+    const resolved = resolveOtpSessionRole({
+      roleCodes: ['SUPER_ADMIN', 'FARMER', 'BUYER'],
+      roleCodesByAssignedAt: ['SUPER_ADMIN', 'FARMER', 'BUYER'],
+      requestedRole: null,
+    });
+    assert.equal(resolved.ok, true);
+    if (resolved.ok) {
+      assert.equal(resolved.role, 'FARMER');
+    }
+  });
+
+  it('rejects workforce-only accounts without a mobile role request', () => {
+    const resolved = resolveOtpSessionRole({
+      roleCodes: ['SUPER_ADMIN'],
+      roleCodesByAssignedAt: ['SUPER_ADMIN'],
+      requestedRole: null,
+    });
+    assert.equal(resolved.ok, false);
+  });
+
+  it('rejects requested role the account does not hold', () => {
+    const resolved = resolveOtpSessionRole({
+      roleCodes: ['SUPER_ADMIN', 'FARMER'],
+      roleCodesByAssignedAt: ['SUPER_ADMIN', 'FARMER'],
+      requestedRole: 'BUYER',
+    });
+    assert.equal(resolved.ok, false);
   });
 });
 

@@ -90,6 +90,16 @@
     "ops/003_ops_report_jobs.sql",
     "ops/004_ops_admin_notifications.sql",
     "ops/005_ops_alert_thresholds.sql",
-    "identity/025_identity_batch4_permissions.sql"
+    "identity/025_identity_batch4_permissions.sql",
+    "identity/026_identity_delivery_phase1_permissions.sql",
+    "ops/006_ops_delivery_phase1_config.sql",
+    "delivery/003_delivery_shipment_domain.sql",
+    "delivery/004_delivery_aggregate_guards.sql",
+    "ops/007_ops_delivery_dispatch_config.sql",
+    "delivery/005_delivery_execution_arrived_status.sql",
+    "ops/008_ops_delivery_sla_thresholds.sql",
+    "ops/009_ops_delivery_pod_requirements.sql",
+    "delivery/006_delivery_earnings_settlement_types.sql",
+    "delivery/007_delivery_rc1_hardening_indexes.sql"
   ]
 }

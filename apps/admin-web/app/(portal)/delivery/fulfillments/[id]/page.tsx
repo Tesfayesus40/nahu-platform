@@ -19,7 +19,7 @@ type Action =
   | "UPDATE_LOGISTICS"
   | null;
 
-export default function DeliveryDetailPage() {
+export default function FulfillmentDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const { capabilities } = usePortal();
@@ -89,7 +89,7 @@ export default function DeliveryDetailPage() {
       <div>
         <PageHeader title="Fulfillment" />
         <p className="form-error">{error}</p>
-        <Link href="/delivery" className="btn btn-secondary">
+        <Link href="/delivery/fulfillments" className="btn btn-secondary">
           Back
         </Link>
       </div>
@@ -114,7 +114,7 @@ export default function DeliveryDetailPage() {
         title={`Fulfillment ${detail.id.slice(0, 8)}…`}
         subtitle={detail.status}
         actions={
-          <Link href="/delivery" className="btn btn-secondary">
+          <Link href="/delivery/fulfillments" className="btn btn-secondary">
             Back to queue
           </Link>
         }
@@ -187,48 +187,31 @@ export default function DeliveryDetailPage() {
         <div className="card" style={{ marginTop: 16 }}>
           <h2>Actions</h2>
           <div className="action-row" style={{ flexWrap: "wrap", gap: 8 }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setAction("MARK_READY")}
-            >
-              Mark ready
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setAction("MARK_IN_TRANSIT")}
-            >
-              Mark in transit
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => setAction("MARK_DELIVERED")}
-            >
-              Mark delivered
-            </button>
-            <button
-              type="button"
-              className="btn btn-danger"
-              onClick={() => setAction("RAISE_EXCEPTION")}
-            >
-              Raise exception
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setAction("CLOSE")}
-            >
-              Close
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setAction("UPDATE_LOGISTICS")}
-            >
-              Update logistics
-            </button>
+            {(
+              [
+                ["MARK_READY", "Mark ready"],
+                ["MARK_IN_TRANSIT", "Mark in transit"],
+                ["MARK_DELIVERED", "Mark delivered"],
+                ["RAISE_EXCEPTION", "Raise exception"],
+                ["CLOSE", "Close"],
+                ["UPDATE_LOGISTICS", "Update logistics"],
+              ] as const
+            ).map(([code, label]) => (
+              <button
+                key={code}
+                type="button"
+                className={
+                  code === "RAISE_EXCEPTION"
+                    ? "btn btn-danger"
+                    : code === "MARK_DELIVERED"
+                      ? "btn btn-primary"
+                      : "btn btn-secondary"
+                }
+                onClick={() => setAction(code)}
+              >
+                {label}
+              </button>
+            ))}
           </div>
           <div
             style={{
@@ -294,9 +277,7 @@ export default function DeliveryDetailPage() {
               ? "Exception code from the field above will be sent."
               : undefined
         }
-        requireReason={
-          action === "RAISE_EXCEPTION" || action === "CLOSE"
-        }
+        requireReason={action === "RAISE_EXCEPTION" || action === "CLOSE"}
         danger={action === "RAISE_EXCEPTION" || action === "CLOSE"}
         confirmLabel="Confirm"
         onClose={() => setAction(null)}

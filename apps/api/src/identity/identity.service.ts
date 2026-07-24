@@ -9,15 +9,22 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from './sms/sms.service';
-import { RequestOtpDto } from './dto/request-otp.dto';
+import { RequestOtpDto, RegistrationRole } from './dto/request-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
-import { isWorkforceBlockedFromOtp } from './admin/admin-auth.rules';
+import {
+  isOtpMobileRole,
+  isWorkforceBlockedFromOtp,
+  resolveOtpSessionRole,
+} from './admin/admin-auth.rules';
 
 // Dev/staging-only universal OTP, gated behind nodeEnv below — same
 // approach as the original auth.service.js, so any phone can be tested
 // locally without SMS ever sending, but this is never accepted in production.
 const DEV_OTP = '123456';
+
+/** Feature flag: when false, COURIER OTP request/verify is rejected (D1). */
+const COURIER_APP_FLAG = 'delivery.courier_app.enabled';
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -42,8 +49,14 @@ export class IdentityService {
     return !this.isProduction || this.config.get<boolean>('otp.devBypassEnabled') === true;
   }
 
-  /** Workforce / MFA-required users must use admin password+TOTP, never OTP. */
-  private async assertNotWorkforceOtp(userId: string): Promise<void> {
+  /**
+   * Block OTP only when the login is not a mobile-role path.
+   * Multi-role SUPER_ADMIN+FARMER+BUYER may still OTP as FARMER/BUYER/COURIER.
+   */
+  private async assertOtpAllowedForUser(
+    userId: string,
+    requestedRole?: string | null,
+  ): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { userRoles: { include: { role: true } } },
@@ -56,15 +69,35 @@ export class IdentityService {
       isWorkforceBlockedFromOtp({
         roleCodes,
         mfaRequired: user.mfaRequired,
+        requestedRole,
       })
     ) {
       throw new ForbiddenException(
-        'Workforce accounts cannot authenticate via OTP; use the Admin Portal login',
+        requestedRole && !isOtpMobileRole(requestedRole)
+          ? 'OTP login is only available for FARMER, BUYER, and COURIER'
+          : 'Workforce accounts cannot authenticate via OTP; use the Admin Portal login',
       );
     }
   }
 
+  /** D1: reject COURIER OTP when courier app feature flag is off. */
+  private async assertCourierOtpAllowed(role: string): Promise<void> {
+    if (role !== RegistrationRole.COURIER) {
+      return;
+    }
+    const flag = await this.prisma.featureFlag.findUnique({
+      where: { code: COURIER_APP_FLAG },
+    });
+    // Missing flag (pre-migration) → allow so local bootstraps are not blocked;
+    // after D1 migrate, explicit `enabled: false` disables courier OTP.
+    if (flag && !flag.enabled) {
+      throw new ForbiddenException('Courier app authentication is disabled');
+    }
+  }
+
   async requestOtp({ phone, role }: RequestOtpDto) {
+    await this.assertCourierOtpAllowed(role);
+
     let user = await this.prisma.user.findUnique({
       where: { phone },
       include: { userRoles: { include: { role: true } } },
@@ -76,6 +109,7 @@ export class IdentityService {
         isWorkforceBlockedFromOtp({
           roleCodes,
           mfaRequired: user.mfaRequired,
+          requestedRole: role,
         })
       ) {
         throw new ForbiddenException(
@@ -93,12 +127,12 @@ export class IdentityService {
 
     // Assign the requested role if the user doesn't already have it.
     // Registration is additive: requesting OTP as BUYER after already
-    // being a FARMER adds the BUYER role rather than replacing anything.
-    // DTO already restricts role to FARMER|BUYER only.
+    // being a FARMER (or SUPER_ADMIN) adds BUYER rather than replacing anything.
+    // DTO restricts role to FARMER|BUYER|COURIER — never workforce roles.
     const roleRow = await this.prisma.role.findUnique({ where: { code: role } });
     if (!roleRow) {
       throw new NotFoundException(
-        `Role "${role}" is not seeded yet — run migration 012_identity_seed_core_roles.sql`,
+        `Role "${role}" is not seeded yet — run identity delivery Phase 1 migrations`,
       );
     }
     await this.prisma.userRole.upsert({
@@ -145,12 +179,16 @@ export class IdentityService {
   }
 
   async verifyOtp({ phone, otp, role }: VerifyOtpDto) {
+    if (role) {
+      await this.assertCourierOtpAllowed(role);
+    }
+
     if (this.devOtpEnabled && otp === DEV_OTP) {
       const user = await this.prisma.user.findUnique({ where: { phone } });
       if (!user) {
         throw new UnauthorizedException('Phone number not registered. Request OTP first.');
       }
-      await this.assertNotWorkforceOtp(user.id);
+      await this.assertOtpAllowedForUser(user.id, role);
       this.logger.debug(`[DEV] Universal OTP used for ${phone}`);
       return this.issueSession(user.id, phone, role);
     }
@@ -172,7 +210,7 @@ export class IdentityService {
       throw new UnauthorizedException('Phone number not registered. Request OTP first.');
     }
 
-    await this.assertNotWorkforceOtp(user.id);
+    await this.assertOtpAllowedForUser(user.id, role);
 
     if (!user.phoneVerified) {
       await this.prisma.user.update({
@@ -224,36 +262,57 @@ export class IdentityService {
     return this.me(userId);
   }
 
-  /** Signs a JWT and returns it with a minimal user summary — shared by both DEV_OTP and normal verify paths. */
+  /**
+   * Signs a JWT with the *requested* mobile role when provided.
+   * Never falls back to SUPER_ADMIN / first-assigned workforce role for OTP sessions.
+   */
   private async issueSession(userId: string, phone: string, preferredRole?: string) {
-    await this.assertNotWorkforceOtp(userId);
-
-    let roleCode: string | null = null;
-
-    if (preferredRole) {
-      const match = await this.prisma.userRole.findFirst({
-        where: { userId, role: { code: preferredRole } },
-        include: { role: true },
-      });
-      if (match) {
-        roleCode = match.role.code;
-      }
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        userRoles: {
+          include: { role: true },
+          orderBy: { assignedAt: 'asc' },
+        },
+      },
+    });
+    if (!user) {
+      throw new UnauthorizedException('Phone number not registered. Request OTP first.');
     }
 
-    if (!roleCode) {
-      const primaryRole = await this.prisma.userRole.findFirst({
-        where: { userId },
-        include: { role: true },
-        orderBy: { assignedAt: 'asc' },
-      });
-      roleCode = primaryRole?.role.code ?? null;
+    const roleCodes = user.userRoles.map((ur) => ur.role.code);
+    const roleCodesByAssignedAt = roleCodes;
+
+    if (
+      isWorkforceBlockedFromOtp({
+        roleCodes,
+        mfaRequired: user.mfaRequired,
+        requestedRole: preferredRole,
+      })
+    ) {
+      throw new ForbiddenException(
+        'Workforce accounts cannot authenticate via OTP; use the Admin Portal login',
+      );
     }
 
-    const token = this.jwt.sign({ userId, phone, role: roleCode });
+    const resolved = resolveOtpSessionRole({
+      roleCodes,
+      requestedRole: preferredRole,
+      roleCodesByAssignedAt,
+    });
+    if (!resolved.ok) {
+      throw new ForbiddenException(resolved.reason);
+    }
+
+    const token = this.jwt.sign({
+      userId,
+      phone,
+      role: resolved.role,
+    });
 
     return {
       token,
-      user: { id: userId, phone, role: roleCode },
+      user: { id: userId, phone, role: resolved.role },
     };
   }
 }

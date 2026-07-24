@@ -147,3 +147,69 @@ Apply after A8:
 - `identity/024_identity_batch3_permissions.sql`
 
 Handoff: [`a9-a11-staging-deployment-checklist.md`](./a9-a11-staging-deployment-checklist.md)
+
+## D1 Delivery identity / RBAC / config
+
+Apply after A14 / batch4 permissions:
+
+- `identity/026_identity_delivery_phase1_permissions.sql`
+- `ops/006_ops_delivery_phase1_config.sql`
+
+Then regenerate Prisma client (`npx prisma generate` in `apps/api`).
+
+## D2 Delivery shipment domain schema
+
+Apply after D1:
+
+- `delivery/003_delivery_shipment_domain.sql`
+- `delivery/004_delivery_aggregate_guards.sql` (immutability + assignment integrity)
+
+Then `npx prisma generate` in `apps/api`. See [`d2-delivery-shipment-domain-schema.md`](../07-decisions/d2-delivery-shipment-domain-schema.md).
+
+## D3 Courier application foundation
+
+App: `nahu-buna-gebaya/nahu-buna-courier/`. Nest courier routes in `apps/api` (no new SQL beyond D2/004). See [`d3-courier-application-foundation.md`](../07-decisions/d3-courier-application-foundation.md).
+
+## D4 Dispatch assignment engine
+
+Apply after D3:
+
+- `ops/007_ops_delivery_dispatch_config.sql`
+
+See [`d4-dispatch-assignment-engine.md`](../07-decisions/d4-dispatch-assignment-engine.md).
+
+## D5 Delivery execution engine
+
+Apply after D4:
+
+- `delivery/005_delivery_execution_arrived_status.sql` (`ARRIVED` + `arrived_at`)
+
+Then `npx prisma generate` in `apps/api`. See [`d5-delivery-execution-engine.md`](../07-decisions/d5-delivery-execution-engine.md).
+
+## D6 Delivery operations administration
+
+No new SQL. Admin APIs + Admin Portal ops UI. See [`d6-delivery-operations-administration.md`](../07-decisions/d6-delivery-operations-administration.md).
+
+## D7 Courier delivery experience
+
+No new SQL. Courier list query params + app UX. See [`d7-courier-delivery-experience.md`](../07-decisions/d7-courier-delivery-experience.md).
+
+## D8 Farmer & Buyer delivery experience
+
+No new SQL. Party read APIs + Farmer/Buyer tracking UX. See [`d8-farmer-buyer-delivery-experience.md`](../07-decisions/d8-farmer-buyer-delivery-experience.md).
+
+## D9 Delivery operational readiness
+
+SQL: `ops/008_ops_delivery_sla_thresholds.sql` (SLA hour settings). Admin ops metrics/alerts + portal polish. See [`d9-delivery-operational-readiness.md`](../07-decisions/d9-delivery-operational-readiness.md).
+
+## D10 Proof of Delivery framework
+
+SQL: `ops/009_ops_delivery_pod_requirements.sql` (OTP/photo/GPS/recipient flags). See [`d10-proof-of-delivery-framework.md`](../07-decisions/d10-proof-of-delivery-framework.md).
+
+## D11 Courier earnings & settlement
+
+SQL: `delivery/006_delivery_earnings_settlement_types.sql` (earning types + settlement ledger statuses). Append-only immutability remains from `delivery/004`. See [`d11-courier-earnings-settlement.md`](../07-decisions/d11-courier-earnings-settlement.md).
+
+## D12 Delivery RC1 hardening
+
+SQL: `delivery/007_delivery_rc1_hardening_indexes.sql` (unique primary accrual, unique earning references, hot-path indexes). See [`d12-delivery-platform-rc1-architecture.md`](../07-decisions/d12-delivery-platform-rc1-architecture.md).

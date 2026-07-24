@@ -763,3 +763,284 @@ export type MonitoringSnapshotResponse = {
   };
   extensibility: string;
 };
+
+/** D6 — Shipment operations */
+export type ShipmentOpsListItem = {
+  id: string;
+  fulfillmentId: string;
+  shipmentType: string;
+  currentStatus: string;
+  bucket: string | null;
+  courierUserId: string | null;
+  deliveryZone: string | null;
+  serviceLevel: string | null;
+  assignedAt: string | null;
+  acceptedAt: string | null;
+  pickedUpAt: string | null;
+  arrivedAt: string | null;
+  deliveredAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  stopCount: number;
+  activeAssignment: {
+    id: string;
+    courierUserId: string;
+    assignedAt: string;
+  } | null;
+};
+
+export type ShipmentsListResponse = {
+  page: number;
+  limit: number;
+  total: number;
+  buckets: {
+    byStatus: Record<string, number>;
+    buckets: Record<string, number>;
+  };
+  items: ShipmentOpsListItem[];
+};
+
+export type ShipmentOpsDetail = ShipmentOpsListItem & {
+  notes: string | null;
+  pickup: { lat: number | null; lng: number | null };
+  dropoff: { lat: number | null; lng: number | null };
+  estimatedDistanceM: number | null;
+  estimatedDurationSec: number | null;
+  cancelledAt: string | null;
+  failedAt: string | null;
+  fulfillment: {
+    id: string;
+    status: string;
+    orderId: string;
+    trackingRef: string | null;
+    carrierCode: string | null;
+    exceptionCode: string | null;
+  } | null;
+  courier: {
+    userId: string;
+    displayName: string | null;
+    phone: string | null;
+    availability: string;
+    availabilityUi: string;
+    active: boolean;
+    verified: boolean;
+  } | null;
+  stops: Array<{
+    id: string;
+    sequence: number;
+    stopType: string;
+    status: string;
+    addressText: string | null;
+    instructions: string | null;
+    lat: number | null;
+    lng: number | null;
+    contactPhone: string | null;
+    arrivedAt: string | null;
+    completedAt: string | null;
+  }>;
+  assignmentHistory: Array<{
+    id: string;
+    courierUserId: string;
+    assignedByUserId: string | null;
+    assignedAt: string;
+    acceptedAt: string | null;
+    rejectedAt: string | null;
+    cancelledAt: string | null;
+    isActive: boolean;
+    rejectReason: string | null;
+    cancelReason: string | null;
+  }>;
+  timeline: Array<{
+    id: string;
+    eventType: string;
+    fromStatus: string | null;
+    toStatus: string | null;
+    actorUserId: string | null;
+    message: string | null;
+    occurredAt: string;
+    payloadJson: unknown;
+  }>;
+  pods?: Array<{
+    id: string;
+    stopId: string;
+    attemptNo: number;
+    method: string;
+    recipientName: string | null;
+    capturedAt: string;
+    capturedByUserId: string | null;
+    notes: string | null;
+    otpVerified: boolean;
+    otpVerifiedAt: string | null;
+    otpReference: string | null;
+    hasPhoto: boolean;
+    photoUrl: string | null;
+    mediaCount: number;
+    hasSignature: boolean;
+    gps: { lat: number; lng: number; accuracyM: number | null } | null;
+  }>;
+  actions: {
+    canCancel: boolean;
+    canRetry: boolean;
+    canRelease: boolean;
+    canAssign: boolean;
+    canReassign: boolean;
+    canUnassign: boolean;
+  };
+};
+
+export type CourierOpsListItem = {
+  userId: string;
+  displayName: string | null;
+  phone: string | null;
+  vehicleType: string | null;
+  active: boolean;
+  verified: boolean;
+  availability: string;
+  availabilityUi: string;
+  serviceRegions: string[];
+  activeWorkload: number;
+  maxActiveShipments?: number;
+  capacityPct?: number | null;
+  completedDeliveries: number;
+  locationAt: string | null;
+  updatedAt: string;
+};
+
+export type CouriersListResponse = {
+  page: number;
+  limit: number;
+  total: number;
+  maxActiveShipments?: number;
+  items: CourierOpsListItem[];
+};
+
+export type CourierOpsDetail = Omit<CourierOpsListItem, "completedDeliveries"> & {
+  completedDeliveries: number;
+  completedCount: number;
+  lastLat: number | null;
+  lastLng: number | null;
+  assignedShipments: Array<{
+    id: string;
+    currentStatus: string;
+    deliveryZone: string | null;
+    assignedAt: string | null;
+    updatedAt: string;
+    fulfillmentId: string;
+  }>;
+  recentCompleted: Array<{
+    id: string;
+    currentStatus: string;
+    completedAt: string | null;
+    deliveryZone: string | null;
+    fulfillmentId: string;
+  }>;
+  recentAssignments: Array<{
+    id: string;
+    shipmentId: string;
+    assignedAt: string;
+    acceptedAt: string | null;
+    rejectedAt: string | null;
+    cancelledAt: string | null;
+    isActive: boolean;
+  }>;
+};
+
+export type DeliveryOpsMetrics = {
+  asOf: string;
+  dayStart: string;
+  awaitingAssignment: number;
+  assignmentBacklog?: number;
+  activeDeliveries: number;
+  completedToday: number;
+  deliveredToday?: number;
+  failedToday: number;
+  returnedToday: number;
+  openFailed?: number;
+  openReturned?: number;
+  delayedInTransit?: number;
+  delayedPodPending?: number;
+  sla?: { inTransitHours: number; podPendingHours: number };
+  averageDeliveryDurationMs: number | null;
+  averageDeliveryDurationMin: number | null;
+  courierUtilization: {
+    onlineCouriers: number;
+    totalActiveCouriers: number;
+    couriersWithActiveShipments: number;
+    maxActiveShipmentsPerCourier?: number;
+    onlineRate: number | null;
+    busyRate: number | null;
+  };
+  health?: {
+    alertCount: number;
+    criticalCount: number;
+    warnCount: number;
+  };
+  alerts?: Array<{
+    code: string;
+    label: string;
+    value: number;
+    warnAbove: number;
+    criticalAbove: number;
+    severity: "ok" | "warn" | "critical";
+  }>;
+  buckets: Record<string, number>;
+  byStatus: Record<string, number>;
+  eventsToday: Record<string, number>;
+};
+
+export type SettlementStatus =
+  | "PENDING"
+  | "ELIGIBLE"
+  | "APPROVED"
+  | "PAID"
+  | "REVERSED";
+
+export type EarningListItem = {
+  id: string;
+  shipmentId: string;
+  courierUserId: string;
+  earningType: string;
+  amount: number;
+  currency: string;
+  ledgerStatus: string;
+  settlementStatus: SettlementStatus;
+  replacesEarningId: string | null;
+  reference: string | null;
+  policyCode: string | null;
+  createdAt: string;
+};
+
+export type EarningsListResponse = {
+  page: number;
+  limit: number;
+  total: number;
+  operationalSummary: {
+    byStatus: Record<string, { count: number; sumEtb: number }>;
+  };
+  items: EarningListItem[];
+};
+
+export type EarningDetail = {
+  id: string;
+  shipmentId: string;
+  courierUserId: string;
+  earningType: string;
+  amount: number;
+  currency: string;
+  ledgerStatus: string;
+  settlementStatus: SettlementStatus;
+  replacesEarningId: string | null;
+  reference: string | null;
+  policyCode: string | null;
+  createdAt: string;
+  history: Array<{
+    id: string;
+    earningType: string;
+    amount: number;
+    ledgerStatus: string;
+    replacesEarningId: string | null;
+    reference: string | null;
+    createdAt: string;
+  }>;
+};

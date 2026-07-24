@@ -3,6 +3,8 @@ import { IsEnum, IsString, Matches } from 'class-validator';
 export enum RegistrationRole {
   FARMER = 'FARMER',
   BUYER = 'BUYER',
+  /** Delivery Phase 1 (D1) — OTP onboarding; invitations deferred. */
+  COURIER = 'COURIER',
 }
 
 export class RequestOtpDto {

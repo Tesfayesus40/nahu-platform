@@ -1,272 +1,172 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
-import { StatusBadge } from "@/components/StatusBadge";
-import { DataTable, type Column } from "@/components/DataTable";
-import { FilterBar, type FilterField } from "@/components/FilterBar";
+import { OpsAlertsPanel } from "@/components/delivery/OpsAlertsPanel";
 import { usePortal } from "@/components/PortalShell";
 import { bffGet, type BffError } from "@/lib/client";
-import type {
-  FulfillmentListItem,
-  FulfillmentsListResponse,
-} from "@/lib/types";
+import type { DeliveryOpsMetrics } from "@/lib/types";
 
-const PAGE_SIZE = 20;
+const BUCKET_LINKS: Array<{ key: string; label: string }> = [
+  { key: "AWAITING_ASSIGNMENT", label: "Awaiting assignment" },
+  { key: "ASSIGNED", label: "Assigned" },
+  { key: "IN_TRANSIT", label: "In transit" },
+  { key: "ARRIVED", label: "Arrived" },
+  { key: "DELIVERED", label: "Delivered" },
+  { key: "BUYER_CONFIRMATION_PENDING", label: "Buyer confirmation" },
+  { key: "COMPLETED", label: "Completed" },
+  { key: "FAILED", label: "Failed" },
+  { key: "RETURNED", label: "Returned" },
+  { key: "CANCELLED", label: "Cancelled" },
+];
 
-const STATUSES = [
-  "PENDING_HANDOFF",
-  "READY",
-  "IN_TRANSIT",
-  "DELIVERED",
-  "EXCEPTION",
-  "CLOSED",
-].map((value) => ({
-  value,
-  label: value.replaceAll("_", " "),
-}));
-
-function DeliveryQueue() {
-  const searchParams = useSearchParams();
+export default function DeliveryOpsDashboardPage() {
   const { capabilities } = usePortal();
   const canRead = capabilities.permissions.includes("delivery.read");
-
-  const initialStatus = searchParams.get("status") ?? "";
-  const initialQueue = searchParams.get("queue") ?? "open";
-
-  const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState({
-    q: "",
-    status: initialStatus,
-    queue:
-      initialQueue === "exceptions" || initialQueue === "all"
-        ? initialQueue
-        : "open",
-  });
-  const [applied, setApplied] = useState(filters);
-  const [data, setData] = useState<FulfillmentsListResponse | null>(null);
+  const [data, setData] = useState<DeliveryOpsMetrics | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const filterFields: FilterField[] = useMemo(
-    () => [
-      {
-        key: "q",
-        label: "Search",
-        type: "text",
-        placeholder: "Tracking, carrier, address…",
-      },
-      {
-        key: "status",
-        label: "Status",
-        type: "select",
-        options: STATUSES,
-      },
-      {
-        key: "queue",
-        label: "Queue",
-        type: "select",
-        options: [
-          { value: "open", label: "Open" },
-          { value: "exceptions", label: "Exceptions" },
-          { value: "all", label: "All" },
-        ],
-      },
-    ],
-    [],
-  );
-
-  const load = useCallback(
-    async (targetPage: number) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams({
-          page: String(targetPage),
-          limit: String(PAGE_SIZE),
-        });
-        if (applied.q.trim()) params.set("q", applied.q.trim());
-        if (applied.status) {
-          params.set("status", applied.status);
-        } else {
-          params.set("queue", applied.queue);
-        }
-        const result = await bffGet<FulfillmentsListResponse>(
-          `/api/delivery/fulfillments?${params.toString()}`,
-        );
-        setData(result);
-        setPage(targetPage);
-      } catch (err) {
-        setError((err as BffError).message);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [applied],
-  );
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setData(await bffGet<DeliveryOpsMetrics>("/api/delivery/ops/metrics"));
+    } catch (err) {
+      setError((err as BffError).message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (canRead) void load(1);
+    if (canRead) void load();
     else setLoading(false);
   }, [canRead, load]);
-
-  const columns: Column<FulfillmentListItem>[] = [
-    {
-      key: "id",
-      header: "Fulfillment",
-      render: (row) => (
-        <Link href={`/delivery/${row.id}`} className="table-link">
-          {row.id.slice(0, 8)}…
-        </Link>
-      ),
-    },
-    {
-      key: "order",
-      header: "Order",
-      render: (row) => (
-        <span>
-          <Link href={`/orders/${row.orderId}`} className="table-link">
-            {row.orderId.slice(0, 8)}…
-          </Link>
-          <br />
-          <StatusBadge status={row.orderStatus ?? "—"} />
-        </span>
-      ),
-    },
-    {
-      key: "status",
-      header: "Status",
-      render: (row) => <StatusBadge status={row.status} />,
-    },
-    {
-      key: "carrier",
-      header: "Carrier / tracking",
-      render: (row) =>
-        [row.carrierCode, row.trackingRef].filter(Boolean).join(" · ") || "—",
-    },
-    {
-      key: "address",
-      header: "Address",
-      render: (row) => row.deliveryAddress ?? "—",
-    },
-    {
-      key: "total",
-      header: "Total",
-      render: (row) =>
-        row.totalEtb != null ? `${row.totalEtb} ETB` : "—",
-    },
-    {
-      key: "updatedAt",
-      header: "Updated",
-      render: (row) => new Date(row.updatedAt).toLocaleString(),
-    },
-  ];
 
   if (!canRead) {
     return (
       <div>
-        <PageHeader title="Delivery" subtitle="delivery.read required" />
-        <p className="form-error">
-          You do not have permission to view delivery.
-        </p>
+        <PageHeader title="Delivery ops" subtitle="delivery.read required" />
+        <p className="form-error">Missing permission.</p>
       </div>
     );
   }
 
-  const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
-
   return (
     <div>
       <PageHeader
-        title="Delivery"
-        subtitle="Fulfillment cases — handoff, transit, exceptions."
-      />
-
-      <div className="queue-tabs">
-        {(
-          [
-            { value: "open", label: "Open" },
-            { value: "exceptions", label: "Exceptions" },
-            { value: "all", label: "All" },
-          ] as const
-        ).map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            className={`btn btn-secondary sort-chip${
-              !applied.status && applied.queue === opt.value ? " active" : ""
-            }`}
-            onClick={() => {
-              const next = { ...filters, status: "", queue: opt.value };
-              setFilters(next);
-              setApplied(next);
-            }}
-          >
-            {opt.label}
+        title="Delivery operations"
+        subtitle="Operational readiness — status counts, ShipmentEvent today, SLA delays, courier utilization."
+        actions={
+          <button type="button" className="btn btn-secondary" onClick={() => void load()}>
+            Refresh
           </button>
-        ))}
-      </div>
-
-      <FilterBar
-        fields={filterFields}
-        values={filters}
-        onChange={(key, value) =>
-          setFilters((prev) => ({ ...prev, [key]: value }))
         }
-        onSubmit={() => setApplied(filters)}
-        onReset={() => {
-          const empty = { q: "", status: "", queue: "open" };
-          setFilters(empty);
-          setApplied(empty);
-        }}
       />
 
       {error ? <p className="form-error">{error}</p> : null}
-      {loading ? <p className="muted">Loading fulfillments…</p> : null}
+      {loading ? <p className="muted">Loading metrics…</p> : null}
 
-      {!loading && data ? (
+      {data ? (
         <>
-          <DataTable
-            columns={columns}
-            rows={data.items}
-            rowKey={(row) => row.id}
-            emptyMessage="No fulfillments match these filters."
-          />
-          <div className="pagination">
-            <span className="muted">
-              Page {data.page} of {totalPages} · {data.total} total
-            </span>
-            <div className="buttons">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={page <= 1}
-                onClick={() => void load(page - 1)}
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={page >= totalPages}
-                onClick={() => void load(page + 1)}
-              >
-                Next
-              </button>
+          <div className="kpi-row">
+            <div className="kpi-card">
+              <div className="kpi-label">Assignment backlog</div>
+              <div className="kpi-value">{data.assignmentBacklog ?? data.awaitingAssignment}</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Active deliveries</div>
+              <div className="kpi-value">{data.activeDeliveries}</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Delayed in-transit</div>
+              <div className="kpi-value">{data.delayedInTransit ?? 0}</div>
+              <div className="muted" style={{ fontSize: 12 }}>
+                &gt;{data.sla?.inTransitHours ?? 24}h
+              </div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Delayed POD-pending</div>
+              <div className="kpi-value">{data.delayedPodPending ?? 0}</div>
+              <div className="muted" style={{ fontSize: 12 }}>
+                &gt;{data.sla?.podPendingHours ?? 12}h
+              </div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Open failed</div>
+              <div className="kpi-value">{data.openFailed ?? data.failedToday}</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Open returned</div>
+              <div className="kpi-value">{data.openReturned ?? data.returnedToday}</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Completed today</div>
+              <div className="kpi-value">{data.completedToday}</div>
+            </div>
+            <div className="kpi-card">
+              <div className="kpi-label">Courier busy %</div>
+              <div className="kpi-value">
+                {data.courierUtilization.busyRate ?? "—"}
+              </div>
             </div>
           </div>
+
+          {data.alerts ? <OpsAlertsPanel alerts={data.alerts} /> : null}
+
+          <div className="card" style={{ marginTop: 16 }}>
+            <h2>Shipment status summaries</h2>
+            <div className="queue-tabs" style={{ flexWrap: "wrap" }}>
+              {BUCKET_LINKS.map((b) => (
+                <Link
+                  key={b.key}
+                  href={`/delivery/shipments?bucket=${b.key}`}
+                  className="btn btn-secondary sort-chip"
+                >
+                  {b.label} ({data.buckets[b.key] ?? 0})
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div className="card" style={{ marginTop: 16 }}>
+            <h2>Courier utilization</h2>
+            <dl className="kv">
+              <dt>Online</dt>
+              <dd>
+                {data.courierUtilization.onlineCouriers} /{" "}
+                {data.courierUtilization.totalActiveCouriers} (
+                {data.courierUtilization.onlineRate ?? "—"}%)
+              </dd>
+              <dt>With active shipments</dt>
+              <dd>{data.courierUtilization.couriersWithActiveShipments}</dd>
+              <dt>Max active / courier</dt>
+              <dd>
+                {data.courierUtilization.maxActiveShipmentsPerCourier ?? "—"}
+              </dd>
+              <dt>Avg duration (min)</dt>
+              <dd>{data.averageDeliveryDurationMin ?? "—"}</dd>
+              <dt>Health</dt>
+              <dd>
+                {data.health
+                  ? `${data.health.criticalCount} critical · ${data.health.warnCount} warn`
+                  : "—"}
+              </dd>
+            </dl>
+            <Link href="/delivery/couriers" className="btn btn-secondary">
+              Courier workload →
+            </Link>
+          </div>
+
+          <p className="muted" style={{ marginTop: 12 }}>
+            As of {new Date(data.asOf).toLocaleString()} · today from{" "}
+            {new Date(data.dayStart).toLocaleDateString()} UTC · completed today
+            counts ShipmentEvent <code>delivery.shipment.completed</code> only
+          </p>
         </>
       ) : null}
     </div>
-  );
-}
-
-export default function DeliveryPage() {
-  return (
-    <Suspense fallback={<p className="muted">Loading delivery…</p>}>
-      <DeliveryQueue />
-    </Suspense>
   );
 }

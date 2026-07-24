@@ -121,6 +121,8 @@ export class AdminMonitoringService {
       stalledEscrow,
       deliveryExceptions,
       verificationPending,
+      deliveryInTransit,
+      deliveryPodPending,
     ] = await Promise.all([
       this.prisma.auditEvent.count({
         where: { outcome: 'DENIED', occurredAt: { gte: since7d } },
@@ -132,12 +134,26 @@ export class AdminMonitoringService {
       this.prisma.verificationCase.count({
         where: { status: { in: [...PENDING_VERIFICATION_STATUSES] } },
       }),
+      this.prisma.shipment.count({
+        where: {
+          deletedAt: null,
+          currentStatus: { in: ['PICKED_UP', 'IN_TRANSIT'] },
+        },
+      }),
+      this.prisma.shipment.count({
+        where: {
+          deletedAt: null,
+          currentStatus: { in: ['ARRIVED', 'DELIVERED'] },
+        },
+      }),
     ]);
 
     return {
       'audit.denied_7d': auditDenied7d,
       'orders.stalled_escrow': stalledEscrow,
       'delivery.exceptions': deliveryExceptions,
+      'delivery.in_transit': deliveryInTransit,
+      'delivery.pod_pending': deliveryPodPending,
       'verification.pending': verificationPending,
     };
   }
