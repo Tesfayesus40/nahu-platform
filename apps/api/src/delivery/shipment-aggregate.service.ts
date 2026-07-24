@@ -6,7 +6,10 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  ACTIVE_OUTBOUND_STATUSES,
   ShipmentStatus,
+  assertStopsReadyForAssignment,
+  planOutboundStopsFromOrder,
   planStatusTransition,
   toDbAvailability,
   toUiAvailability,
@@ -631,5 +634,154 @@ export class ShipmentAggregateService {
       recentEvents: events,
       timeline: events,
     };
+  }
+
+  /**
+   * RC1 Marketplace → Shipment handoff.
+   * When a fulfillment is READY, ensure one active OUTBOUND shipment in CREATED
+   * with PICKUP + DROPOFF stops. Does not Release or Assign (DispatchService).
+   */
+  async createOutboundFromFulfillment(
+    tx: Tx,
+    input: {
+      fulfillmentId: string;
+      actorUserId?: string | null;
+      source?: string;
+    },
+  ): Promise<{ shipmentId: string; created: boolean }> {
+    const existing = await tx.shipment.findFirst({
+      where: {
+        fulfillmentId: input.fulfillmentId,
+        deletedAt: null,
+        shipmentType: 'OUTBOUND',
+        currentStatus: { in: [...ACTIVE_OUTBOUND_STATUSES] },
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      return { shipmentId: existing.id, created: false };
+    }
+
+    const fulfillment = await tx.fulfillmentCase.findUnique({
+      where: { id: input.fulfillmentId },
+      include: {
+        order: {
+          include: {
+            buyer: {
+              select: {
+                phone: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+            farmer: {
+              include: {
+                user: {
+                  select: {
+                    phone: true,
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!fulfillment) {
+      throw new NotFoundException('Fulfillment case not found');
+    }
+
+    const stops = planOutboundStopsFromOrder({
+      deliveryAddress: fulfillment.order.deliveryAddress,
+      pickupNotes: fulfillment.pickupNotes,
+      deliveryNotes: fulfillment.deliveryNotes,
+      farmer: fulfillment.order.farmer,
+      buyer: fulfillment.order.buyer,
+    });
+
+    const readyCheck = assertStopsReadyForAssignment([
+      { sequence: stops.pickup.sequence, stopType: stops.pickup.stopType },
+      { sequence: stops.dropoff.sequence, stopType: stops.dropoff.stopType },
+    ]);
+    if (!readyCheck.ok) {
+      throw new BadRequestException(readyCheck.reason);
+    }
+
+    try {
+      const shipment = await tx.shipment.create({
+        data: {
+          fulfillmentId: fulfillment.id,
+          shipmentType: 'OUTBOUND',
+          currentStatus: 'CREATED',
+          serviceLevel: 'STANDARD',
+          notes: fulfillment.pickupNotes ?? fulfillment.deliveryNotes ?? null,
+          metadataJson: {
+            source: input.source ?? 'fulfillment_ready',
+            orderId: fulfillment.orderId,
+          },
+          stops: {
+            create: [
+              {
+                sequence: stops.pickup.sequence,
+                stopType: stops.pickup.stopType,
+                status: 'PENDING',
+                addressText: stops.pickup.addressText,
+                contactName: stops.pickup.contactName,
+                contactPhone: stops.pickup.contactPhone,
+                instructions: stops.pickup.instructions,
+              },
+              {
+                sequence: stops.dropoff.sequence,
+                stopType: stops.dropoff.stopType,
+                status: 'PENDING',
+                addressText: stops.dropoff.addressText,
+                contactName: stops.dropoff.contactName,
+                contactPhone: stops.dropoff.contactPhone,
+                instructions: stops.dropoff.instructions,
+              },
+            ],
+          },
+        },
+      });
+
+      await tx.shipmentEvent.create({
+        data: {
+          shipmentId: shipment.id,
+          eventType: 'delivery.shipment.created',
+          fromStatus: null,
+          toStatus: 'CREATED',
+          actorUserId: input.actorUserId ?? null,
+          message: 'Outbound shipment created from READY fulfillment',
+          payloadJson: {
+            fulfillmentId: fulfillment.id,
+            orderId: fulfillment.orderId,
+            source: input.source ?? 'fulfillment_ready',
+          },
+          occurredAt: new Date(),
+        },
+      });
+
+      return { shipmentId: shipment.id, created: true };
+    } catch (err) {
+      // Concurrent MARK_READY / START_FULFILLMENT — unique active outbound wins.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const raced = await tx.shipment.findFirst({
+          where: {
+            fulfillmentId: input.fulfillmentId,
+            deletedAt: null,
+            shipmentType: 'OUTBOUND',
+            currentStatus: { in: [...ACTIVE_OUTBOUND_STATUSES] },
+          },
+          select: { id: true },
+        });
+        if (raced) return { shipmentId: raced.id, created: false };
+      }
+      throw err;
+    }
   }
 }

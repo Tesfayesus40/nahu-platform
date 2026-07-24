@@ -18,6 +18,8 @@ import {
   FulfillmentActionDto,
   ListFulfillmentQueryDto,
 } from './dto/fulfillment.dto';
+import { ShipmentAggregateService } from './shipment-aggregate.service';
+import { DeliveryEventsPublisher } from './delivery-events.publisher';
 
 type RequestMeta = { ip?: string; userAgent?: string; requestId?: string };
 
@@ -27,6 +29,8 @@ export class AdminDeliveryService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly adminAuth: AdminAuthService,
+    private readonly aggregate: ShipmentAggregateService,
+    private readonly events: DeliveryEventsPublisher,
   ) {}
 
   async countOpen(): Promise<number> {
@@ -121,9 +125,22 @@ export class AdminDeliveryService {
   async get(id: string) {
     const c = await this.prisma.fulfillmentCase.findUnique({
       where: { id },
-      include: {
-        events: { orderBy: { createdAt: 'desc' }, take: 50 },
-        order: {
+        include: {
+          events: { orderBy: { createdAt: 'desc' }, take: 50 },
+          shipments: {
+            where: { deletedAt: null },
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+            select: {
+              id: true,
+              currentStatus: true,
+              shipmentType: true,
+              courierUserId: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+          order: {
           include: {
             buyer: {
               select: {
@@ -174,6 +191,7 @@ export class AdminDeliveryService {
     const fromStatus = existing.status as FulfillmentStatus;
     const toStatus = statusAfterFulfillmentAction(action, fromStatus);
     const now = new Date();
+    let createdShipmentId: string | null = null;
 
     await this.prisma.$transaction(async (tx) => {
       const data: Prisma.FulfillmentCaseUpdateInput = {
@@ -232,7 +250,29 @@ export class AdminDeliveryService {
           },
         });
       }
+
+      // RC1: first READY → create Shipment (CREATED) + stops; Admin Release/Assign next.
+      if (toStatus === 'READY') {
+        const handoff = await this.aggregate.createOutboundFromFulfillment(tx, {
+          fulfillmentId: id,
+          actorUserId: admin.userId,
+          source: `fulfillment.${action.toLowerCase()}`,
+        });
+        if (handoff.created) createdShipmentId = handoff.shipmentId;
+      }
     });
+
+    if (createdShipmentId) {
+      this.events.publish({
+        shipmentId: createdShipmentId,
+        eventType: 'delivery.shipment.created',
+        fromStatus: null,
+        toStatus: 'CREATED',
+        actorUserId: admin.userId,
+        occurredAt: now,
+        payload: { fulfillmentId: id, source: 'fulfillment_ready' },
+      });
+    }
 
     await this.audit.appendEvent({
       actorUserId: admin.userId,
@@ -244,7 +284,10 @@ export class AdminDeliveryService {
       reason: dto.reason ?? null,
       outcome: 'SUCCESS',
       beforeJson: { status: fromStatus },
-      afterJson: { status: toStatus },
+      afterJson: {
+        status: toStatus,
+        ...(createdShipmentId ? { shipmentId: createdShipmentId } : {}),
+      },
       ip: meta.ip,
       userAgent: meta.userAgent,
       requestId: meta.requestId,

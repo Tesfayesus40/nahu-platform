@@ -334,6 +334,90 @@ export type StopDraft = {
   stopType: StopType;
 };
 
+/** Build a readable location line from farmer profile geography. */
+export function formatFarmerPickupAddress(input: {
+  region?: string | null;
+  zone?: string | null;
+  woreda?: string | null;
+}): string {
+  const parts = [input.region, input.zone, input.woreda]
+    .map((p) => (typeof p === 'string' ? p.trim() : ''))
+    .filter(Boolean);
+  return parts.length ? parts.join(', ') : 'Farmer pickup location';
+}
+
+export function formatPersonName(input: {
+  firstName?: string | null;
+  lastName?: string | null;
+}): string | null {
+  const parts = [input.firstName, input.lastName]
+    .map((p) => (typeof p === 'string' ? p.trim() : ''))
+    .filter(Boolean);
+  return parts.length ? parts.join(' ') : null;
+}
+
+/**
+ * RC1 outbound stop plan from fulfillment/order parties.
+ * Status stays CREATED until Admin Release → Assign (DispatchService).
+ */
+export function planOutboundStopsFromOrder(input: {
+  deliveryAddress: string;
+  pickupNotes?: string | null;
+  deliveryNotes?: string | null;
+  farmer?: {
+    region?: string | null;
+    zone?: string | null;
+    woreda?: string | null;
+    user?: {
+      firstName?: string | null;
+      lastName?: string | null;
+      phone?: string | null;
+    } | null;
+  } | null;
+  buyer?: {
+    firstName?: string | null;
+    lastName?: string | null;
+    phone?: string | null;
+  } | null;
+}): {
+  pickup: {
+    sequence: 1;
+    stopType: 'PICKUP';
+    addressText: string;
+    contactName: string | null;
+    contactPhone: string | null;
+    instructions: string | null;
+  };
+  dropoff: {
+    sequence: 2;
+    stopType: 'DROPOFF';
+    addressText: string;
+    contactName: string | null;
+    contactPhone: string | null;
+    instructions: string | null;
+  };
+} {
+  const farmerUser = input.farmer?.user ?? null;
+  return {
+    pickup: {
+      sequence: 1,
+      stopType: 'PICKUP',
+      addressText: formatFarmerPickupAddress(input.farmer ?? {}),
+      contactName: formatPersonName(farmerUser ?? {}),
+      contactPhone: farmerUser?.phone ?? null,
+      instructions: input.pickupNotes?.trim() || null,
+    },
+    dropoff: {
+      sequence: 2,
+      stopType: 'DROPOFF',
+      addressText: input.deliveryAddress.trim() || 'Buyer delivery address',
+      contactName: formatPersonName(input.buyer ?? {}),
+      contactPhone: input.buyer?.phone ?? null,
+      instructions: input.deliveryNotes?.trim() || null,
+    },
+  };
+}
+
 /** Shipment may leave CREATED / be offered only with ≥1 stop; RC1 expects PICKUP+DROPOFF. */
 export function assertStopsReadyForAssignment(stops: StopDraft[]): {
   ok: true;

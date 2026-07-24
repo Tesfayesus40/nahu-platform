@@ -18,6 +18,8 @@ import {
   type OrderAdminAction,
 } from './order-admin.rules';
 import { fulfillmentStatusForOrder } from '../delivery/fulfillment.rules';
+import { ShipmentAggregateService } from '../delivery/shipment-aggregate.service';
+import { DeliveryEventsPublisher } from '../delivery/delivery-events.publisher';
 import {
   ListOrdersQueryDto,
   OrderAdminActionDto,
@@ -44,6 +46,8 @@ export class AdminOrdersService {
     private readonly certificates: CertificatesService,
     private readonly reservations: ReservationsService,
     private readonly payments: PaymentsService,
+    private readonly shipmentAggregate: ShipmentAggregateService,
+    private readonly deliveryEvents: DeliveryEventsPublisher,
   ) {}
 
   async countByStatus(): Promise<Record<string, number>> {
@@ -241,6 +245,7 @@ export class AdminOrdersService {
         });
       });
     } else {
+      let createdShipmentId: string | null = null;
       await this.prisma.$transaction(async (tx) => {
         await tx.order.update({
           where: { id: orderId },
@@ -260,8 +265,26 @@ export class AdminOrdersService {
           },
         });
 
-        await this.upsertFulfillmentTx(tx, orderId, toStatus, admin.userId, action);
+        createdShipmentId = await this.upsertFulfillmentTx(
+          tx,
+          orderId,
+          toStatus,
+          admin.userId,
+          action,
+        );
       });
+
+      if (createdShipmentId) {
+        this.deliveryEvents.publish({
+          shipmentId: createdShipmentId,
+          eventType: 'delivery.shipment.created',
+          fromStatus: null,
+          toStatus: 'CREATED',
+          actorUserId: admin.userId,
+          occurredAt: now,
+          payload: { orderId, source: `order.${action.toLowerCase()}` },
+        });
+      }
 
       if (action === 'COMPLETE_ORDER') {
         const existing = await this.prisma.originCertificate.findUnique({
@@ -332,10 +355,11 @@ export class AdminOrdersService {
     orderStatus: string,
     actorUserId: string,
     action: string,
-  ) {
+  ): Promise<string | null> {
     const status = fulfillmentStatusForOrder(orderStatus);
     const existing = await tx.fulfillmentCase.findUnique({ where: { orderId } });
     const now = new Date();
+    let fulfillmentId: string;
     if (!existing) {
       const created = await tx.fulfillmentCase.create({
         data: {
@@ -356,31 +380,41 @@ export class AdminOrdersService {
           actorUserId,
         },
       });
-      return;
+      fulfillmentId = created.id;
+    } else {
+      await tx.fulfillmentCase.update({
+        where: { id: existing.id },
+        data: {
+          status,
+          readyAt: status === 'READY' ? (existing.readyAt ?? now) : existing.readyAt,
+          shippedAt:
+            status === 'IN_TRANSIT' ? (existing.shippedAt ?? now) : existing.shippedAt,
+          deliveredAt:
+            status === 'DELIVERED' ? (existing.deliveredAt ?? now) : existing.deliveredAt,
+          updatedAt: now,
+        },
+      });
+      await tx.fulfillmentEvent.create({
+        data: {
+          fulfillmentId: existing.id,
+          eventType: action,
+          fromStatus: existing.status,
+          toStatus: status,
+          message: `Synced from order action ${action}`,
+          actorUserId,
+        },
+      });
+      fulfillmentId = existing.id;
     }
 
-    await tx.fulfillmentCase.update({
-      where: { id: existing.id },
-      data: {
-        status,
-        readyAt: status === 'READY' ? (existing.readyAt ?? now) : existing.readyAt,
-        shippedAt:
-          status === 'IN_TRANSIT' ? (existing.shippedAt ?? now) : existing.shippedAt,
-        deliveredAt:
-          status === 'DELIVERED' ? (existing.deliveredAt ?? now) : existing.deliveredAt,
-        updatedAt: now,
-      },
+    if (status !== 'READY') return null;
+
+    const handoff = await this.shipmentAggregate.createOutboundFromFulfillment(tx, {
+      fulfillmentId,
+      actorUserId,
+      source: `order.${action.toLowerCase()}`,
     });
-    await tx.fulfillmentEvent.create({
-      data: {
-        fulfillmentId: existing.id,
-        eventType: action,
-        fromStatus: existing.status,
-        toStatus: status,
-        message: `Synced from order action ${action}`,
-        actorUserId,
-      },
-    });
+    return handoff.created ? handoff.shipmentId : null;
   }
 
   private async restoreListingStock(

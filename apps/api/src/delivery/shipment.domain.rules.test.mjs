@@ -79,6 +79,42 @@ function assertStopsReadyForAssignment(stops) {
   return { ok: true };
 }
 
+function formatFarmerPickupAddress(input) {
+  const parts = [input.region, input.zone, input.woreda]
+    .map((p) => (typeof p === 'string' ? p.trim() : ''))
+    .filter(Boolean);
+  return parts.length ? parts.join(', ') : 'Farmer pickup location';
+}
+
+function formatPersonName(input) {
+  const parts = [input.firstName, input.lastName]
+    .map((p) => (typeof p === 'string' ? p.trim() : ''))
+    .filter(Boolean);
+  return parts.length ? parts.join(' ') : null;
+}
+
+function planOutboundStopsFromOrder(input) {
+  const farmerUser = input.farmer?.user ?? null;
+  return {
+    pickup: {
+      sequence: 1,
+      stopType: 'PICKUP',
+      addressText: formatFarmerPickupAddress(input.farmer ?? {}),
+      contactName: formatPersonName(farmerUser ?? {}),
+      contactPhone: farmerUser?.phone ?? null,
+      instructions: input.pickupNotes?.trim() || null,
+    },
+    dropoff: {
+      sequence: 2,
+      stopType: 'DROPOFF',
+      addressText: input.deliveryAddress.trim() || 'Buyer delivery address',
+      contactName: formatPersonName(input.buyer ?? {}),
+      contactPhone: input.buyer?.phone ?? null,
+      instructions: input.deliveryNotes?.trim() || null,
+    },
+  };
+}
+
 function buildEarningCorrection(input) {
   if (input.earningType === 'VOID') {
     return {
@@ -368,5 +404,34 @@ describe('shipment domain (D2/D5)', () => {
     assert.equal(toDbAvailability('BREAK'), 'ON_BREAK');
     assert.equal(toUiAvailability('AVAILABLE'), 'ONLINE');
     assert.equal(toUiAvailability('ON_BREAK'), 'BREAK');
+  });
+
+  it('plans RC1 outbound PICKUP+DROPOFF stops from order parties', () => {
+    const stops = planOutboundStopsFromOrder({
+      deliveryAddress: 'Bole, Addis Ababa',
+      pickupNotes: 'Gate 2',
+      deliveryNotes: 'Call on arrival',
+      farmer: {
+        region: 'Oromia',
+        zone: 'Jimma',
+        woreda: 'Gomma',
+        user: { firstName: 'Abebe', lastName: 'Kebede', phone: '+251911000001' },
+      },
+      buyer: { firstName: 'Sara', lastName: 'Hailu', phone: '+251911000002' },
+    });
+    assert.equal(stops.pickup.stopType, 'PICKUP');
+    assert.equal(stops.pickup.sequence, 1);
+    assert.equal(stops.pickup.addressText, 'Oromia, Jimma, Gomma');
+    assert.equal(stops.pickup.contactName, 'Abebe Kebede');
+    assert.equal(stops.dropoff.stopType, 'DROPOFF');
+    assert.equal(stops.dropoff.sequence, 2);
+    assert.equal(stops.dropoff.addressText, 'Bole, Addis Ababa');
+    assert.equal(
+      assertStopsReadyForAssignment([
+        { sequence: 1, stopType: 'PICKUP' },
+        { sequence: 2, stopType: 'DROPOFF' },
+      ]).ok,
+      true,
+    );
   });
 });

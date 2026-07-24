@@ -10,6 +10,7 @@ import { PaymentsModule } from '../payments/payments.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { AuditModule } from '../audit/audit.module';
 import { IdentityModule } from '../identity/identity.module';
+import { DeliveryModule } from '../delivery/delivery.module';
 import { AdminAuthGuard } from '../common/guards/admin-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 
@@ -20,6 +21,7 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
     InventoryModule,
     AuditModule,
     IdentityModule,
+    DeliveryModule,
   ],
   controllers: [
     OrdersController,
