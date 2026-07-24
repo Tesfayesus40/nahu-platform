@@ -313,15 +313,20 @@ export class SettlementService {
       },
     });
 
+    const toLedgerRow = (r: { amount: Prisma.Decimal; ledgerStatus: string }) => ({
+      amount: this.toAmount(r.amount),
+      ledgerStatus: r.ledgerStatus,
+    });
+
     return {
       page,
       limit,
       total,
       summary: {
-        todayEtb: sumEarningLedger(todayRows),
-        weekEtb: sumEarningLedger(weekRows),
-        monthEtb: sumEarningLedger(monthRows),
-        periodBalanceEtb: sumEarningLedger(allForBalance),
+        todayEtb: sumEarningLedger(todayRows.map(toLedgerRow)),
+        weekEtb: sumEarningLedger(weekRows.map(toLedgerRow)),
+        monthEtb: sumEarningLedger(monthRows.map(toLedgerRow)),
+        periodBalanceEtb: sumEarningLedger(allForBalance.map(toLedgerRow)),
         completedDeliveries: completedCount,
         pendingSettlements: pending,
       },
