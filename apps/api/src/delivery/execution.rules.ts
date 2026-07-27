@@ -63,7 +63,7 @@ export const EXECUTION_REQUIRED_STATUS: Record<
   startTransit: ['PICKED_UP'],
   arriveAtDestination: ['IN_TRANSIT'],
   markDelivered: ['ARRIVED'],
-  completeDelivery: ['DELIVERED'],
+  completeDelivery: ['DELIVERED', 'BUYER_CONFIRMED'],
   markFailed: ['ACCEPTED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED'],
   markReturned: ['PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED'],
 };
@@ -160,13 +160,17 @@ export function planExecutionAction(input: {
   }
 
   if (input.action === 'completeDelivery' && input.buyerConfirmRequired) {
-    return {
-      ok: false,
-      error: new ExecutionDomainError(
-        'BUYER_CONFIRM_REQUIRED',
-        'Buyer confirmation is required before completion',
-      ),
-    };
+    // AD-1: block only while still awaiting buyer acknowledgement at DELIVERED.
+    // BUYER_CONFIRMED may be completed by courier/system as a safety net.
+    if (current === 'DELIVERED') {
+      return {
+        ok: false,
+        error: new ExecutionDomainError(
+          'BUYER_CONFIRM_REQUIRED',
+          'Buyer confirmation is required before completion',
+        ),
+      };
+    }
   }
 
   if (input.action === 'startPickup') {

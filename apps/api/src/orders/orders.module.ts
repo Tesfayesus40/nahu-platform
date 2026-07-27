@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
+import { BuyerConfirmService } from './buyer-confirm.service';
 import { AdminDisputesController } from './admin-disputes.controller';
 import { AdminDisputesService } from './admin-disputes.service';
 import { AdminOrdersController } from './admin-orders.controller';
@@ -30,11 +31,17 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
   ],
   providers: [
     OrdersService,
+    BuyerConfirmService,
     AdminDisputesService,
     AdminOrdersService,
     AdminAuthGuard,
     PermissionsGuard,
   ],
-  exports: [OrdersService, AdminDisputesService, AdminOrdersService],
+  exports: [
+    OrdersService,
+    BuyerConfirmService,
+    AdminDisputesService,
+    AdminOrdersService,
+  ],
 })
 export class OrdersModule {}

@@ -54,7 +54,7 @@ const EXECUTION_REQUIRED_STATUS = {
   startTransit: ['PICKED_UP'],
   arriveAtDestination: ['IN_TRANSIT'],
   markDelivered: ['ARRIVED'],
-  completeDelivery: ['DELIVERED'],
+  completeDelivery: ['DELIVERED', 'BUYER_CONFIRMED'],
   markFailed: ['ACCEPTED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED'],
   markReturned: ['PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED'],
 };
@@ -152,13 +152,15 @@ function planExecutionAction(input) {
   }
 
   if (input.action === 'completeDelivery' && input.buyerConfirmRequired) {
-    return {
-      ok: false,
-      error: new ExecutionDomainError(
-        'BUYER_CONFIRM_REQUIRED',
-        'Buyer confirmation is required before completion',
-      ),
-    };
+    if (current === 'DELIVERED') {
+      return {
+        ok: false,
+        error: new ExecutionDomainError(
+          'BUYER_CONFIRM_REQUIRED',
+          'Buyer confirmation is required before completion',
+        ),
+      };
+    }
   }
 
   if (input.action === 'startPickup') {
@@ -345,7 +347,7 @@ describe('execution rules (D5)', () => {
     }
   });
 
-  it('blocks complete when buyer confirm is required', () => {
+  it('blocks complete when buyer confirm is required at DELIVERED', () => {
     const planned = planExecutionAction({
       action: 'completeDelivery',
       currentStatus: 'DELIVERED',
@@ -353,6 +355,16 @@ describe('execution rules (D5)', () => {
     });
     assert.equal(planned.ok, false);
     assert.equal(planned.error.code, 'BUYER_CONFIRM_REQUIRED');
+  });
+
+  it('allows complete from BUYER_CONFIRMED even when confirm flag is on', () => {
+    const planned = planExecutionAction({
+      action: 'completeDelivery',
+      currentStatus: 'BUYER_CONFIRMED',
+      buyerConfirmRequired: true,
+    });
+    assert.equal(planned.ok, true);
+    assert.equal(planned.nextStatus, 'COMPLETED');
   });
 
   it('treats duplicate status actions as idempotent', () => {

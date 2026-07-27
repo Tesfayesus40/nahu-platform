@@ -34,6 +34,7 @@
     "test:monitoring-rules": "node --test src/admin/monitoring.rules.test.mjs",
     "test:rc1-rules": "node --test src/admin/rc1-stabilization.rules.test.mjs",
     "test:order-admin-rules": "node --test src/orders/order-admin.rules.test.mjs",
+    "test:buyer-confirm-rules": "node --test src/orders/buyer-confirm.rules.test.mjs",
     "test:fulfillment-rules": "node --test src/delivery/fulfillment.rules.test.mjs",
     "test:delivery-config-rules": "node --test src/delivery/delivery-config.rules.test.mjs",
     "test:shipment-domain-rules": "node --test src/delivery/shipment.domain.rules.test.mjs",

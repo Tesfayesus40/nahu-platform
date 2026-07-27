@@ -7,7 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentsService } from '../payments/payments.service';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { CertificatesService } from '../certificates/certificates.service';
+import { DeliveryMethod } from './dto/create-order.dto';
 import { ReservationsService } from '../inventory/reservations.service';
 import {
   OrderContractError,
@@ -15,6 +15,7 @@ import {
 } from './order-contract.rules';
 import { buildCoffeeExtension } from '../marketplace/listing-contract.rules';
 import { isPubliclyVisibleModeration } from '../marketplace/listing-moderation.rules';
+import { BuyerConfirmService } from './buyer-confirm.service';
 
 const COMMISSION_RATE = 0.02; // 2% — matches the existing Nahu Buna Gebaya commission model
 
@@ -27,9 +28,9 @@ function toNumber(value: unknown): number | null {
 export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly certificates: CertificatesService,
     private readonly payments: PaymentsService,
     private readonly reservations: ReservationsService,
+    private readonly buyerConfirm: BuyerConfirmService,
   ) {}
 
   async createOrder(buyerId: string, dto: CreateOrderDto) {
@@ -50,6 +51,43 @@ export class OrdersService {
 
     if (!isPubliclyVisibleModeration(listing.moderationStatus ?? 'APPROVED')) {
       throw new BadRequestException('Listing not found or no longer available');
+    }
+
+    const deliveryMethod = dto.deliveryMethod ?? DeliveryMethod.NAHU_COURIER;
+    let deliveryAddressId: string | null = null;
+    let deliveryAddress = dto.deliveryAddress?.trim() || '';
+
+    if (dto.deliveryAddressId) {
+      const saved = await this.prisma.buyerAddress.findFirst({
+        where: {
+          id: dto.deliveryAddressId,
+          userId: buyerId,
+          deletedAt: null,
+        },
+      });
+      if (!saved) {
+        throw new BadRequestException(
+          'Delivery address not found or does not belong to this buyer',
+        );
+      }
+      deliveryAddressId = saved.id;
+      if (!deliveryAddress) {
+        deliveryAddress = saved.addressText;
+      }
+    }
+
+    if (deliveryMethod === DeliveryMethod.NAHU_COURIER) {
+      if (!deliveryAddress || deliveryAddress.length < 10) {
+        throw new BadRequestException(
+          'deliveryAddress (or deliveryAddressId) is required for NAHU_COURIER',
+        );
+      }
+    } else if (!deliveryAddress) {
+      // Dual-write column is NOT NULL — use a light placeholder for pickup / seller delivery.
+      deliveryAddress =
+        deliveryMethod === DeliveryMethod.CUSTOMER_PICKUP
+          ? 'Customer pickup'
+          : 'Seller delivery';
     }
 
     let resolved;
@@ -98,7 +136,9 @@ export class OrdersService {
           farmerPayoutEtb,
           paymentMethod: dto.paymentMethod,
           paymentReference: reference,
-          deliveryAddress: dto.deliveryAddress,
+          deliveryAddress,
+          deliveryAddressId,
+          deliveryMethod,
         },
       });
 
@@ -161,27 +201,19 @@ export class OrdersService {
     return this.shapeOrder(updated);
   }
 
+  /**
+   * AD-1 buyer confirmation.
+   * - Legacy: PAID_ESCROW with no open shipment → COMPLETED + certificate
+   * - Delivery: active shipment DELIVERED → order COMPLETED + shipment
+   *   DELIVERED → BUYER_CONFIRMED → COMPLETED (distinct transitions)
+   */
   async confirmDelivery(orderId: string, buyerId: string) {
-    const order = await this.prisma.order.findFirst({
-      where: { id: orderId, buyerId, status: 'PAID_ESCROW' },
+    const result = await this.buyerConfirm.confirmOrderDelivery({
+      orderId,
+      requireBuyerId: buyerId,
+      actor: { userId: buyerId, kind: 'BUYER' },
     });
-    if (!order) {
-      throw new NotFoundException('Order not found or not in escrow');
-    }
-
-    const now = new Date();
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: 'COMPLETED', completedAt: now, deliveredAt: now },
-    });
-
-    // Auto-issue the origin certificate. Consolidated into
-    // CertificatesService so there's exactly one code path that creates a
-    // certificate (the original app had two, with mismatched columns —
-    // see migration 003_orders_origin_certificates.sql).
-    await this.certificates.issueCertificateForOrder(orderId);
-
-    return this.shapeOrder(updated);
+    return this.shapeOrder(result.order);
   }
 
   async cancelOrder(orderId: string, buyerId: string) {
@@ -443,6 +475,8 @@ export class OrdersService {
       paymentMethod: order.paymentMethod,
       paymentReference: order.paymentReference,
       deliveryAddress: order.deliveryAddress,
+      deliveryAddressId: order.deliveryAddressId ?? null,
+      deliveryMethod: order.deliveryMethod ?? 'NAHU_COURIER',
       paidAt: order.paidAt,
       deliveredAt: order.deliveredAt,
       completedAt: order.completedAt,

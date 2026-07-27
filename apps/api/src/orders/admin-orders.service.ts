@@ -20,6 +20,7 @@ import {
 import { fulfillmentStatusForOrder } from '../delivery/fulfillment.rules';
 import { ShipmentAggregateService } from '../delivery/shipment-aggregate.service';
 import { DeliveryEventsPublisher } from '../delivery/delivery-events.publisher';
+import { BuyerConfirmService } from './buyer-confirm.service';
 import {
   ListOrdersQueryDto,
   OrderAdminActionDto,
@@ -48,6 +49,7 @@ export class AdminOrdersService {
     private readonly payments: PaymentsService,
     private readonly shipmentAggregate: ShipmentAggregateService,
     private readonly deliveryEvents: DeliveryEventsPublisher,
+    private readonly buyerConfirm: BuyerConfirmService,
   ) {}
 
   async countByStatus(): Promise<Record<string, number>> {
@@ -225,6 +227,37 @@ export class AdminOrdersService {
     }
 
     const now = new Date();
+
+    if (action === 'COMPLETE_ORDER') {
+      const active = await this.buyerConfirm.findActiveOutboundShipment(orderId);
+      if (
+        active &&
+        (active.currentStatus === 'DELIVERED' ||
+          active.currentStatus === 'BUYER_CONFIRMED')
+      ) {
+        await this.buyerConfirm.confirmOrderDelivery({
+          orderId,
+          actor: { userId: admin.userId, kind: 'ADMIN' },
+          reason: dto.reason,
+        });
+        await this.audit.appendEvent({
+          actorUserId: admin.userId,
+          actorSessionId: admin.sessionId,
+          permissionCode: 'orders.transition',
+          action: `orders.admin.${action.toLowerCase()}`,
+          targetType: 'order',
+          targetId: orderId,
+          reason: dto.reason ?? null,
+          outcome: 'SUCCESS',
+          beforeJson: { status: order.status },
+          afterJson: { status: 'COMPLETED', via: 'buyer_confirm_service' },
+          ip: meta.ip,
+          userAgent: meta.userAgent,
+          requestId: meta.requestId,
+        });
+        return this.get(orderId);
+      }
+    }
 
     if (action === 'CANCEL_UNPAID') {
       await this.prisma.$transaction(async (tx) => {

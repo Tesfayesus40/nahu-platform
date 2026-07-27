@@ -13,6 +13,7 @@ import {
   trackingStepIndex,
 } from './tracking.rules';
 import { toPartyPodStatus } from './pod.rules';
+import { canConfirmDelivery } from '../orders/buyer-confirm.rules';
 
 type PartyRole = 'FARMER' | 'BUYER';
 
@@ -287,7 +288,7 @@ export class PartyDeliveryService {
     role: PartyRole,
     orderId: string,
   ) {
-    await this.assertOrderAccess(orderId, userId, role);
+    const order = await this.assertOrderAccess(orderId, userId, role);
 
     const fulfillment = await this.prisma.fulfillmentCase.findUnique({
       where: { orderId },
@@ -299,6 +300,14 @@ export class PartyDeliveryService {
         fulfillment: null,
         activeShipment: null,
         shipments: [],
+        canConfirmDelivery:
+          role === 'BUYER'
+            ? canConfirmDelivery({
+                orderStatus: order.status,
+                orderDisputed: order.status === 'DISPUTED',
+                activeShipmentStatus: null,
+              })
+            : false,
         message: 'NO_SHIPMENT',
       };
     }
@@ -332,6 +341,14 @@ export class PartyDeliveryService {
       },
       activeShipment: detail,
       shipments: shipments.map((s) => this.toSummary(s, orderId)),
+      canConfirmDelivery:
+        role === 'BUYER'
+          ? canConfirmDelivery({
+              orderStatus: order.status,
+              orderDisputed: order.status === 'DISPUTED',
+              activeShipmentStatus: active?.currentStatus ?? null,
+            })
+          : false,
       message: detail ? 'OK' : 'NO_ACTIVE_SHIPMENT',
     };
   }
