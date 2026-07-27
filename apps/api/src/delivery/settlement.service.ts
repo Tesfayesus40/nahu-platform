@@ -30,6 +30,7 @@ import {
   resolveSettlementStatus,
   sumEarningLedger,
 } from './settlement.rules';
+import { CourierNotificationsService } from './courier-notifications.service';
 
 type AuditMeta = {
   ip?: string;
@@ -49,6 +50,7 @@ export class SettlementService {
     private readonly config: DeliveryConfigService,
     private readonly events: DeliveryEventsPublisher,
     private readonly audit: AuditService,
+    private readonly courierNotifications: CourierNotificationsService,
   ) {}
 
   private throwDomain(err: SettlementDomainError): never {
@@ -681,6 +683,12 @@ export class SettlementService {
       userAgent: input.meta?.userAgent,
       requestId: input.meta?.requestId,
     });
+
+    if (primary.courierUserId) {
+      await this.courierNotifications
+        .notifyPaymentReleased(primary.courierUserId, primary.id)
+        .catch(() => undefined);
+    }
 
     return this.getEarningDetail(primary.id);
   }

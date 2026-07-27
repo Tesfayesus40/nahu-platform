@@ -1,4 +1,10 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class UpdateMeDto {
   @IsOptional()
@@ -11,4 +17,18 @@ export class UpdateMeDto {
   @IsString()
   @MaxLength(100)
   fathersName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  lastName?: string;
+
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(255)
+  email?: string;
+
+  @IsOptional()
+  @IsIn(['en', 'am'])
+  preferredLanguage?: string;
 }

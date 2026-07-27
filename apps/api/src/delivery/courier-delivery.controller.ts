@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Param,
@@ -22,12 +23,22 @@ import {
   MarkDeliveredDto,
   ListCourierShipmentsQueryDto,
 } from './dto/courier-delivery.dto';
+import {
+  ListCourierNotificationsQueryDto,
+  SubmitVerificationDto,
+  UpdateCourierProfileDto,
+  UpdateNotificationPrefsDto,
+  UpsertPayoutAccountDto,
+  UpsertVehicleDto,
+} from './dto/courier-crm.dto';
 import { ListCourierEarningsQueryDto } from './dto/settlement.dto';
 import { DeliveryConfigService } from './delivery-config.service';
 import { DispatchService } from './dispatch.service';
 import { DeliveryExecutionService } from './delivery-execution.service';
 import { ProofOfDeliveryService } from './proof-of-delivery.service';
 import { SettlementService } from './settlement.service';
+import { CourierProfileService } from './courier-profile.service';
+import { CourierNotificationsService } from './courier-notifications.service';
 
 @Controller('delivery/courier')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -40,6 +51,8 @@ export class CourierDeliveryController {
     private readonly config: DeliveryConfigService,
     private readonly pod: ProofOfDeliveryService,
     private readonly settlement: SettlementService,
+    private readonly crm: CourierProfileService,
+    private readonly notifications: CourierNotificationsService,
   ) {}
 
   private async assertCourierAppEnabled() {
@@ -51,7 +64,150 @@ export class CourierDeliveryController {
   @Get('me')
   async me(@CurrentUser() user: JwtPayload) {
     await this.assertCourierAppEnabled();
-    return this.shipments.getCourierProfileView(user.userId, user.phone);
+    return this.crm.getMe(user.userId, user.phone);
+  }
+
+  @Patch('me')
+  async updateMe(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: UpdateCourierProfileDto,
+  ) {
+    await this.assertCourierAppEnabled();
+    return this.crm.updateMe(user.userId, dto);
+  }
+
+  @Patch('me/notification-prefs')
+  async updatePrefs(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: UpdateNotificationPrefsDto,
+  ) {
+    await this.assertCourierAppEnabled();
+    return this.crm.updateNotificationPrefs(user.userId, dto);
+  }
+
+  @Get('verification')
+  async getVerification(@CurrentUser() user: JwtPayload) {
+    await this.assertCourierAppEnabled();
+    return this.crm.getVerification(user.userId);
+  }
+
+  @Post('verification')
+  async submitVerification(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: SubmitVerificationDto,
+  ) {
+    await this.assertCourierAppEnabled();
+    return this.crm.submitVerification(user.userId, dto);
+  }
+
+  @Get('vehicles')
+  async listVehicles(@CurrentUser() user: JwtPayload) {
+    await this.assertCourierAppEnabled();
+    return this.crm.listVehicles(user.userId);
+  }
+
+  @Post('vehicles')
+  async createVehicle(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: UpsertVehicleDto,
+  ) {
+    await this.assertCourierAppEnabled();
+    return this.crm.createVehicle(user.userId, dto);
+  }
+
+  @Patch('vehicles/:id')
+  async updateVehicle(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpsertVehicleDto,
+  ) {
+    await this.assertCourierAppEnabled();
+    return this.crm.updateVehicle(user.userId, id, dto);
+  }
+
+  @Delete('vehicles/:id')
+  async deleteVehicle(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.assertCourierAppEnabled();
+    return this.crm.deleteVehicle(user.userId, id);
+  }
+
+  @Post('vehicles/:id/activate')
+  async activateVehicle(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.assertCourierAppEnabled();
+    return this.crm.activateVehicle(user.userId, id);
+  }
+
+  @Get('payout-accounts')
+  async listPayouts(@CurrentUser() user: JwtPayload) {
+    await this.assertCourierAppEnabled();
+    return this.crm.listPayoutAccounts(user.userId);
+  }
+
+  @Post('payout-accounts')
+  async createPayout(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: UpsertPayoutAccountDto,
+  ) {
+    await this.assertCourierAppEnabled();
+    return this.crm.createPayoutAccount(user.userId, dto);
+  }
+
+  @Patch('payout-accounts/:id')
+  async updatePayout(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpsertPayoutAccountDto,
+  ) {
+    await this.assertCourierAppEnabled();
+    return this.crm.updatePayoutAccount(user.userId, id, dto);
+  }
+
+  @Delete('payout-accounts/:id')
+  async deletePayout(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.assertCourierAppEnabled();
+    return this.crm.deletePayoutAccount(user.userId, id);
+  }
+
+  @Get('notifications')
+  async listNotifications(
+    @CurrentUser() user: JwtPayload,
+    @Query() query: ListCourierNotificationsQueryDto,
+  ) {
+    await this.assertCourierAppEnabled();
+    return this.notifications.list(user.userId, query);
+  }
+
+  @Post('notifications/read-all')
+  async markAllRead(@CurrentUser() user: JwtPayload) {
+    await this.assertCourierAppEnabled();
+    return this.notifications.markAllRead(user.userId);
+  }
+
+  @Post('notifications/:id/read')
+  async markRead(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.assertCourierAppEnabled();
+    return this.notifications.markRead(user.userId, id);
+  }
+
+  @Delete('notifications/:id')
+  async deleteNotification(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.assertCourierAppEnabled();
+    return this.notifications.softDelete(user.userId, id);
   }
 
   /** D11 — read-only earnings summary + ledger rows (no payout). */

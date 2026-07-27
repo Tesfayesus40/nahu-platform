@@ -246,12 +246,27 @@ export class IdentityService {
   }
 
   async updateMe(userId: string, dto: UpdateMeDto) {
-    const data: { firstName?: string | null; middleName?: string | null } = {};
+    const data: {
+      firstName?: string | null;
+      middleName?: string | null;
+      lastName?: string | null;
+      email?: string | null;
+      preferredLanguage?: string;
+    } = {};
     if (dto.firstName !== undefined) {
       data.firstName = dto.firstName.trim() || null;
     }
     if (dto.fathersName !== undefined) {
       data.middleName = dto.fathersName.trim() || null;
+    }
+    if (dto.lastName !== undefined) {
+      data.lastName = dto.lastName.trim() || null;
+    }
+    if (dto.email !== undefined) {
+      data.email = dto.email.trim().toLowerCase() || null;
+    }
+    if (dto.preferredLanguage !== undefined) {
+      data.preferredLanguage = dto.preferredLanguage;
     }
 
     if (Object.keys(data).length === 0) {

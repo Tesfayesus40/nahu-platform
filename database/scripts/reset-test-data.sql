@@ -1,3 +1,7 @@
+-- DEPRECATED — use database/scripts/uat-data-reset.sql
+--              pnpm db:reset -- --confirm=UAT_RESET
+--              docs/08-guides/uat-database-reset.md
+--
 -- Reset test marketplace data on staging (or local dev).
 -- Keeps seeded IAM: roles, permissions, cooperatives structure.
 -- Does NOT drop schemas or re-run migrations.

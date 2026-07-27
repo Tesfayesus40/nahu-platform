@@ -79,6 +79,10 @@ export default function CourierDetailPage() {
             <dd>{detail.active ? "Yes" : "No"}</dd>
             <dt>Verified</dt>
             <dd>{detail.verified ? "Yes" : "No"}</dd>
+            <dt>KYC queue</dt>
+            <dd>
+              <Link href="/delivery/verifications">Open courier KYC</Link>
+            </dd>
             <dt>Phone</dt>
             <dd>{detail.phone ?? "—"}</dd>
             <dt>Vehicle</dt>

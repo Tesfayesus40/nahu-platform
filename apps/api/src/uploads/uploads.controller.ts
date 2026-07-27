@@ -29,4 +29,17 @@ export class UploadsController {
   uploadListingPhoto(@UploadedFile() file: Express.Multer.File) {
     return this.uploads.saveListingPhoto(file);
   }
+
+  @Post('courier-media')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('COURIER')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_FILE_SIZE },
+    }),
+  )
+  uploadCourierMedia(@UploadedFile() file: Express.Multer.File) {
+    return this.uploads.saveListingPhoto(file);
+  }
 }

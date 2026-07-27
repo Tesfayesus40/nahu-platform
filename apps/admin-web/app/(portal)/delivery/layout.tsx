@@ -4,6 +4,7 @@ const TABS = [
   { href: "/delivery", label: "Ops dashboard", exact: true },
   { href: "/delivery/shipments", label: "Shipments" },
   { href: "/delivery/couriers", label: "Couriers" },
+  { href: "/delivery/verifications", label: "Courier KYC" },
   { href: "/delivery/fulfillments", label: "Fulfillments" },
   { href: "/delivery/earnings", label: "Earnings" },
 ];

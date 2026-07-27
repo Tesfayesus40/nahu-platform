@@ -12,6 +12,9 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "format": "prettier --write .",
+    "db:reset": "pnpm --filter @nahu-platform/api db:reset",
+    "db:seed": "pnpm --filter @nahu-platform/api db:seed",
+    "db:seed:demo": "pnpm --filter @nahu-platform/api db:seed:demo",
     "db:reset-staging": "pnpm --filter @nahu-platform/api db:reset-staging",
     "db:dump-staging": "pnpm --filter @nahu-platform/api db:dump-staging"
   },

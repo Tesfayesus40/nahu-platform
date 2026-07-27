@@ -32,6 +32,7 @@ import {
 } from './dispatch.rules';
 import { ShipmentStatus, isShipmentStatus } from './shipment.domain.rules';
 import { AuditService } from '../audit/audit.service';
+import { CourierNotificationsService } from './courier-notifications.service';
 
 type Tx = Prisma.TransactionClient;
 
@@ -48,6 +49,7 @@ export class DispatchService {
     private readonly config: DeliveryConfigService,
     private readonly events: DeliveryEventsPublisher,
     private readonly audit: AuditService,
+    private readonly courierNotifications: CourierNotificationsService,
     @Inject(COURIER_SELECTION_STRATEGY)
     private readonly selection: CourierSelectionStrategy,
   ) {}
@@ -257,6 +259,15 @@ export class DispatchService {
     });
 
     if (publication) this.events.publish(publication);
+
+    if (courierUserId) {
+      await this.courierNotifications
+        .notifyShipmentAssigned(courierUserId, input.shipmentId)
+        .catch(() => undefined);
+      await this.courierNotifications
+        .notifyPickupReminder(courierUserId, input.shipmentId)
+        .catch(() => undefined);
+    }
 
     if (input.audit) {
       await this.audit.appendEvent({
@@ -572,6 +583,12 @@ export class DispatchService {
     });
 
     if (publication) this.events.publish(publication);
+
+    if (publication) {
+      await this.courierNotifications
+        .notifyShipmentAccepted(courierUserId, shipmentId)
+        .catch(() => undefined);
+    }
 
     return this.aggregate.getCourierShipment(courierUserId, shipmentId);
   }

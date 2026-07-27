@@ -21,6 +21,7 @@ import {
 } from './execution.rules';
 import { ShipmentStatus, isShipmentStatus } from './shipment.domain.rules';
 import { PodCaptureInput } from './pod.rules';
+import { CourierNotificationsService } from './courier-notifications.service';
 
 type Tx = Prisma.TransactionClient;
 
@@ -39,6 +40,7 @@ export class DeliveryExecutionService {
     private readonly events: DeliveryEventsPublisher,
     private readonly pod: ProofOfDeliveryService,
     private readonly settlement: SettlementService,
+    private readonly courierNotifications: CourierNotificationsService,
   ) {}
 
   private throwDomain(err: ExecutionDomainError): never {
@@ -254,6 +256,27 @@ export class DeliveryExecutionService {
 
     if (publication) {
       this.events.publish(publication);
+      const pub = publication as {
+        payload?: { action?: string } | null;
+      };
+      const action = pub.payload?.action;
+      if (action === 'startPickup') {
+        await this.courierNotifications
+          .notifyPickupReminder(courierUserId, shipmentId)
+          .catch(() => undefined);
+      } else if (action === 'confirmPickup') {
+        await this.courierNotifications
+          .notifyPickupConfirmed(courierUserId, shipmentId)
+          .catch(() => undefined);
+      } else if (action === 'startTransit') {
+        await this.courierNotifications
+          .notifyDeliveryStarted(courierUserId, shipmentId)
+          .catch(() => undefined);
+      } else if (action === 'completeDelivery') {
+        await this.courierNotifications
+          .notifyDeliveryCompleted(courierUserId, shipmentId)
+          .catch(() => undefined);
+      }
     }
     if (settlementPublication) {
       this.events.publish(settlementPublication);
@@ -286,11 +309,14 @@ export class DeliveryExecutionService {
     shipmentId: string,
     capture: PodCaptureInput = {},
   ) {
-    return this.pod.completeDropoffAndDeliver(
-      courierUserId,
-      shipmentId,
-      capture,
-    );
+    return this.pod
+      .completeDropoffAndDeliver(courierUserId, shipmentId, capture)
+      .then(async (result) => {
+        await this.courierNotifications
+          .notifyDeliveryCompleted(courierUserId, shipmentId)
+          .catch(() => undefined);
+        return result;
+      });
   }
 
   completeDelivery(courierUserId: string, shipmentId: string) {

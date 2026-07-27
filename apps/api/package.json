@@ -46,7 +46,10 @@
     "test:settlement-rules": "node --test src/delivery/settlement.rules.test.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "db:reset-staging": "node scripts/reset-test-data.mjs",
+    "db:reset": "node scripts/uat-data-reset.cjs",
+    "db:seed": "node scripts/seed-system.cjs",
+    "db:seed:demo": "node scripts/seed-demo.cjs",
+    "db:reset-staging": "node scripts/uat-data-reset.cjs --confirm=UAT_RESET",
     "db:dump-staging": "node scripts/dump-staging-data.mjs"
   },
   "dependencies": {
@@ -67,6 +70,7 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.2.0",
     "otplib": "^12.0.1",
+    "pg": "^8.22.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },

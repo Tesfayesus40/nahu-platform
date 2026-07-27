@@ -51,6 +51,7 @@ model User {
   permissionsGranted RolePermission[] @relation("GrantedByUser")
   farmerProfile      FarmerProfile?
   buyerOrders        Order[]           @relation("BuyerOrders")
+  buyerAddresses     BuyerAddress[]
   adminInvitationsReceived AdminInvitation[] @relation("InvitationInvitee")
   adminInvitationsSent     AdminInvitation[] @relation("InvitationInviter")
   mfaFactors         MfaFactor[]
@@ -420,24 +421,126 @@ model FulfillmentEvent {
 }
 
 model CourierProfile {
-  userId          String    @id @map("user_id") @db.Uuid
-  displayName     String?   @map("display_name") @db.VarChar(200)
-  phone           String?   @db.VarChar(20)
-  vehicleType     String?   @map("vehicle_type") @db.VarChar(40)
-  active          Boolean   @default(true)
-  verified        Boolean   @default(false)
-  availability    String    @default("OFFLINE") @db.VarChar(20)
-  serviceRegions  String[]  @default([]) @map("service_regions")
-  lastLat         Float?    @map("last_lat")
-  lastLng         Float?    @map("last_lng")
-  lastAccuracyM   Float?    @map("last_accuracy_m")
-  locationAt      DateTime? @map("location_at") @db.Timestamptz
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime  @default(now()) @map("updated_at") @db.Timestamptz
-  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+  userId                       String    @id @map("user_id") @db.Uuid
+  displayName                  String?   @map("display_name") @db.VarChar(200)
+  phone                        String?   @db.VarChar(20)
+  vehicleType                  String?   @map("vehicle_type") @db.VarChar(40)
+  active                       Boolean   @default(true)
+  verified                     Boolean   @default(false)
+  availability                 String    @default("OFFLINE") @db.VarChar(20)
+  serviceRegions               String[]  @default([]) @map("service_regions")
+  lastLat                      Float?    @map("last_lat")
+  lastLng                      Float?    @map("last_lng")
+  lastAccuracyM                Float?    @map("last_accuracy_m")
+  locationAt                   DateTime? @map("location_at") @db.Timestamptz
+  photoUrl                     String?   @map("photo_url")
+  gender                       String?   @db.VarChar(20)
+  dateOfBirth                  DateTime? @map("date_of_birth") @db.Date
+  emergencyContactName         String?   @map("emergency_contact_name") @db.VarChar(200)
+  emergencyContactPhone        String?   @map("emergency_contact_phone") @db.VarChar(25)
+  preferredLanguage            String    @default("en") @map("preferred_language") @db.Char(2)
+  verificationStatus           String    @default("NOT_SUBMITTED") @map("verification_status") @db.VarChar(20)
+  verificationRejectionReason  String?   @map("verification_rejection_reason")
+  notificationPrefs            Json      @default("{}") @map("notification_prefs")
+  activeVehicleId              String?   @map("active_vehicle_id") @db.Uuid
+  createdAt                    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                    DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+  deletedAt                    DateTime? @map("deleted_at") @db.Timestamptz
 
   @@index([availability])
   @@map("courier_profiles")
+  @@schema("delivery")
+}
+
+model CourierVehicle {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  courierUserId        String    @map("courier_user_id") @db.Uuid
+  vehicleType          String    @map("vehicle_type") @db.VarChar(20)
+  brand                String?   @db.VarChar(100)
+  model                String?   @db.VarChar(100)
+  year                 Int?
+  colour               String?   @db.VarChar(60)
+  plateNumber          String    @map("plate_number") @db.VarChar(40)
+  registrationNumber   String?   @map("registration_number") @db.VarChar(80)
+  insuranceExpiry      DateTime? @map("insurance_expiry") @db.Date
+  photoUrl             String?   @map("photo_url")
+  isActive             Boolean   @default(false) @map("is_active")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@index([courierUserId])
+  @@map("courier_vehicles")
+  @@schema("delivery")
+}
+
+model CourierPayoutAccount {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  courierUserId String    @map("courier_user_id") @db.Uuid
+  methodType    String    @map("method_type") @db.VarChar(30)
+  bankName      String?   @map("bank_name") @db.VarChar(120)
+  accountName   String    @map("account_name") @db.VarChar(200)
+  accountNumber String?   @map("account_number") @db.VarChar(80)
+  phoneNumber   String?   @map("phone_number") @db.VarChar(25)
+  isDefault     Boolean   @default(false) @map("is_default")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@index([courierUserId])
+  @@map("courier_payout_accounts")
+  @@schema("delivery")
+}
+
+model CourierVerificationCase {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  courierUserId    String    @map("courier_user_id") @db.Uuid
+  documentType     String    @map("document_type") @db.VarChar(30)
+  documentNumber   String    @map("document_number") @db.VarChar(80)
+  status           String    @default("PENDING") @db.VarChar(20)
+  rejectionReason  String?   @map("rejection_reason")
+  submittedAt      DateTime  @default(now()) @map("submitted_at") @db.Timestamptz
+  reviewedAt       DateTime? @map("reviewed_at") @db.Timestamptz
+  reviewedBy       String?   @map("reviewed_by") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  documents        CourierVerificationDocument[]
+
+  @@index([status, submittedAt])
+  @@map("courier_verification_cases")
+  @@schema("delivery")
+}
+
+model CourierVerificationDocument {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  caseId     String   @map("case_id") @db.Uuid
+  side       String   @db.VarChar(20)
+  fileUrl    String   @map("file_url")
+  uploadedAt DateTime @default(now()) @map("uploaded_at") @db.Timestamptz
+
+  case CourierVerificationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, side])
+  @@map("courier_verification_documents")
+  @@schema("delivery")
+}
+
+model CourierNotification {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  courierUserId String    @map("courier_user_id") @db.Uuid
+  type          String    @db.VarChar(40)
+  titleEn       String    @map("title_en") @db.VarChar(200)
+  titleAm       String    @map("title_am") @db.VarChar(200)
+  bodyEn        String    @map("body_en")
+  bodyAm        String    @map("body_am")
+  data          Json      @default("{}")
+  readAt        DateTime? @map("read_at") @db.Timestamptz
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([courierUserId, createdAt])
+  @@map("courier_notifications")
   @@schema("delivery")
 }
 
@@ -916,11 +1019,67 @@ model FarmerProfile {
   user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   cooperative        Cooperative?  @relation(fields: [cooperativeId], references: [id], onDelete: SetNull)
   listings           Listing[]
+  pickupLocations    PickupLocation[]
   orders             Order[]       @relation("FarmerOrders")
   farmParties        FarmParty[]
   warehouseParties   WarehouseParty[]
 
   @@map("farmer_profiles")
+  @@schema("marketplace")
+}
+
+model PickupLocation {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  farmerProfileId  String    @map("farmer_profile_id") @db.Uuid
+  name             String    @db.VarChar(120)
+  contactName      String?   @map("contact_name") @db.VarChar(150)
+  contactPhone     String?   @map("contact_phone") @db.VarChar(30)
+  addressText      String    @map("address_text") @db.VarChar(500)
+  lat              Decimal?  @db.Decimal(10, 7)
+  lng              Decimal?  @db.Decimal(10, 7)
+  landmark         String?   @db.VarChar(255)
+  instructions     String?   @db.VarChar(500)
+  isDefault        Boolean   @default(false) @map("is_default")
+  locationKind     String    @default("FARM") @map("location_kind") @db.VarChar(40)
+  googlePlaceId    String?   @map("google_place_id") @db.VarChar(255)
+  formattedAddress String?   @map("formatted_address") @db.VarChar(500)
+  metadataJson     Json?     @map("metadata_json")
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  farmerProfile    FarmerProfile @relation(fields: [farmerProfileId], references: [id], onDelete: Cascade)
+  listings         Listing[]
+
+  @@index([farmerProfileId])
+  @@map("pickup_locations")
+  @@schema("marketplace")
+}
+
+model BuyerAddress {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  name            String?   @db.VarChar(120)
+  recipientName   String?   @map("recipient_name") @db.VarChar(150)
+  recipientPhone  String?   @map("recipient_phone") @db.VarChar(30)
+  addressText     String    @map("address_text") @db.VarChar(500)
+  lat             Decimal?  @db.Decimal(10, 7)
+  lng             Decimal?  @db.Decimal(10, 7)
+  instructions    String?   @db.VarChar(500)
+  isDefault       Boolean   @default(false) @map("is_default")
+  addressKind     String    @default("HOME") @map("address_kind") @db.VarChar(40)
+  googlePlaceId   String?   @map("google_place_id") @db.VarChar(255)
+  formattedAddress String?  @map("formatted_address") @db.VarChar(500)
+  metadataJson    Json?     @map("metadata_json")
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders          Order[]
+
+  @@index([userId])
+  @@map("buyer_addresses")
   @@schema("marketplace")
 }
 
@@ -1016,6 +1175,7 @@ model Listing {
   moderationNotes  String?     @map("moderation_notes")
   moderatedAt      DateTime?   @map("moderated_at") @db.Timestamptz
   moderatedByUserId String?    @map("moderated_by_user_id") @db.Uuid
+  pickupLocationId String?     @map("pickup_location_id") @db.Uuid
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime      @default(now()) @map("updated_at") @db.Timestamptz
 
@@ -1025,6 +1185,7 @@ model Listing {
   unit           Unit?         @relation(fields: [unitCode], references: [code], onDelete: Restrict)
   stockLot       StockLot?     @relation(fields: [stockLotId], references: [id], onDelete: SetNull)
   farm           Farm?         @relation(fields: [farmId], references: [id], onDelete: SetNull)
+  pickupLocation PickupLocation? @relation(fields: [pickupLocationId], references: [id], onDelete: SetNull)
   orders         Order[]
   reservations   Reservation[]
   moderationDecisions ListingModerationDecision[]
@@ -1038,6 +1199,7 @@ model Listing {
   @@index([stockLotId])
   @@index([farmId])
   @@index([unitCode])
+  @@index([pickupLocationId])
   @@map("listings")
   @@schema("marketplace")
 }
@@ -1107,6 +1269,8 @@ model Order {
   paymentMethod     PaymentMethod @map("payment_method")
   paymentReference  String?       @map("payment_reference") @db.VarChar(100)
   deliveryAddress   String        @map("delivery_address") @db.VarChar(500)
+  deliveryAddressId String?       @map("delivery_address_id") @db.Uuid
+  deliveryMethod    String        @default("NAHU_COURIER") @map("delivery_method") @db.VarChar(40)
   paidAt            DateTime?     @map("paid_at") @db.Timestamptz
   deliveredAt       DateTime?     @map("delivered_at") @db.Timestamptz
   completedAt       DateTime?     @map("completed_at") @db.Timestamptz
@@ -1116,6 +1280,7 @@ model Order {
   listing           Listing            @relation(fields: [listingId], references: [id], onDelete: Restrict)
   buyer             User               @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Restrict)
   farmer            FarmerProfile      @relation("FarmerOrders", fields: [farmerId], references: [id], onDelete: Restrict)
+  deliveryAddressRef BuyerAddress?     @relation(fields: [deliveryAddressId], references: [id], onDelete: SetNull)
   unit              Unit?              @relation(fields: [unitCode], references: [code], onDelete: Restrict)
   certificate       OriginCertificate?
   reservations      Reservation[]
@@ -1127,6 +1292,7 @@ model Order {
   @@index([farmerId])
   @@index([status])
   @@index([unitCode])
+  @@index([deliveryAddressId])
   @@map("orders")
   @@schema("orders")
 }

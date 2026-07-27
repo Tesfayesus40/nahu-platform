@@ -100,6 +100,10 @@
     "ops/008_ops_delivery_sla_thresholds.sql",
     "ops/009_ops_delivery_pod_requirements.sql",
     "delivery/006_delivery_earnings_settlement_types.sql",
-    "delivery/007_delivery_rc1_hardening_indexes.sql"
+    "delivery/007_delivery_rc1_hardening_indexes.sql",
+    "marketplace/016_marketplace_pickup_locations.sql",
+    "marketplace/017_marketplace_buyer_addresses.sql",
+    "marketplace/018_marketplace_location_place_ids.sql",
+    "delivery/008_delivery_courier_crm.sql"
   ]
 }

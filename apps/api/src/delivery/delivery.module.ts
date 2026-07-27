@@ -15,6 +15,9 @@ import { PartyDeliveryService } from './party-delivery.service';
 import { ProofOfDeliveryService } from './proof-of-delivery.service';
 import { SettlementService } from './settlement.service';
 import { AdminSettlementController } from './admin-settlement.controller';
+import { AdminCourierVerificationController } from './admin-courier-verification.controller';
+import { CourierProfileService } from './courier-profile.service';
+import { CourierNotificationsService } from './courier-notifications.service';
 import {
   COURIER_SELECTION_STRATEGY,
   RuleBasedCourierSelectionStrategy,
@@ -30,6 +33,7 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
     AdminDeliveryController,
     AdminDispatchController,
     AdminSettlementController,
+    AdminCourierVerificationController,
     CourierDeliveryController,
     SellerDeliveryController,
     BuyerDeliveryController,
@@ -45,6 +49,8 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
     DispatchService,
     DeliveryExecutionService,
     DeliveryEventsPublisher,
+    CourierProfileService,
+    CourierNotificationsService,
     RuleBasedCourierSelectionStrategy,
     {
       provide: COURIER_SELECTION_STRATEGY,
@@ -64,6 +70,8 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
     DispatchService,
     DeliveryExecutionService,
     DeliveryEventsPublisher,
+    CourierProfileService,
+    CourierNotificationsService,
   ],
 })
 export class DeliveryModule {}
