@@ -21,7 +21,7 @@
 | Repo | Tag (after approval) | Apps |
 |------|----------------------|------|
 | `nahu-platform` | `v1.0.0-rc1` | Nest API, Admin Web, migrations, CI |
-| `nahu-buna-gebaya` | `v1.0.0-rc1` | Buyer, Farmer, shared; **Courier excluded until source committed** |
+| `nahu-buna-gebaya` | `v1.0.0-rc1` | Buyer, Farmer, Courier, shared |
 
 See [RC1_MANIFEST.md](./RC1_MANIFEST.md) for commit hashes and tag readiness.
 
