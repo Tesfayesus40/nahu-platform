@@ -7,6 +7,7 @@
 | Artifact | Path |
 |----------|------|
 | Release notes (this file) | `docs/releases/v1.0.0-rc1/README.md` |
+| **RC1 Manifest (authoritative)** | [RC1_MANIFEST.md](./RC1_MANIFEST.md) |
 | Version freeze | [VERSION-FREEZE.md](./VERSION-FREEZE.md) |
 | Deployment notes | [DEPLOYMENT.md](./DEPLOYMENT.md) |
 | Release checklist | [CHECKLIST.md](./CHECKLIST.md) |
@@ -17,10 +18,12 @@
 
 **Companion repos**
 
-| Repo | Tag (after commit) | Apps |
-|------|--------------------|------|
+| Repo | Tag (after approval) | Apps |
+|------|----------------------|------|
 | `nahu-platform` | `v1.0.0-rc1` | Nest API, Admin Web, migrations, CI |
-| `nahu-buna-gebaya` | `v1.0.0-rc1` | Buyer, Farmer, Courier, shared |
+| `nahu-buna-gebaya` | `v1.0.0-rc1` | Buyer, Farmer, shared; **Courier excluded until source committed** |
+
+See [RC1_MANIFEST.md](./RC1_MANIFEST.md) for commit hashes and tag readiness.
 
 ---
 
