@@ -1,6 +1,6 @@
-# RC1 Manifest — v1.0.0-rc1
+# RC1 Manifest â€” v1.0.0-rc1
 
-**Status:** Code-complete and **tag-ready** (local) — awaiting human approval to push/tag  
+**Status:** Code-complete and **tag-ready** (local) â€” awaiting human approval to push/tag  
 **Date:** 2026-07-29  
 **Authority:** Authoritative description of the `v1.0.0-rc1` release candidate.
 
@@ -10,8 +10,8 @@
 
 | Repository | Branch | Tip commit (pre-manifest-refresh parent) | Ahead of remote |
 |------------|--------|------------------------------------------|-----------------|
-| `nahu-platform` | `main` | `b329d8a` — product code + release docs complete | **17** ahead of `origin/main` |
-| `nahu-buna-gebaya` | `chore/farmer-rc1` | `bd69f15` — Buyer/Farmer/Courier/shared + CI | **9** ahead of `origin/chore/farmer-rc1` |
+| `nahu-platform` | `main` | `b329d8a` â€” product code + release docs complete | **18** ahead of `origin/main` |
+| `nahu-buna-gebaya` | `chore/farmer-rc1` | `bd69f15` â€” Buyer/Farmer/Courier/shared + CI | **9** ahead of `origin/chore/farmer-rc1` |
 
 > After this manifest refresh commit lands, use `git rev-parse HEAD` on each repo as the definitive tip for tagging.
 
@@ -53,7 +53,7 @@
 | Module | Notes |
 |--------|-------|
 | Identity / Auth | OTP, JWT, admin MFA |
-| Catalog G2–G5 | Verticals, attributes, listing schema |
+| Catalog G2â€“G5 | Verticals, attributes, listing schema |
 | Marketplace | Listings, locations, seller party G7 |
 | Orders + Revenue Engine | Fee snapshots, disputes |
 | Pricing | Schedules, fees, stub rails |
@@ -127,7 +127,7 @@ Pinned list: [migration-manifest.frozen.json](./migration-manifest.frozen.json) 
 3. Apply migrations through `ops/013` on staging  
 4. Deploy Nest image; verify `GET /health/ready`  
 5. Point Admin Web + Buyer/Farmer/Courier EAS at Nest  
-6. Set secrets (`JWT_SECRET`, `ADMIN_MFA_ENCRYPTION_KEY`, `CORS_ORIGINS`, …)  
+6. Set secrets (`JWT_SECRET`, `ADMIN_MFA_ENCRYPTION_KEY`, `CORS_ORIGINS`, â€¦)  
 7. Run [CHECKLIST.md](./CHECKLIST.md) + [PILOT-VERIFICATION.md](./PILOT-VERIFICATION.md)
 
 ---
