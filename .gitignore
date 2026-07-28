@@ -15,3 +15,19 @@ apps/api/api/
 
 # Temporary docx extraction artifacts
 docs/_extracted/
+
+# Local staging diagnostic / one-off scripts (not part of RC1 release)
+apps/api/scripts/apply-018-place-ids.cjs
+apps/api/scripts/apply-location-migrations-env.cjs
+apps/api/scripts/apply-location-migrations.cjs
+apps/api/scripts/approve-listing.cjs
+apps/api/scripts/diagnose-listings-uuid.cjs
+apps/api/scripts/diagnose-listings-uuid2.cjs
+apps/api/scripts/inspect-order-fulfillment.cjs
+apps/api/scripts/probe-location-shipment-links.cjs
+apps/api/scripts/rc1-courier-auth-smoke.cjs
+apps/api/scripts/rc1-db-crm-check.cjs
+apps/api/scripts/smoke-location-uat.cjs
+apps/api/scripts/smoke-location-workflow-uat.cjs
+apps/api/scripts/verify-shipment-location-handoff.cjs
+scripts/apply-location-migrations.cjs
