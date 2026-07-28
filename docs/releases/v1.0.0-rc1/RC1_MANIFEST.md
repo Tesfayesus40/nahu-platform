@@ -1,19 +1,19 @@
-# RC1 Manifest â€” v1.0.0-rc1
+# RC1 Manifest - v1.0.0-rc1
 
-**Status:** Code-complete and **tag-ready** (local) â€” awaiting human approval to push/tag  
+**Status:** Code-complete and **tag-ready** (local) - awaiting human approval to push/tag  
 **Date:** 2026-07-29  
 **Authority:** Authoritative description of the `v1.0.0-rc1` release candidate.
 
 ---
 
-## 1. Repositories & release commits
+## 1. Repositories and release commits
 
-| Repository | Branch | Tip commit (pre-manifest-refresh parent) | Ahead of remote |
-|------------|--------|------------------------------------------|-----------------|
-| `nahu-platform` | `main` | `b329d8a` â€” product code + release docs complete | **18** ahead of `origin/main` |
-| `nahu-buna-gebaya` | `chore/farmer-rc1` | `bd69f15` â€” Buyer/Farmer/Courier/shared + CI | **9** ahead of `origin/chore/farmer-rc1` |
+| Repository | Branch | Tip commit | Ahead of remote |
+|------------|--------|------------|-----------------|
+| `nahu-platform` | `main` | `8641b90` (update after this commit via `git rev-parse --short HEAD`) | ahead of `origin/main` |
+| `nahu-buna-gebaya` | `chore/farmer-rc1` | `bd69f15` | **9** ahead of `origin/chore/farmer-rc1` |
 
-> After this manifest refresh commit lands, use `git rev-parse HEAD` on each repo as the definitive tip for tagging.
+Use `git rev-parse HEAD` on each repo as the definitive tip for tagging.
 
 **Tags:** none created yet.  
 **Push:** not performed.
@@ -53,7 +53,7 @@
 | Module | Notes |
 |--------|-------|
 | Identity / Auth | OTP, JWT, admin MFA |
-| Catalog G2â€“G5 | Verticals, attributes, listing schema |
+| Catalog G2-G5 | Verticals, attributes, listing schema |
 | Marketplace | Listings, locations, seller party G7 |
 | Orders + Revenue Engine | Fee snapshots, disputes |
 | Pricing | Schedules, fees, stub rails |
@@ -89,8 +89,8 @@ Pinned list: [migration-manifest.frozen.json](./migration-manifest.frozen.json) 
 
 | Exclusion | Where |
 |-----------|--------|
-| Local diagnostic / one-off API scripts | gitignored under `apps/api/scripts/*` (see platform `.gitignore`) |
-| Icon orientation experiment assets/scripts | gitignored under gebaya `shared/brand/icons/orientation/` + analyze/compare scripts |
+| Local diagnostic / one-off API scripts | gitignored (platform `.gitignore`) |
+| Icon orientation experiment assets/scripts | gitignored (gebaya) |
 | Courier `UI_REDESIGN.md`, `COURIER_RC1_UI_AUDIT.md` | gitignored |
 | Live Telebirr/CBE/Chapa | Deferred Track A |
 | Notification platform | Deferred Track B |
@@ -127,7 +127,7 @@ Pinned list: [migration-manifest.frozen.json](./migration-manifest.frozen.json) 
 3. Apply migrations through `ops/013` on staging  
 4. Deploy Nest image; verify `GET /health/ready`  
 5. Point Admin Web + Buyer/Farmer/Courier EAS at Nest  
-6. Set secrets (`JWT_SECRET`, `ADMIN_MFA_ENCRYPTION_KEY`, `CORS_ORIGINS`, â€¦)  
+6. Set secrets (`JWT_SECRET`, `ADMIN_MFA_ENCRYPTION_KEY`, `CORS_ORIGINS`, ...)  
 7. Run [CHECKLIST.md](./CHECKLIST.md) + [PILOT-VERIFICATION.md](./PILOT-VERIFICATION.md)
 
 ---
@@ -136,7 +136,7 @@ Pinned list: [migration-manifest.frozen.json](./migration-manifest.frozen.json) 
 
 | Repo | Working tree | Tag-ready? |
 |------|--------------|------------|
-| `nahu-platform` | Clean | **Yes** (after this manifest commit) |
+| `nahu-platform` | Clean | **Yes** |
 | `nahu-buna-gebaya` | Clean | **Yes** |
 
 **Do not push or tag until the release owner approves.**
