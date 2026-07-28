@@ -103,7 +103,13 @@ export class AdminListingModerationService {
               },
             },
           },
-          category: { select: { code: true, nameEn: true } },
+          category: {
+            select: {
+              code: true,
+              nameEn: true,
+              marketplaceVertical: { select: { code: true } },
+            },
+          },
           product: { select: { code: true, nameEn: true } },
           _count: { select: { moderationDecisions: true } },
         },
@@ -139,7 +145,7 @@ export class AdminListingModerationService {
             },
           },
         },
-        category: true,
+        category: { include: { marketplaceVertical: true } },
         product: { include: { defaultUnit: true } },
         moderationDecisions: {
           orderBy: { createdAt: 'desc' },
@@ -391,8 +397,8 @@ export class AdminListingModerationService {
     moderationStatus: string;
     quantityKg: unknown;
     pricePerKg: unknown;
-    grade: string;
-    processMethod: string;
+    grade: string | null;
+    processMethod: string | null;
     variety: string | null;
     photoUrls: string[];
     createdAt: Date;
@@ -406,7 +412,10 @@ export class AdminListingModerationService {
         lastName: string | null;
       } | null;
     } | null;
-    category?: { code: string } | null;
+    category?: {
+      code: string;
+      marketplaceVertical?: { code: string } | null;
+    } | null;
     product?: { code: string } | null;
     _count?: { moderationDecisions: number };
   }) {
@@ -432,7 +441,9 @@ export class AdminListingModerationService {
       sellerName,
       sellerPhone: user?.phone ?? null,
       categoryCode: listing.category?.code ?? null,
+      verticalCode: listing.category?.marketplaceVertical?.code ?? null,
       productCode: listing.product?.code ?? null,
+      productTypeCode: listing.product?.code ?? null,
       decisionCount: listing._count?.moderationDecisions,
     };
   }

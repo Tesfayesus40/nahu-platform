@@ -13,6 +13,7 @@ import {
   MaxLength,
   Min,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
 
 export enum ProcessMethod {
@@ -174,4 +175,29 @@ export class CreateListingDto {
   @ArrayMaxSize(5)
   @IsUrl({}, { each: true })
   photoUrls?: string[] = [];
+
+  /** Optional saved pickup location owned by the farmer. */
+  @IsOptional()
+  @IsUUID()
+  pickupLocationId?: string;
+
+  /**
+   * G3 additive attribute values (code + value).
+   * Coffee clients may omit — columns dual-write into attributes.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => ListingAttributeInputDto)
+  attributes?: ListingAttributeInputDto[];
+}
+
+export class ListingAttributeInputDto {
+  @IsString()
+  @MaxLength(80)
+  code: string;
+
+  @IsOptional()
+  value?: string | number | boolean | null;
 }

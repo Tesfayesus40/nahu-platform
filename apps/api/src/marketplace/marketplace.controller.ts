@@ -5,6 +5,10 @@ import { UpdateFarmerProfileDto } from './dto/update-farmer-profile.dto';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { QueryListingsDto } from './dto/query-listings.dto';
+import { CreatePickupLocationDto } from './dto/create-pickup-location.dto';
+import { UpdatePickupLocationDto } from './dto/update-pickup-location.dto';
+import { CreateBuyerAddressDto } from './dto/create-buyer-address.dto';
+import { UpdateBuyerAddressDto } from './dto/update-buyer-address.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { RolesGuard, Roles } from '../common/guards/roles.guard';
@@ -42,9 +46,95 @@ export class FarmersController {
     return this.marketplace.getCooperatives();
   }
 
+  @Get('pickup-locations')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('FARMER')
+  listPickupLocations(@CurrentUser() user: JwtPayload) {
+    return this.marketplace.listPickupLocations(user.userId);
+  }
+
+  @Post('pickup-locations')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('FARMER')
+  createPickupLocation(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: CreatePickupLocationDto,
+  ) {
+    return this.marketplace.createPickupLocation(user.userId, dto);
+  }
+
+  @Patch('pickup-locations/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('FARMER')
+  updatePickupLocation(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: UpdatePickupLocationDto,
+  ) {
+    return this.marketplace.updatePickupLocation(user.userId, id, dto);
+  }
+
+  @Delete('pickup-locations/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('FARMER')
+  deletePickupLocation(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.marketplace.deletePickupLocation(user.userId, id);
+  }
+
+  @Post('pickup-locations/:id/default')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('FARMER')
+  setDefaultPickupLocation(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.marketplace.setDefaultPickupLocation(user.userId, id);
+  }
+
   @Get(':id')
   getPublicProfile(@Param('id') id: string) {
     return this.marketplace.getPublicProfile(id);
+  }
+}
+
+@Controller('buyers')
+export class BuyersController {
+  constructor(private readonly marketplace: MarketplaceService) {}
+
+  @Get('addresses')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('BUYER')
+  listAddresses(@CurrentUser() user: JwtPayload) {
+    return this.marketplace.listBuyerAddresses(user.userId);
+  }
+
+  @Post('addresses')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('BUYER')
+  createAddress(@CurrentUser() user: JwtPayload, @Body() dto: CreateBuyerAddressDto) {
+    return this.marketplace.createBuyerAddress(user.userId, dto);
+  }
+
+  @Patch('addresses/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('BUYER')
+  updateAddress(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: UpdateBuyerAddressDto,
+  ) {
+    return this.marketplace.updateBuyerAddress(user.userId, id, dto);
+  }
+
+  @Delete('addresses/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('BUYER')
+  deleteAddress(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.marketplace.deleteBuyerAddress(user.userId, id);
+  }
+
+  @Post('addresses/:id/default')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('BUYER')
+  setDefaultAddress(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.marketplace.setDefaultBuyerAddress(user.userId, id);
   }
 }
 

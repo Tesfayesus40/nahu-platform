@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogService } from '../catalog/catalog.service';
+import { ListingAttributesService } from '../catalog/listing-attributes.service';
 import { FarmsService } from '../farms/farms.service';
 import { ReservationsService } from '../inventory/reservations.service';
 import {
@@ -18,6 +19,10 @@ import { UpdateFarmerProfileDto } from './dto/update-farmer-profile.dto';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { QueryListingsDto } from './dto/query-listings.dto';
+import { CreatePickupLocationDto } from './dto/create-pickup-location.dto';
+import { UpdatePickupLocationDto } from './dto/update-pickup-location.dto';
+import { CreateBuyerAddressDto } from './dto/create-buyer-address.dto';
+import { UpdateBuyerAddressDto } from './dto/update-buyer-address.dto';
 import { CoffeeGrade, ProcessMethod } from './dto/create-listing.dto';
 import {
   buildListingKeywordOr,
@@ -25,6 +30,7 @@ import {
   shapePublicCertificateSummary,
   shapePublicFarmSummary,
 } from './listing-search.rules';
+import { SellerPartyService } from './seller-party.service';
 
 /** Prisma returns NUMERIC/DECIMAL columns as Decimal objects — flatten to plain numbers for JSON responses. */
 function toNumber(value: unknown): number | null {
@@ -37,8 +43,10 @@ export class MarketplaceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly catalog: CatalogService,
+    private readonly listingAttributes: ListingAttributesService,
     private readonly farms: FarmsService,
     private readonly reservations: ReservationsService,
+    private readonly sellerParties: SellerPartyService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -58,7 +66,12 @@ export class MarketplaceService {
       data: { ...profileData, userId },
       include: { user: true, cooperative: true },
     });
-    return this.shapeProfile(profile, { includePhone: true });
+    await this.sellerParties.ensureForFarmerProfile(profile);
+    const withParty = await this.prisma.farmerProfile.findUnique({
+      where: { id: profile.id },
+      include: { user: true, cooperative: true, sellerParty: true },
+    });
+    return this.shapeProfile(withParty, { includePhone: true });
   }
 
   async updateFarmerProfile(userId: string, dto: UpdateFarmerProfileDto) {
@@ -99,10 +112,18 @@ export class MarketplaceService {
   async getMyProfile(userId: string) {
     const profile = await this.prisma.farmerProfile.findUnique({
       where: { userId },
-      include: { user: true, cooperative: true },
+      include: { user: true, cooperative: true, sellerParty: true },
     });
     if (!profile) {
       throw new NotFoundException('Profile not found');
+    }
+    if (!profile.sellerPartyId) {
+      await this.sellerParties.ensureForFarmerProfile(profile);
+      const refreshed = await this.prisma.farmerProfile.findUnique({
+        where: { userId },
+        include: { user: true, cooperative: true, sellerParty: true },
+      });
+      return this.shapeProfile(refreshed, { includePhone: true });
     }
     return this.shapeProfile(profile, { includePhone: true });
   }
@@ -160,9 +181,338 @@ export class MarketplaceService {
     return this.prisma.cooperative.findMany({ orderBy: { name: 'asc' } });
   }
 
+  // ---------------------------------------------------------------------
+  // Farmer pickup locations (saved address book)
+  // ---------------------------------------------------------------------
+
+  async listPickupLocations(userId: string) {
+    const farmer = await this.requireFarmerProfile(userId);
+    const rows = await this.prisma.pickupLocation.findMany({
+      where: { farmerProfileId: farmer.id, deletedAt: null },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+    });
+    return { data: rows.map((r) => this.shapePickupLocation(r)) };
+  }
+
+  async createPickupLocation(userId: string, dto: CreatePickupLocationDto) {
+    const farmer = await this.requireFarmerProfile(userId);
+    const makeDefault = dto.isDefault === true;
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      if (makeDefault) {
+        await tx.pickupLocation.updateMany({
+          where: { farmerProfileId: farmer.id, deletedAt: null, isDefault: true },
+          data: { isDefault: false, updatedAt: new Date() },
+        });
+      }
+
+      return tx.pickupLocation.create({
+        data: {
+          farmerProfileId: farmer.id,
+          name: dto.name.trim(),
+          contactName: dto.contactName?.trim() || null,
+          contactPhone: dto.contactPhone?.trim() || null,
+          addressText: dto.addressText.trim(),
+          lat: dto.lat ?? null,
+          lng: dto.lng ?? null,
+          landmark: dto.landmark?.trim() || null,
+          instructions: dto.instructions?.trim() || null,
+          isDefault: makeDefault,
+          locationKind: dto.locationKind ?? 'FARM',
+          googlePlaceId: dto.googlePlaceId?.trim() || null,
+          formattedAddress:
+            dto.formattedAddress?.trim() || dto.addressText.trim(),
+        },
+      });
+    });
+
+    return this.shapePickupLocation(row);
+  }
+
+  async updatePickupLocation(
+    userId: string,
+    id: string,
+    dto: UpdatePickupLocationDto,
+  ) {
+    const farmer = await this.requireFarmerProfile(userId);
+    const existing = await this.prisma.pickupLocation.findFirst({
+      where: { id, farmerProfileId: farmer.id, deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException('Pickup location not found');
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      if (dto.isDefault === true) {
+        await tx.pickupLocation.updateMany({
+          where: {
+            farmerProfileId: farmer.id,
+            deletedAt: null,
+            isDefault: true,
+            NOT: { id },
+          },
+          data: { isDefault: false, updatedAt: new Date() },
+        });
+      }
+
+      return tx.pickupLocation.update({
+        where: { id },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+          ...(dto.contactName !== undefined
+            ? { contactName: dto.contactName?.trim() || null }
+            : {}),
+          ...(dto.contactPhone !== undefined
+            ? { contactPhone: dto.contactPhone?.trim() || null }
+            : {}),
+          ...(dto.addressText !== undefined
+            ? { addressText: dto.addressText.trim() }
+            : {}),
+          ...(dto.lat !== undefined ? { lat: dto.lat } : {}),
+          ...(dto.lng !== undefined ? { lng: dto.lng } : {}),
+          ...(dto.landmark !== undefined
+            ? { landmark: dto.landmark?.trim() || null }
+            : {}),
+          ...(dto.instructions !== undefined
+            ? { instructions: dto.instructions?.trim() || null }
+            : {}),
+          ...(dto.isDefault !== undefined ? { isDefault: dto.isDefault } : {}),
+          ...(dto.locationKind !== undefined
+            ? { locationKind: dto.locationKind }
+            : {}),
+          ...(dto.googlePlaceId !== undefined
+            ? { googlePlaceId: dto.googlePlaceId?.trim() || null }
+            : {}),
+          ...(dto.formattedAddress !== undefined
+            ? { formattedAddress: dto.formattedAddress?.trim() || null }
+            : {}),
+          updatedAt: new Date(),
+        },
+      });
+    });
+
+    return this.shapePickupLocation(row);
+  }
+
+  async deletePickupLocation(userId: string, id: string) {
+    const farmer = await this.requireFarmerProfile(userId);
+    const existing = await this.prisma.pickupLocation.findFirst({
+      where: { id, farmerProfileId: farmer.id, deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException('Pickup location not found');
+
+    await this.prisma.pickupLocation.update({
+      where: { id },
+      data: { deletedAt: new Date(), isDefault: false, updatedAt: new Date() },
+    });
+
+    return { success: true };
+  }
+
+  async setDefaultPickupLocation(userId: string, id: string) {
+    const farmer = await this.requireFarmerProfile(userId);
+    const existing = await this.prisma.pickupLocation.findFirst({
+      where: { id, farmerProfileId: farmer.id, deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException('Pickup location not found');
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      await tx.pickupLocation.updateMany({
+        where: {
+          farmerProfileId: farmer.id,
+          deletedAt: null,
+          isDefault: true,
+          NOT: { id },
+        },
+        data: { isDefault: false, updatedAt: new Date() },
+      });
+      return tx.pickupLocation.update({
+        where: { id },
+        data: { isDefault: true, updatedAt: new Date() },
+      });
+    });
+
+    return this.shapePickupLocation(row);
+  }
+
+  // ---------------------------------------------------------------------
+  // Buyer saved addresses
+  // ---------------------------------------------------------------------
+
+  async listBuyerAddresses(userId: string) {
+    const rows = await this.prisma.buyerAddress.findMany({
+      where: { userId, deletedAt: null },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+    });
+    return { data: rows.map((r) => this.shapeBuyerAddress(r)) };
+  }
+
+  async createBuyerAddress(userId: string, dto: CreateBuyerAddressDto) {
+    const makeDefault = dto.isDefault === true;
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      if (makeDefault) {
+        await tx.buyerAddress.updateMany({
+          where: { userId, deletedAt: null, isDefault: true },
+          data: { isDefault: false, updatedAt: new Date() },
+        });
+      }
+
+      return tx.buyerAddress.create({
+        data: {
+          userId,
+          name: dto.name?.trim() || null,
+          recipientName: dto.recipientName?.trim() || null,
+          recipientPhone: dto.recipientPhone?.trim() || null,
+          addressText: dto.addressText.trim(),
+          lat: dto.lat ?? null,
+          lng: dto.lng ?? null,
+          instructions: dto.instructions?.trim() || null,
+          isDefault: makeDefault,
+          addressKind: dto.addressKind ?? 'HOME',
+          googlePlaceId: dto.googlePlaceId?.trim() || null,
+          formattedAddress:
+            dto.formattedAddress?.trim() || dto.addressText.trim(),
+        },
+      });
+    });
+
+    return this.shapeBuyerAddress(row);
+  }
+
+  async updateBuyerAddress(userId: string, id: string, dto: UpdateBuyerAddressDto) {
+    const existing = await this.prisma.buyerAddress.findFirst({
+      where: { id, userId, deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException('Address not found');
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      if (dto.isDefault === true) {
+        await tx.buyerAddress.updateMany({
+          where: { userId, deletedAt: null, isDefault: true, NOT: { id } },
+          data: { isDefault: false, updatedAt: new Date() },
+        });
+      }
+
+      return tx.buyerAddress.update({
+        where: { id },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name?.trim() || null } : {}),
+          ...(dto.recipientName !== undefined
+            ? { recipientName: dto.recipientName?.trim() || null }
+            : {}),
+          ...(dto.recipientPhone !== undefined
+            ? { recipientPhone: dto.recipientPhone?.trim() || null }
+            : {}),
+          ...(dto.addressText !== undefined
+            ? { addressText: dto.addressText.trim() }
+            : {}),
+          ...(dto.lat !== undefined ? { lat: dto.lat } : {}),
+          ...(dto.lng !== undefined ? { lng: dto.lng } : {}),
+          ...(dto.instructions !== undefined
+            ? { instructions: dto.instructions?.trim() || null }
+            : {}),
+          ...(dto.isDefault !== undefined ? { isDefault: dto.isDefault } : {}),
+          ...(dto.addressKind !== undefined
+            ? { addressKind: dto.addressKind }
+            : {}),
+          ...(dto.googlePlaceId !== undefined
+            ? { googlePlaceId: dto.googlePlaceId?.trim() || null }
+            : {}),
+          ...(dto.formattedAddress !== undefined
+            ? { formattedAddress: dto.formattedAddress?.trim() || null }
+            : {}),
+          updatedAt: new Date(),
+        },
+      });
+    });
+
+    return this.shapeBuyerAddress(row);
+  }
+
+  async deleteBuyerAddress(userId: string, id: string) {
+    const existing = await this.prisma.buyerAddress.findFirst({
+      where: { id, userId, deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException('Address not found');
+
+    await this.prisma.buyerAddress.update({
+      where: { id },
+      data: { deletedAt: new Date(), isDefault: false, updatedAt: new Date() },
+    });
+
+    return { success: true };
+  }
+
+  async setDefaultBuyerAddress(userId: string, id: string) {
+    const existing = await this.prisma.buyerAddress.findFirst({
+      where: { id, userId, deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException('Address not found');
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      await tx.buyerAddress.updateMany({
+        where: { userId, deletedAt: null, isDefault: true, NOT: { id } },
+        data: { isDefault: false, updatedAt: new Date() },
+      });
+      return tx.buyerAddress.update({
+        where: { id },
+        data: { isDefault: true, updatedAt: new Date() },
+      });
+    });
+
+    return this.shapeBuyerAddress(row);
+  }
+
+  private async requireFarmerProfile(userId: string) {
+    const farmer = await this.prisma.farmerProfile.findUnique({ where: { userId } });
+    if (!farmer) throw new NotFoundException('Farmer profile not found');
+    return farmer;
+  }
+
+  private shapePickupLocation(row: any) {
+    return {
+      id: row.id,
+      farmerProfileId: row.farmerProfileId,
+      name: row.name,
+      contactName: row.contactName,
+      contactPhone: row.contactPhone,
+      addressText: row.addressText,
+      lat: toNumber(row.lat),
+      lng: toNumber(row.lng),
+      landmark: row.landmark,
+      instructions: row.instructions,
+      isDefault: row.isDefault,
+      locationKind: row.locationKind,
+      googlePlaceId: row.googlePlaceId ?? null,
+      formattedAddress: row.formattedAddress ?? null,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  private shapeBuyerAddress(row: any) {
+    return {
+      id: row.id,
+      userId: row.userId,
+      name: row.name,
+      recipientName: row.recipientName,
+      recipientPhone: row.recipientPhone,
+      addressText: row.addressText,
+      lat: toNumber(row.lat),
+      lng: toNumber(row.lng),
+      instructions: row.instructions,
+      isDefault: row.isDefault,
+      addressKind: row.addressKind,
+      googlePlaceId: row.googlePlaceId ?? null,
+      formattedAddress: row.formattedAddress ?? null,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+
   private shapeProfile(profile: any, { includePhone }: { includePhone: boolean }) {
     return {
       id: profile.id,
+      sellerPartyId: profile.sellerPartyId ?? profile.sellerParty?.id ?? null,
       region: profile.region,
       zone: profile.zone,
       woreda: profile.woreda,
@@ -191,6 +541,26 @@ export class MarketplaceService {
       );
     }
 
+    const sellerParty = await this.sellerParties.ensureForFarmerProfile(farmer);
+
+    let pickupLocationId: string | null = null;
+    if (dto.pickupLocationId) {
+      const pickup = await this.prisma.pickupLocation.findFirst({
+        where: {
+          id: dto.pickupLocationId,
+          farmerProfileId: farmer.id,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!pickup) {
+        throw new BadRequestException(
+          'Pickup location not found or does not belong to this farmer',
+        );
+      }
+      pickupLocationId = pickup.id;
+    }
+
     const product = await this.resolveListingProduct(dto.productCode, dto.categoryCode);
     const categoryCode = product.category.code.toUpperCase();
     const listingFields = await this.buildListingWriteFields(dto, categoryCode);
@@ -205,15 +575,17 @@ export class MarketplaceService {
           data: {
             ...listingFields,
             farmerId: farmer.id,
+            sellerPartyId: sellerParty.id,
             categoryId: product.categoryId,
             productId: product.id,
             stockLotId: lot.id,
             farmId: lot.farmId,
+            pickupLocationId,
             harvestDate: new Date(dto.harvestDate),
             photoUrls: dto.photoUrls ?? [],
             moderationStatus: 'PENDING',
           },
-          include: { category: true, product: { include: { defaultUnit: true } } },
+          include: { category: { include: { marketplaceVertical: true } }, product: { include: { defaultUnit: true } }, sellerParty: true },
         });
 
         await this.reservations.reserveForListingTx(tx, {
@@ -227,6 +599,21 @@ export class MarketplaceService {
         return created;
       });
 
+      await this.listingAttributes.syncListingAttributes(
+        listing.id,
+        product.categoryId,
+        {
+          grade: listingFields.grade,
+          processMethod: listingFields.processMethod,
+          variety: listingFields.variety,
+          region: listingFields.region,
+          washingStation: listingFields.washingStation,
+          altitudeM: listingFields.altitudeM,
+          cupScore: listingFields.cupScore,
+        },
+        dto.attributes,
+      );
+
       return this.shapeListingWithReservation(listing);
     }
 
@@ -234,16 +621,37 @@ export class MarketplaceService {
       data: {
         ...listingFields,
         farmerId: farmer.id,
+        sellerPartyId: sellerParty.id,
         categoryId: product.categoryId,
         productId: product.id,
+        pickupLocationId,
         harvestDate: new Date(dto.harvestDate),
         photoUrls: dto.photoUrls ?? [],
         moderationStatus: 'PENDING',
       },
-      include: { category: true, product: { include: { defaultUnit: true } } },
+      include: {
+        category: { include: { marketplaceVertical: true } },
+        product: { include: { defaultUnit: true } },
+        sellerParty: true,
+      },
     });
 
-    return this.shapeListing(listing);
+    await this.listingAttributes.syncListingAttributes(
+      listing.id,
+      product.categoryId,
+      {
+        grade: listingFields.grade,
+        processMethod: listingFields.processMethod,
+        variety: listingFields.variety,
+        region: listingFields.region,
+        washingStation: listingFields.washingStation,
+        altitudeM: listingFields.altitudeM,
+        cupScore: listingFields.cupScore,
+      },
+      dto.attributes,
+    );
+
+    return this.enrichWithAttributes(this.shapeListing(listing));
   }
 
   async getMyListings(userId: string) {
@@ -254,11 +662,15 @@ export class MarketplaceService {
 
     const listings = await this.prisma.listing.findMany({
       where: { farmerId: farmer.id },
-      include: { category: true, product: { include: { defaultUnit: true } } },
+      include: { category: { include: { marketplaceVertical: true } }, product: { include: { defaultUnit: true } } },
       orderBy: { createdAt: 'desc' },
     });
 
-    return { data: listings.map((l: any) => this.shapeListing(l)) };
+    return {
+      data: await this.enrichManyWithAttributes(
+        listings.map((l: any) => this.shapeListing(l)),
+      ),
+    };
   }
 
   async getListings(query: QueryListingsDto) {
@@ -345,7 +757,7 @@ export class MarketplaceService {
         where: where as any,
         include: {
           farmer: { include: { user: true, cooperative: true } },
-          category: true,
+          category: { include: { marketplaceVertical: true } },
           product: { include: { defaultUnit: true } },
         },
         orderBy,
@@ -356,7 +768,9 @@ export class MarketplaceService {
     ]);
 
     return {
-      data: listings.map((l: any) => this.shapeListing(l, { includeFarmerSummary: true })),
+      data: await this.enrichManyWithAttributes(
+        listings.map((l: any) => this.shapeListing(l, { includeFarmerSummary: true })),
+      ),
       pagination: {
         page,
         limit,
@@ -371,7 +785,7 @@ export class MarketplaceService {
       where: { id },
       include: {
         farmer: { include: { user: true, cooperative: true } },
-        category: true,
+        category: { include: { marketplaceVertical: true } },
         product: { include: { defaultUnit: true } },
       },
     });
@@ -384,7 +798,9 @@ export class MarketplaceService {
 
     if (isOwner) {
       // Owners may inspect their own listings regardless of moderation.
-      return this.shapeListing(listing, { includeFarmerDetail: true });
+      return this.enrichWithAttributes(
+        this.shapeListing(listing, { includeFarmerDetail: true }),
+      );
     }
 
     if (
@@ -393,7 +809,9 @@ export class MarketplaceService {
     ) {
       throw new NotFoundException('Listing not found');
     }
-    return this.shapeListing(listing, { includeFarmerDetail: true });
+    return this.enrichWithAttributes(
+      this.shapeListing(listing, { includeFarmerDetail: true }),
+    );
   }
 
   async updateListing(userId: string, listingId: string, dto: UpdateListingDto) {
@@ -443,8 +861,32 @@ export class MarketplaceService {
       qualityGrade,
       grade,
       processMethod,
+      pickupLocationId: pickupLocationIdDto,
+      attributes: _attributes,
       ...rest
     } = dto;
+
+    let pickupLocationUpdate: { pickupLocationId: string | null } | undefined;
+    if (pickupLocationIdDto !== undefined) {
+      if (pickupLocationIdDto === null || pickupLocationIdDto === '') {
+        pickupLocationUpdate = { pickupLocationId: null };
+      } else {
+        const pickup = await this.prisma.pickupLocation.findFirst({
+          where: {
+            id: pickupLocationIdDto,
+            farmerProfileId: farmer.id,
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+        if (!pickup) {
+          throw new BadRequestException(
+            'Pickup location not found or does not belong to this farmer',
+          );
+        }
+        pickupLocationUpdate = { pickupLocationId: pickup.id };
+      }
+    }
 
     let productUpdate: { categoryId: string; productId: string } | undefined;
     let categoryCodeForRules =
@@ -505,8 +947,8 @@ export class MarketplaceService {
       if (categoryCodeForRules === 'COFFEE') {
         try {
           const coffee = assertCoffeeExtensionRequirements({
-            qualityGrade: qualityGrade ?? grade ?? listing.grade,
-            processMethod: processMethod ?? listing.processMethod,
+            qualityGrade: qualityGrade ?? grade ?? listing.grade ?? undefined,
+            processMethod: processMethod ?? listing.processMethod ?? undefined,
           });
           gradeUpdate = {
             grade: coffee.grade as CoffeeGrade,
@@ -561,6 +1003,7 @@ export class MarketplaceService {
               ...rest,
               ...quantityUpdate,
               ...gradeUpdate,
+              ...(pickupLocationUpdate ?? {}),
               ...(harvestDate ? { harvestDate: new Date(harvestDate) } : {}),
               ...(productUpdate ?? {}),
               updatedAt: new Date(),
@@ -570,8 +1013,9 @@ export class MarketplaceService {
 
         const updatedBound = await this.prisma.listing.findUnique({
           where: { id: listingId },
-          include: { category: true, product: { include: { defaultUnit: true } } },
+          include: { category: { include: { marketplaceVertical: true } }, product: { include: { defaultUnit: true } } },
         });
+        await this.syncAttributesFromListing(updatedBound, dto.attributes);
         return this.shapeListingWithReservation(updatedBound);
       }
     }
@@ -582,13 +1026,15 @@ export class MarketplaceService {
         ...rest,
         ...quantityUpdate,
         ...gradeUpdate,
+        ...(pickupLocationUpdate ?? {}),
         ...(harvestDate ? { harvestDate: new Date(harvestDate) } : {}),
         ...(productUpdate ?? {}),
         updatedAt: new Date(),
       },
-      include: { category: true, product: { include: { defaultUnit: true } } },
+      include: { category: { include: { marketplaceVertical: true } }, product: { include: { defaultUnit: true } } },
     });
 
+    await this.syncAttributesFromListing(updated, dto.attributes);
     return this.shapeListingWithReservation(updated);
   }
 
@@ -618,7 +1064,7 @@ export class MarketplaceService {
       return tx.listing.update({
         where: { id: listingId },
         data: { status: 'CANCELLED' },
-        include: { category: true, product: { include: { defaultUnit: true } } },
+        include: { category: { include: { marketplaceVertical: true } }, product: { include: { defaultUnit: true } } },
       });
     });
 
@@ -630,7 +1076,11 @@ export class MarketplaceService {
       const product = await this.catalog.findActiveProductByCode(productCode);
       if (
         !product ||
-        !isProductSellable(product.category.isActive, product.status)
+        !isProductSellable(
+          product.category.isActive,
+          product.status,
+          product.category.sellEnabled ?? true,
+        )
       ) {
         throw new BadRequestException('This product is not available yet');
       }
@@ -651,7 +1101,10 @@ export class MarketplaceService {
     }
 
     const product = await this.catalog.findDefaultActiveProduct(category.id);
-    if (!product || !isProductSellable(category.isActive, product.status)) {
+    if (
+      !product ||
+      !isProductSellable(category.isActive, product.status, category.sellEnabled ?? true)
+    ) {
       throw new BadRequestException('This product category is not available yet');
     }
 
@@ -733,16 +1186,20 @@ export class MarketplaceService {
 
   private shapeCategoryFields(listing: any) {
     return {
+      verticalCode: listing.category?.marketplaceVertical?.code ?? null,
       categoryCode: listing.category?.code ?? null,
       categoryNameEn: listing.category?.nameEn ?? null,
       categoryNameAm: listing.category?.nameAm ?? null,
+      listingKind: listing.category?.listingKind ?? null,
     };
   }
 
   private shapeProductFields(listing: any) {
+    const productCode = listing.product?.code ?? null;
     return {
       productId: listing.product?.id ?? listing.productId ?? null,
-      productCode: listing.product?.code ?? null,
+      productCode,
+      productTypeCode: productCode,
       productNameEn: listing.product?.nameEn ?? null,
       productNameAm: listing.product?.nameAm ?? null,
       defaultUnitCode: listing.product?.defaultUnit?.code ?? null,
@@ -761,10 +1218,19 @@ export class MarketplaceService {
     const base = {
       id: listing.id,
       farmerId: listing.farmerId ?? listing.farmer?.id ?? null,
+      sellerPartyId:
+        listing.sellerPartyId ??
+        listing.sellerParty?.id ??
+        listing.farmer?.sellerPartyId ??
+        null,
+      sellerType:
+        listing.sellerParty?.sellerTypeCode ??
+        (listing.farmerId || listing.farmer ? 'FARMER' : null),
       ...this.shapeCategoryFields(listing),
       ...this.shapeProductFields(listing),
       stockLotId: listing.stockLotId ?? null,
       farmId: listing.farmId ?? null,
+      pickupLocationId: listing.pickupLocationId ?? null,
       region: listing.region,
       regionEn: listing.regionEn,
       woreda: listing.woreda,
@@ -845,7 +1311,7 @@ export class MarketplaceService {
       },
       orderBy: { createdAt: 'desc' },
     });
-    return {
+    const withReservation = {
       ...shaped,
       reservation: reservation
         ? {
@@ -858,5 +1324,51 @@ export class MarketplaceService {
           }
         : null,
     };
+    return this.enrichWithAttributes(withReservation);
+  }
+
+  private async enrichWithAttributes<T extends { id?: string; attributes?: unknown }>(
+    shaped: T,
+  ): Promise<T & { attributes: unknown[] }> {
+    if (!shaped?.id) {
+      return { ...shaped, attributes: [] as unknown[] };
+    }
+    const attributes = await this.listingAttributes.loadValuesForListing(shaped.id);
+    return { ...shaped, attributes };
+  }
+
+  private async enrichManyWithAttributes<T extends { id?: string }>(
+    shaped: T[],
+  ): Promise<Array<T & { attributes: unknown[] }>> {
+    const map = await this.listingAttributes.loadValuesForListings(
+      shaped.map((s) => s.id).filter(Boolean) as string[],
+    );
+    return shaped.map((s) => ({
+      ...s,
+      attributes: (s.id && map.get(s.id)) || [],
+    }));
+  }
+
+  private async syncAttributesFromListing(
+    listing: any,
+    clientAttributes?: { code: string; value?: string | number | boolean | null }[],
+  ) {
+    if (!listing?.id) return;
+    await this.listingAttributes.syncListingAttributes(
+      listing.id,
+      listing.categoryId,
+      {
+        grade: listing.grade,
+        processMethod: listing.processMethod,
+        variety: listing.variety,
+        region: listing.region,
+        washingStation: listing.washingStation,
+        altitudeM: toNumber(listing.altitudeM),
+        cupScore: toNumber(listing.cupScore),
+        moisturePct: toNumber(listing.moisturePct),
+        screenSize: listing.screenSize,
+      },
+      clientAttributes,
+    );
   }
 }

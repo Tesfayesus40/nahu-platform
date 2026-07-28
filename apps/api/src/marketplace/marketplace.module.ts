@@ -5,7 +5,9 @@ import { InventoryModule } from '../inventory/inventory.module';
 import { AuditModule } from '../audit/audit.module';
 import { IdentityModule } from '../identity/identity.module';
 import { MarketplaceService } from './marketplace.service';
-import { FarmersController, ListingsController } from './marketplace.controller';
+import { FarmersController, ListingsController, BuyersController } from './marketplace.controller';
+import { SellersController } from './sellers.controller';
+import { SellerPartyService } from './seller-party.service';
 import { AdminVerificationController } from './admin-verification.controller';
 import { AdminVerificationService } from './admin-verification.service';
 import { AdminListingModerationController } from './admin-listing-moderation.controller';
@@ -25,6 +27,8 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
   imports: [CatalogModule, FarmsModule, InventoryModule, AuditModule, IdentityModule],
   controllers: [
     FarmersController,
+    SellersController,
+    BuyersController,
     ListingsController,
     AdminVerificationController,
     AdminListingModerationController,
@@ -33,6 +37,7 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
   ],
   providers: [
     MarketplaceService,
+    SellerPartyService,
     AdminVerificationService,
     AdminListingModerationService,
     AdminPromotionsService,
@@ -42,6 +47,7 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
   ],
   exports: [
     MarketplaceService,
+    SellerPartyService,
     AdminVerificationService,
     AdminListingModerationService,
     AdminPromotionsService,
