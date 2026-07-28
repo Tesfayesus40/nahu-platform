@@ -10,7 +10,7 @@
 
 | Repository | Branch | Tip commit (pre-manifest-refresh parent) | Ahead of remote |
 |------------|--------|------------------------------------------|-----------------|
-| `nahu-platform` | `main` | `b329d8a` — product code + release docs complete | **16** ahead of `origin/main` |
+| `nahu-platform` | `main` | `b329d8a` — product code + release docs complete | **17** ahead of `origin/main` |
 | `nahu-buna-gebaya` | `chore/farmer-rc1` | `bd69f15` — Buyer/Farmer/Courier/shared + CI | **9** ahead of `origin/chore/farmer-rc1` |
 
 > After this manifest refresh commit lands, use `git rev-parse HEAD` on each repo as the definitive tip for tagging.
