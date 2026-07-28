@@ -1,6 +1,6 @@
 {
   "name": "@nahu-platform/admin-web",
-  "version": "0.1.0",
+  "version": "1.0.0-rc1",
   "private": true,
   "description": "Nahu Admin Portal (A1 security shell) - Next.js BFF over the Nest API",
   "scripts": {
