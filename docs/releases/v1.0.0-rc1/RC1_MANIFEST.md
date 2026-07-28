@@ -10,8 +10,8 @@
 
 | Repository | Branch | Latest release-prep commit | Ahead of remote |
 |------------|--------|----------------------------|-----------------|
-| `nahu-platform` | `main` | `0b55fbf` — `docs(release): add RC1_MANIFEST and exclude Courier until source lands` | **2** ahead of `origin/main` |
-| `nahu-buna-gebaya` | `chore/farmer-rc1` | `b92ad72` — `docs(release): note Courier exclusion in RC1_RELEASE pointer` | **2** ahead of `origin/chore/farmer-rc1` |
+| `nahu-platform` | `main` | `4cdf4a4` — includes `RC1_MANIFEST.md` (this doc) | **3** ahead of `origin/main` |
+| `nahu-buna-gebaya` | `chore/farmer-rc1` | `b92ad72` — Courier exclusion in `RC1_RELEASE.md` | **2** ahead of `origin/chore/farmer-rc1` |
 
 **Tags:** none created yet.  
 **Push:** not performed.
