@@ -35,6 +35,9 @@ export default function DisputeDetailPage() {
   const [noteOpen, setNoteOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [refundAmount, setRefundAmount] = useState("");
+  const [refundGoods, setRefundGoods] = useState("");
+  const [refundBuyerFee, setRefundBuyerFee] = useState("");
+  const [refundDelivery, setRefundDelivery] = useState("");
   const [evidenceLabel, setEvidenceLabel] = useState("");
   const [evidenceUrl, setEvidenceUrl] = useState("");
   const [evidenceOpen, setEvidenceOpen] = useState(false);
@@ -71,15 +74,29 @@ export default function DisputeDetailPage() {
       notes: input.reason,
     };
     if (action === "REFUND") {
-      const amount = Number(refundAmount);
-      if (!Number.isFinite(amount) || amount < 0) {
-        throw { message: "Enter a valid refund amount (ETB)" };
+      const hasStreams =
+        refundGoods !== "" || refundBuyerFee !== "" || refundDelivery !== "";
+      if (hasStreams) {
+        if (refundGoods !== "") body.refundGoodsEtb = Number(refundGoods) || 0;
+        if (refundBuyerFee !== "")
+          body.refundBuyerFeeEtb = Number(refundBuyerFee) || 0;
+        if (refundDelivery !== "")
+          body.refundDeliveryEtb = Number(refundDelivery) || 0;
+        body.refundPolicyCode = "manual_streams";
+      } else {
+        const amount = Number(refundAmount);
+        if (!Number.isFinite(amount) || amount < 0) {
+          throw { message: "Enter a valid refund amount (ETB)" };
+        }
+        body.refundAmountEtb = amount;
       }
-      body.refundAmountEtb = amount;
     }
     await bffPost(`/api/disputes/${id}/actions`, body);
     setFlash(`Action recorded: ${action}`);
     setRefundAmount("");
+    setRefundGoods("");
+    setRefundBuyerFee("");
+    setRefundDelivery("");
     await load();
   }
 
@@ -181,6 +198,18 @@ export default function DisputeDetailPage() {
               {detail.refundAmountEtb != null
                 ? ` · ${detail.refundAmountEtb} ETB`
                 : ""}
+              {detail.refundGoodsEtb != null ||
+              detail.refundBuyerFeeEtb != null ||
+              detail.refundDeliveryEtb != null ? (
+                <div className="muted" style={{ marginTop: 4 }}>
+                  Goods {String(detail.refundGoodsEtb ?? 0)} · Buyer fee{" "}
+                  {String(detail.refundBuyerFeeEtb ?? 0)} · Delivery{" "}
+                  {String(detail.refundDeliveryEtb ?? 0)}
+                  {detail.refundPolicyCode
+                    ? ` (${detail.refundPolicyCode})`
+                    : ""}
+                </div>
+              ) : null}
             </dd>
             <dt>Assigned</dt>
             <dd>{detail.assignedToUserId ?? "—"}</dd>
@@ -336,17 +365,53 @@ export default function DisputeDetailPage() {
               Internal note
             </button>
           </div>
-          {action === "REFUND" || refundAmount ? (
-            <label className="field" style={{ marginTop: 12, maxWidth: 240 }}>
-              Refund amount (ETB)
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={refundAmount}
-                onChange={(e) => setRefundAmount(e.target.value)}
-              />
-            </label>
+          {action === "REFUND" ||
+          refundAmount ||
+          refundGoods ||
+          refundBuyerFee ||
+          refundDelivery ? (
+            <div style={{ marginTop: 12, display: "grid", gap: 8, maxWidth: 320 }}>
+              <label className="field">
+                Total refund (waterfall if streams empty)
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={refundAmount}
+                  onChange={(e) => setRefundAmount(e.target.value)}
+                />
+              </label>
+              <label className="field">
+                Goods stream
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={refundGoods}
+                  onChange={(e) => setRefundGoods(e.target.value)}
+                />
+              </label>
+              <label className="field">
+                Buyer fee stream
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={refundBuyerFee}
+                  onChange={(e) => setRefundBuyerFee(e.target.value)}
+                />
+              </label>
+              <label className="field">
+                Delivery stream
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={refundDelivery}
+                  onChange={(e) => setRefundDelivery(e.target.value)}
+                />
+              </label>
+            </div>
           ) : null}
           <p className="muted" style={{ marginTop: 8 }}>
             Refund records intent only — no payment provider settlement.

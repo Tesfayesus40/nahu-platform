@@ -134,10 +134,22 @@ export default function OrderDetailPage() {
             <dd>
               <StatusBadge status={detail.status} />
             </dd>
-            <dt>Total</dt>
-            <dd>{String(detail.totalEtb)} ETB</dd>
-            <dt>Commission</dt>
-            <dd>{String(detail.commissionEtb)} ETB</dd>
+            <dt>Goods subtotal</dt>
+            <dd>{String(detail.goodsSubtotalEtb ?? detail.totalEtb)} ETB</dd>
+            <dt>Buyer platform fee</dt>
+            <dd>{String(detail.buyerFeeEtb ?? 0)} ETB</dd>
+            <dt>Farmer platform fee</dt>
+            <dd>
+              {String(detail.farmerFeeEtb ?? detail.commissionEtb)} ETB
+            </dd>
+            <dt>Delivery fee</dt>
+            <dd>{String(detail.deliveryFeeEtb ?? 0)} ETB</dd>
+            <dt>Delivery commission</dt>
+            <dd>{String(detail.deliveryCommissionEtb ?? 0)} ETB</dd>
+            <dt>Courier payout</dt>
+            <dd>{String(detail.courierPayoutEtb ?? 0)} ETB</dd>
+            <dt>Buyer charge</dt>
+            <dd>{String(detail.buyerChargeEtb ?? detail.totalEtb)} ETB</dd>
             <dt>Seller payout</dt>
             <dd>{String(detail.farmerPayoutEtb)} ETB</dd>
             <dt>Qty</dt>
@@ -169,6 +181,29 @@ export default function OrderDetailPage() {
                 : "—"}
             </dd>
           </dl>
+          {Array.isArray(detail.paymentIntents) &&
+          detail.paymentIntents.length > 0 ? (
+            <div style={{ marginTop: 12 }}>
+              <h3>Payment rail intents</h3>
+              <ul className="timeline-list">
+                {detail.paymentIntents.map(
+                  (intent: {
+                    id: string;
+                    intentType: string;
+                    amountEtb: number;
+                    status: string;
+                    providerCode: string;
+                  }) => (
+                    <li key={intent.id}>
+                      <strong>{intent.intentType}</strong> {intent.amountEtb}{" "}
+                      ETB · {intent.providerCode} ·{" "}
+                      <StatusBadge status={intent.status} />
+                    </li>
+                  ),
+                )}
+              </ul>
+            </div>
+          ) : null}
         </div>
 
         <div className="card">

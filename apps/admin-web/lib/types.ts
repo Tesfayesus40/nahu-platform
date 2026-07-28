@@ -403,6 +403,10 @@ export type DisputeDetail = DisputeListItem & {
   resolutionNotes: string | null;
   infoRequestMessage: string | null;
   refundAmountEtb: string | number | null;
+  refundGoodsEtb?: string | number | null;
+  refundBuyerFeeEtb?: string | number | null;
+  refundDeliveryEtb?: string | number | null;
+  refundPolicyCode?: string | null;
   refundNotes: string | null;
   escalatedAt: string | null;
   resolvedAt: string | null;
@@ -413,6 +417,11 @@ export type DisputeDetail = DisputeListItem & {
     id: string;
     status: string;
     totalEtb: string | number;
+    goodsSubtotalEtb?: string | number;
+    buyerFeeEtb?: string | number;
+    farmerFeeEtb?: string | number;
+    deliveryFeeEtb?: string | number;
+    buyerChargeEtb?: string | number;
     commissionEtb: string | number;
     farmerPayoutEtb: string | number;
     quantityKg: string | number;
