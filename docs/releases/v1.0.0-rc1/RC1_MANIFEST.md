@@ -10,7 +10,7 @@
 
 | Repository | Branch | Tip commit | Ahead of remote |
 |------------|--------|------------|-----------------|
-| `nahu-platform` | `main` | `5528067` | **20** ahead of `origin/main` |
+| `nahu-platform` | `main` | `8043a47` | **21** ahead of `origin/main` |
 | `nahu-buna-gebaya` | `chore/farmer-rc1` | `bd69f15` | **9** ahead of `origin/chore/farmer-rc1` |
 
 Use `git rev-parse HEAD` on each repo as the definitive tip for tagging.
