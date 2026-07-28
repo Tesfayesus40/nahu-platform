@@ -4,8 +4,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { QueryCategoriesDto } from './dto/query-categories.dto';
 import { QueryProductsDto } from './dto/query-products.dto';
 
+const categoryInclude = {
+  marketplaceVertical: true,
+} satisfies Prisma.CategoryInclude;
+
 const productInclude = {
-  category: true,
+  category: { include: categoryInclude },
   defaultUnit: true,
   varieties: {
     where: { isActive: true },
@@ -17,21 +21,58 @@ const productInclude = {
 export class CatalogService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listCategories({ activeOnly }: QueryCategoriesDto = {}) {
+  async listVerticals(opts: { activeOnly?: boolean } = {}) {
+    const verticals = await this.prisma.marketplaceVertical.findMany({
+      where: opts.activeOnly ? { isActive: true } : undefined,
+      orderBy: { sortOrder: 'asc' },
+    });
+    return verticals.map((v) => this.shapeVertical(v));
+  }
+
+  async getVerticalByCode(code: string) {
+    const vertical = await this.prisma.marketplaceVertical.findFirst({
+      where: { code: code.toUpperCase() },
+    });
+    if (!vertical) {
+      throw new NotFoundException('Marketplace vertical not found');
+    }
+    return this.shapeVertical(vertical);
+  }
+
+  async listCategoriesByVertical(
+    verticalCode: string,
+    opts: { activeOnly?: boolean } = {},
+  ) {
+    const vertical = await this.prisma.marketplaceVertical.findFirst({
+      where: { code: verticalCode.toUpperCase() },
+    });
+    if (!vertical) {
+      throw new NotFoundException('Marketplace vertical not found');
+    }
+
     const categories = await this.prisma.category.findMany({
-      where: activeOnly ? { isActive: true } : undefined,
+      where: {
+        marketplaceVerticalId: vertical.id,
+        ...(opts.activeOnly ? { isActive: true } : {}),
+      },
+      include: categoryInclude,
       orderBy: { sortOrder: 'asc' },
     });
 
-    return categories.map((category) => ({
-      code: category.code,
-      nameEn: category.nameEn,
-      nameAm: category.nameAm,
-      descriptionEn: category.descriptionEn,
-      descriptionAm: category.descriptionAm,
-      isActive: category.isActive,
-      sortOrder: category.sortOrder,
-    }));
+    return {
+      vertical: this.shapeVertical(vertical),
+      categories: categories.map((c) => this.shapeCategory(c)),
+    };
+  }
+
+  async listCategories({ activeOnly }: QueryCategoriesDto = {}) {
+    const categories = await this.prisma.category.findMany({
+      where: activeOnly ? { isActive: true } : undefined,
+      include: categoryInclude,
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    return categories.map((category) => this.shapeCategory(category));
   }
 
   async listProducts(query: QueryProductsDto = {}) {
@@ -89,7 +130,19 @@ export class CatalogService {
   async findActiveCategoryByCode(code: string) {
     return this.prisma.category.findFirst({
       where: { code: code.toUpperCase(), isActive: true },
+      include: categoryInclude,
     });
+  }
+
+  async getCategoryByCode(code: string) {
+    const category = await this.prisma.category.findFirst({
+      where: { code: code.toUpperCase() },
+      include: categoryInclude,
+    });
+    if (!category) {
+      throw new NotFoundException('Category not found');
+    }
+    return this.shapeCategory(category);
   }
 
   async findCoffeeCategory() {
@@ -99,7 +152,7 @@ export class CatalogService {
   async findActiveProductByCode(code: string) {
     return this.prisma.product.findFirst({
       where: { code: code.toUpperCase(), status: 'ACTIVE' },
-      include: { category: true, defaultUnit: true },
+      include: { category: { include: categoryInclude }, defaultUnit: true },
     });
   }
 
@@ -110,8 +163,55 @@ export class CatalogService {
         isDefault: true,
         status: 'ACTIVE',
       },
-      include: { category: true, defaultUnit: true },
+      include: { category: { include: categoryInclude }, defaultUnit: true },
     });
+  }
+
+  shapeVertical(vertical: {
+    code: string;
+    nameEn: string;
+    nameAm: string | null;
+    description: string | null;
+    defaultBrand: string | null;
+    complianceProfileCode: string | null;
+    isActive: boolean;
+    sortOrder: number;
+    metadata: Prisma.JsonValue;
+  }) {
+    return {
+      code: vertical.code,
+      verticalCode: vertical.code,
+      nameEn: vertical.nameEn,
+      nameAm: vertical.nameAm,
+      description: vertical.description,
+      defaultBrand: vertical.defaultBrand,
+      complianceProfileCode: vertical.complianceProfileCode,
+      isActive: vertical.isActive,
+      sortOrder: vertical.sortOrder,
+      metadata: vertical.metadata,
+    };
+  }
+
+  shapeCategory(
+    category: Prisma.CategoryGetPayload<{ include: typeof categoryInclude }>,
+  ) {
+    return {
+      code: category.code,
+      categoryCode: category.code,
+      verticalCode: category.marketplaceVertical.code,
+      vertical: {
+        code: category.marketplaceVertical.code,
+        nameEn: category.marketplaceVertical.nameEn,
+      },
+      nameEn: category.nameEn,
+      nameAm: category.nameAm,
+      descriptionEn: category.descriptionEn,
+      descriptionAm: category.descriptionAm,
+      listingKind: category.listingKind,
+      sellEnabled: category.sellEnabled,
+      isActive: category.isActive,
+      sortOrder: category.sortOrder,
+    };
   }
 
   private shapeProduct(
@@ -120,7 +220,10 @@ export class CatalogService {
     return {
       id: product.id,
       code: product.code,
+      productTypeCode: product.code,
+      productCode: product.code,
       categoryCode: product.category.code,
+      verticalCode: product.category.marketplaceVertical.code,
       categoryNameEn: product.category.nameEn,
       categoryNameAm: product.category.nameAm,
       nameEn: product.nameEn,
@@ -139,6 +242,7 @@ export class CatalogService {
         nameEn: variety.nameEn,
         nameAm: variety.nameAm,
         isActive: variety.isActive,
+        sortOrder: variety.sortOrder,
       })),
     };
   }
