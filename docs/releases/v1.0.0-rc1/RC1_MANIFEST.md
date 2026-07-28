@@ -10,8 +10,8 @@
 
 | Repository | Branch | Latest release-prep commit | Ahead of remote |
 |------------|--------|----------------------------|-----------------|
-| `nahu-platform` | `main` | `5adbb62` — `docs(release): prepare v1.0.0-rc1 freeze and release pack` | **1** ahead of `origin/main` |
-| `nahu-buna-gebaya` | `chore/farmer-rc1` | `419bad2` — `docs(release): prepare v1.0.0-rc1 freeze for mobile apps` | **1** ahead of `origin/chore/farmer-rc1` |
+| `nahu-platform` | `main` | `0b55fbf` — `docs(release): add RC1_MANIFEST and exclude Courier until source lands` | **2** ahead of `origin/main` |
+| `nahu-buna-gebaya` | `chore/farmer-rc1` | `b92ad72` — `docs(release): note Courier exclusion in RC1_RELEASE pointer` | **2** ahead of `origin/chore/farmer-rc1` |
 
 **Tags:** none created yet.  
 **Push:** not performed.
