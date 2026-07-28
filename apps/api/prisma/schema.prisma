@@ -12,7 +12,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["identity", "catalog", "marketplace", "orders", "farms", "inventory", "warehouse", "audit", "ops", "delivery"]
+  schemas  = ["identity", "catalog", "marketplace", "orders", "farms", "inventory", "warehouse", "audit", "ops", "delivery", "pricing", "payments"]
 }
 
 enum UserStatus {
@@ -50,6 +50,7 @@ model User {
   rolesAssigned      UserRole[]        @relation("AssignedByUser")
   permissionsGranted RolePermission[] @relation("GrantedByUser")
   farmerProfile      FarmerProfile?
+  sellerParties      SellerParty[]
   buyerOrders        Order[]           @relation("BuyerOrders")
   buyerAddresses     BuyerAddress[]
   adminInvitationsReceived AdminInvitation[] @relation("InvitationInvitee")
@@ -375,28 +376,41 @@ model SystemSetting {
 }
 
 model FulfillmentCase {
-  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  orderId          String    @unique @map("order_id") @db.Uuid
-  status           String    @default("PENDING_HANDOFF") @db.VarChar(30)
-  assignedToUserId String?   @map("assigned_to_user_id") @db.Uuid
-  carrierCode      String?   @map("carrier_code") @db.VarChar(50)
-  trackingRef      String?   @map("tracking_ref") @db.VarChar(100)
-  pickupNotes      String?   @map("pickup_notes")
-  deliveryNotes    String?   @map("delivery_notes")
-  exceptionCode    String?   @map("exception_code") @db.VarChar(50)
-  exceptionNotes   String?   @map("exception_notes")
-  readyAt          DateTime? @map("ready_at") @db.Timestamptz
-  shippedAt        DateTime? @map("shipped_at") @db.Timestamptz
-  deliveredAt      DateTime? @map("delivered_at") @db.Timestamptz
-  closedAt         DateTime? @map("closed_at") @db.Timestamptz
-  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+  id                          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId                     String    @unique @map("order_id") @db.Uuid
+  status                      String    @default("PENDING_HANDOFF") @db.VarChar(30)
+  orchestrationStatus         String    @default("PLACED") @map("orchestration_status") @db.VarChar(40)
+  assignedToUserId            String?   @map("assigned_to_user_id") @db.Uuid
+  carrierCode                 String?   @map("carrier_code") @db.VarChar(50)
+  trackingRef                 String?   @map("tracking_ref") @db.VarChar(100)
+  pickupNotes                 String?   @map("pickup_notes")
+  deliveryNotes               String?   @map("delivery_notes")
+  exceptionCode               String?   @map("exception_code") @db.VarChar(50)
+  exceptionNotes              String?   @map("exception_notes")
+  readyAt                     DateTime? @map("ready_at") @db.Timestamptz
+  shippedAt                   DateTime? @map("shipped_at") @db.Timestamptz
+  deliveredAt                 DateTime? @map("delivered_at") @db.Timestamptz
+  closedAt                    DateTime? @map("closed_at") @db.Timestamptz
+  sellerAcceptedAt            DateTime? @map("seller_accepted_at") @db.Timestamptz
+  preparingAt                 DateTime? @map("preparing_at") @db.Timestamptz
+  readyForPickupAt            DateTime? @map("ready_for_pickup_at") @db.Timestamptz
+  courierAssignedAt           DateTime? @map("courier_assigned_at") @db.Timestamptz
+  pickedUpAt                  DateTime? @map("picked_up_at") @db.Timestamptz
+  inTransitAt                 DateTime? @map("in_transit_at") @db.Timestamptz
+  settledAt                   DateTime? @map("settled_at") @db.Timestamptz
+  sellerPickupConfirmedAt     DateTime? @map("seller_pickup_confirmed_at") @db.Timestamptz
+  courierPickupConfirmedAt    DateTime? @map("courier_pickup_confirmed_at") @db.Timestamptz
+  buyerDeliveryConfirmedAt    DateTime? @map("buyer_delivery_confirmed_at") @db.Timestamptz
+  courierDeliveryConfirmedAt  DateTime? @map("courier_delivery_confirmed_at") @db.Timestamptz
+  createdAt                   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                   DateTime  @default(now()) @map("updated_at") @db.Timestamptz
 
   order            Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
   events           FulfillmentEvent[]
   shipments        Shipment[]
 
   @@index([status])
+  @@index([orchestrationStatus])
   @@index([assignedToUserId])
   @@map("fulfillment_cases")
   @@schema("delivery")
@@ -640,6 +654,7 @@ model ShipmentAssignment {
   courierUserId    String    @map("courier_user_id") @db.Uuid
   assignedByUserId String?   @map("assigned_by_user_id") @db.Uuid
   assignedAt       DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
+  offerExpiresAt   DateTime? @map("offer_expires_at") @db.Timestamptz
   acceptedAt       DateTime? @map("accepted_at") @db.Timestamptz
   rejectedAt       DateTime? @map("rejected_at") @db.Timestamptz
   cancelledAt      DateTime? @map("cancelled_at") @db.Timestamptz
@@ -793,22 +808,50 @@ model Promotion {
 // Maps database/migrations/catalog/001..008_catalog_*.sql
 // ============================================================================
 
-model Category {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code          String    @unique @db.VarChar(50)
-  nameEn        String    @map("name_en") @db.VarChar(100)
-  nameAm        String    @map("name_am") @db.VarChar(100)
-  descriptionEn String?   @map("description_en")
-  descriptionAm String?   @map("description_am")
-  isActive      Boolean   @default(false) @map("is_active")
-  sortOrder     Int       @default(0) @map("sort_order") @db.SmallInt
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+model MarketplaceVertical {
+  id                     String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                   String     @unique @db.VarChar(50)
+  nameEn                 String     @map("name_en") @db.VarChar(100)
+  nameAm                 String?    @map("name_am") @db.VarChar(100)
+  description            String?
+  defaultBrand           String?    @map("default_brand") @db.VarChar(150)
+  complianceProfileCode  String?    @map("compliance_profile_code") @db.VarChar(80)
+  isActive               Boolean    @default(false) @map("is_active")
+  sortOrder              Int        @default(0) @map("sort_order") @db.SmallInt
+  metadata               Json       @default("{}") @db.JsonB
+  createdAt              DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime   @default(now()) @map("updated_at") @db.Timestamptz
 
-  products      Product[]
-  listings      Listing[]
+  categories             Category[]
 
   @@index([isActive])
+  @@map("marketplace_verticals")
+  @@schema("catalog")
+}
+
+model Category {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                   String    @unique @db.VarChar(50)
+  nameEn                 String    @map("name_en") @db.VarChar(100)
+  nameAm                 String    @map("name_am") @db.VarChar(100)
+  descriptionEn          String?   @map("description_en")
+  descriptionAm          String?   @map("description_am")
+  marketplaceVerticalId  String    @map("marketplace_vertical_id") @db.Uuid
+  sellEnabled            Boolean   @default(false) @map("sell_enabled")
+  listingKind            String    @default("GOODS") @map("listing_kind") @db.VarChar(20)
+  isActive               Boolean   @default(false) @map("is_active")
+  sortOrder              Int       @default(0) @map("sort_order") @db.SmallInt
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  marketplaceVertical    MarketplaceVertical @relation(fields: [marketplaceVerticalId], references: [id], onDelete: Restrict)
+  products               Product[]
+  listings               Listing[]
+  attributeDefinitions   AttributeDefinition[]
+
+  @@index([isActive])
+  @@index([marketplaceVerticalId])
+  @@index([sellEnabled])
   @@map("categories")
   @@schema("catalog")
 }
@@ -843,6 +886,7 @@ model Unit {
   croppingCycleLines  CroppingCycleLine[]
   harvestLines        HarvestLine[]
   farmActivities      FarmActivity[]
+  attributeDefinitions AttributeDefinition[]
 
   @@map("units")
   @@schema("catalog")
@@ -861,6 +905,135 @@ model UnitConversion {
   @@map("unit_conversions")
   @@schema("catalog")
 }
+
+enum AttributeDataType {
+  TEXT
+  NUMBER
+  DECIMAL
+  BOOLEAN
+  DATE
+  ENUM
+
+  @@schema("catalog")
+  @@map("attribute_data_type")
+}
+
+enum AttributeScope {
+  CATEGORY
+  PRODUCT
+
+  @@schema("catalog")
+  @@map("attribute_scope")
+}
+
+model AttributeEnumSet {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String   @unique @db.VarChar(80)
+  nameEn      String   @map("name_en") @db.VarChar(150)
+  nameAm      String?  @map("name_am") @db.VarChar(150)
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  values      AttributeEnumValue[]
+  definitions AttributeDefinition[]
+
+  @@map("attribute_enum_sets")
+  @@schema("catalog")
+}
+
+model AttributeEnumValue {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  enumSetId String   @map("enum_set_id") @db.Uuid
+  code      String   @db.VarChar(80)
+  nameEn    String   @map("name_en") @db.VarChar(150)
+  nameAm    String?  @map("name_am") @db.VarChar(150)
+  sortOrder Int      @default(0) @map("sort_order") @db.SmallInt
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  enumSet   AttributeEnumSet @relation(fields: [enumSetId], references: [id], onDelete: Cascade)
+  listingValues ListingAttributeValue[]
+
+  @@unique([enumSetId, code])
+  @@index([enumSetId])
+  @@map("attribute_enum_values")
+  @@schema("catalog")
+}
+
+model AttributeDefinition {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code           String            @db.VarChar(80)
+  scope          AttributeScope    @default(CATEGORY)
+  categoryId     String?           @map("category_id") @db.Uuid
+  productId      String?           @map("product_id") @db.Uuid
+  nameEn         String            @map("name_en") @db.VarChar(150)
+  nameAm         String?           @map("name_am") @db.VarChar(150)
+  dataType       AttributeDataType @map("data_type")
+  enumSetId      String?           @map("enum_set_id") @db.Uuid
+  unitCode       String?           @map("unit_code") @db.VarChar(20)
+  unitDimension  String?           @map("unit_dimension") @db.VarChar(20)
+  isRequired     Boolean           @default(false) @map("is_required")
+  isFilterable   Boolean           @default(false) @map("is_filterable")
+  isFacetable    Boolean           @default(false) @map("is_facetable")
+  isListedInCard Boolean           @default(false) @map("is_listed_in_card")
+  helpTextEn     String?           @map("help_text_en")
+  helpTextAm     String?           @map("help_text_am")
+  placeholderEn  String?           @map("placeholder_en") @db.VarChar(200)
+  placeholderAm  String?           @map("placeholder_am") @db.VarChar(200)
+  sectionCode    String?           @map("section_code") @db.VarChar(80)
+  sectionNameEn  String?           @map("section_name_en") @db.VarChar(150)
+  sectionNameAm  String?           @map("section_name_am") @db.VarChar(150)
+  controlType    String            @default("text") @map("control_type") @db.VarChar(40)
+  isVisible      Boolean           @default(true) @map("is_visible")
+  isEditable     Boolean           @default(true) @map("is_editable")
+  isSortable     Boolean           @default(false) @map("is_sortable")
+  searchFilterType String          @default("NONE") @map("search_filter_type") @db.VarChar(20)
+  validationJson Json              @default("{}") @map("validation_json") @db.JsonB
+  legacyColumn   String?           @map("legacy_column") @db.VarChar(80)
+  sortOrder      Int               @default(0) @map("sort_order") @db.SmallInt
+  isActive       Boolean           @default(true) @map("is_active")
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime          @default(now()) @map("updated_at") @db.Timestamptz
+
+  category       Category?         @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  product        Product?          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  enumSet        AttributeEnumSet? @relation(fields: [enumSetId], references: [id], onDelete: Restrict)
+  unit           Unit?             @relation(fields: [unitCode], references: [code], onDelete: Restrict)
+  listingValues  ListingAttributeValue[]
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@map("attribute_definitions")
+  @@schema("catalog")
+}
+
+model ListingAttributeValue {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  listingId             String   @map("listing_id") @db.Uuid
+  attributeDefinitionId String   @map("attribute_definition_id") @db.Uuid
+  valueText             String?  @map("value_text")
+  valueNum              Decimal? @map("value_num") @db.Decimal(18, 6)
+  valueBool             Boolean? @map("value_bool")
+  valueDate             DateTime? @map("value_date") @db.Date
+  valueJson             Json?    @map("value_json") @db.JsonB
+  enumValueId           String?  @map("enum_value_id") @db.Uuid
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  listing               Listing              @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  attributeDefinition   AttributeDefinition  @relation(fields: [attributeDefinitionId], references: [id], onDelete: Restrict)
+  enumValue             AttributeEnumValue?  @relation(fields: [enumValueId], references: [id], onDelete: Restrict)
+
+  @@unique([listingId, attributeDefinitionId])
+  @@index([listingId])
+  @@index([attributeDefinitionId])
+  @@map("listing_attribute_values")
+  @@schema("marketplace")
+}
+
 
 model Product {
   id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -887,6 +1060,7 @@ model Product {
   croppingCycleLines CroppingCycleLine[]
   harvestLines       HarvestLine[]
   farmActivities     FarmActivity[]
+  attributeDefinitions AttributeDefinition[]
 
   @@index([categoryId])
   @@index([status])
@@ -1000,9 +1174,60 @@ model Cooperative {
   @@schema("marketplace")
 }
 
+model SellerType {
+  code        String   @id @db.VarChar(40)
+  nameEn      String   @map("name_en") @db.VarChar(100)
+  nameAm      String?  @map("name_am") @db.VarChar(100)
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order") @db.SmallInt
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  sellerParties SellerParty[]
+
+  @@map("seller_types")
+  @@schema("marketplace")
+}
+
+model SellerParty {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerUserId         String   @map("owner_user_id") @db.Uuid
+  sellerTypeCode      String   @map("seller_type_code") @db.VarChar(40)
+  displayName         String   @map("display_name") @db.VarChar(200)
+  legalName           String?  @map("legal_name") @db.VarChar(200)
+  description         String?
+  logoUrl             String?  @map("logo_url") @db.VarChar(500)
+  contactEmail        String?  @map("contact_email") @db.VarChar(255)
+  contactPhone        String?  @map("contact_phone") @db.VarChar(30)
+  addressText         String?  @map("address_text") @db.VarChar(500)
+  organizationId      String?  @map("organization_id") @db.Uuid
+  businessProfileId   String?  @map("business_profile_id") @db.Uuid
+  status              String   @default("ACTIVE") @db.VarChar(20)
+  verified            Boolean  @default(false)
+  verificationStatus  String   @default("PENDING") @map("verification_status") @db.VarChar(20)
+  verificationNotes   String?  @map("verification_notes") @db.VarChar(500)
+  metadata            Json     @default("{}") @db.JsonB
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  ownerUser           User           @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  sellerType          SellerType     @relation(fields: [sellerTypeCode], references: [code], onDelete: Restrict)
+  farmerProfile       FarmerProfile?
+  listings            Listing[]
+  orders              Order[]        @relation("SellerPartyOrders")
+
+  @@index([ownerUserId])
+  @@index([sellerTypeCode])
+  @@index([status])
+  @@map("seller_parties")
+  @@schema("marketplace")
+}
+
 model FarmerProfile {
   id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId             String    @unique @map("user_id") @db.Uuid
+  sellerPartyId      String?   @unique @map("seller_party_id") @db.Uuid
   cooperativeId      String?   @map("cooperative_id") @db.Uuid
   region             String    @db.VarChar(100)
   zone               String?   @db.VarChar(100)
@@ -1017,6 +1242,7 @@ model FarmerProfile {
   updatedAt          DateTime  @default(now()) @map("updated_at") @db.Timestamptz
 
   user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sellerParty        SellerParty?  @relation(fields: [sellerPartyId], references: [id], onDelete: SetNull)
   cooperative        Cooperative?  @relation(fields: [cooperativeId], references: [id], onDelete: SetNull)
   listings           Listing[]
   pickupLocations    PickupLocation[]
@@ -1146,6 +1372,7 @@ model VerificationDocument {
 model Listing {
   id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   farmerId       String        @map("farmer_id") @db.Uuid
+  sellerPartyId  String?       @map("seller_party_id") @db.Uuid
   categoryId     String?       @map("category_id") @db.Uuid
   productId      String?       @map("product_id") @db.Uuid
   stockLotId     String?       @map("stock_lot_id") @db.Uuid
@@ -1155,8 +1382,8 @@ model Listing {
   woreda         String?       @db.VarChar(100)
   washingStation String?       @map("washing_station") @db.VarChar(150)
   cooperative    String?       @db.VarChar(200)
-  processMethod  ProcessMethod @map("process_method")
-  grade          CoffeeGrade
+  processMethod  ProcessMethod? @map("process_method")
+  grade          CoffeeGrade?
   variety        String?       @db.VarChar(100)
   quantityKg     Decimal       @map("quantity_kg") @db.Decimal(8, 2)
   pricePerKg     Decimal       @map("price_per_kg") @db.Decimal(8, 2)
@@ -1180,6 +1407,7 @@ model Listing {
   updatedAt      DateTime      @default(now()) @map("updated_at") @db.Timestamptz
 
   farmer         FarmerProfile @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  sellerParty    SellerParty?  @relation(fields: [sellerPartyId], references: [id], onDelete: Restrict)
   category       Category?     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   product        Product?      @relation(fields: [productId], references: [id], onDelete: Restrict)
   unit           Unit?         @relation(fields: [unitCode], references: [code], onDelete: Restrict)
@@ -1189,6 +1417,7 @@ model Listing {
   orders         Order[]
   reservations   Reservation[]
   moderationDecisions ListingModerationDecision[]
+  attributeValues     ListingAttributeValue[]
 
   @@index([region])
   @@index([grade])
@@ -1200,6 +1429,7 @@ model Listing {
   @@index([farmId])
   @@index([unitCode])
   @@index([pickupLocationId])
+  @@index([sellerPartyId])
   @@map("listings")
   @@schema("marketplace")
 }
@@ -1257,6 +1487,7 @@ model Order {
   listingId         String        @map("listing_id") @db.Uuid
   buyerId           String        @map("buyer_id") @db.Uuid
   farmerId          String        @map("farmer_id") @db.Uuid
+  sellerPartyId     String?       @map("seller_party_id") @db.Uuid
   quantityKg        Decimal       @map("quantity_kg") @db.Decimal(10, 2)
   /// B1 canonical quantity — dual-written with quantityKg for legacy clients.
   quantity          Decimal?      @db.Decimal(12, 3)
@@ -1265,6 +1496,15 @@ model Order {
   totalEtb          Decimal       @map("total_etb") @db.Decimal(12, 2)
   commissionEtb     Decimal       @map("commission_etb") @db.Decimal(12, 2)
   farmerPayoutEtb   Decimal       @map("farmer_payout_etb") @db.Decimal(12, 2)
+  goodsSubtotalEtb  Decimal?      @map("goods_subtotal_etb") @db.Decimal(12, 2)
+  buyerFeeEtb       Decimal       @default(0) @map("buyer_fee_etb") @db.Decimal(12, 2)
+  farmerFeeEtb      Decimal?      @map("farmer_fee_etb") @db.Decimal(12, 2)
+  deliveryFeeEtb    Decimal       @default(0) @map("delivery_fee_etb") @db.Decimal(12, 2)
+  deliveryCommissionEtb Decimal   @default(0) @map("delivery_commission_etb") @db.Decimal(12, 2)
+  courierPayoutEtb  Decimal       @default(0) @map("courier_payout_etb") @db.Decimal(12, 2)
+  buyerChargeEtb    Decimal?      @map("buyer_charge_etb") @db.Decimal(12, 2)
+  feeScheduleId     String?       @map("fee_schedule_id") @db.Uuid
+  deliveryQuoteId   String?       @map("delivery_quote_id") @db.Uuid
   status            OrderStatus   @default(PENDING_PAYMENT)
   paymentMethod     PaymentMethod @map("payment_method")
   paymentReference  String?       @map("payment_reference") @db.VarChar(100)
@@ -1280,6 +1520,7 @@ model Order {
   listing           Listing            @relation(fields: [listingId], references: [id], onDelete: Restrict)
   buyer             User               @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Restrict)
   farmer            FarmerProfile      @relation("FarmerOrders", fields: [farmerId], references: [id], onDelete: Restrict)
+  sellerParty       SellerParty?       @relation("SellerPartyOrders", fields: [sellerPartyId], references: [id], onDelete: Restrict)
   deliveryAddressRef BuyerAddress?     @relation(fields: [deliveryAddressId], references: [id], onDelete: SetNull)
   unit              Unit?              @relation(fields: [unitCode], references: [code], onDelete: Restrict)
   certificate       OriginCertificate?
@@ -1287,9 +1528,11 @@ model Order {
   disputeCase       DisputeCase?
   adminNotes        OrderAdminNote[]
   fulfillmentCase   FulfillmentCase?
+  paymentCase       PaymentCase?
 
   @@index([buyerId])
   @@index([farmerId])
+  @@index([sellerPartyId])
   @@index([status])
   @@index([unitCode])
   @@index([deliveryAddressId])
@@ -1326,6 +1569,10 @@ model DisputeCase {
   refundStatus       String    @default("NONE") @map("refund_status") @db.VarChar(30)
   refundAmountEtb    Decimal?  @map("refund_amount_etb") @db.Decimal(12, 2)
   refundNotes        String?   @map("refund_notes")
+  refundGoodsEtb     Decimal   @default(0) @map("refund_goods_etb") @db.Decimal(12, 2)
+  refundBuyerFeeEtb  Decimal   @default(0) @map("refund_buyer_fee_etb") @db.Decimal(12, 2)
+  refundDeliveryEtb  Decimal   @default(0) @map("refund_delivery_etb") @db.Decimal(12, 2)
+  refundPolicyCode   String?   @map("refund_policy_code") @db.VarChar(80)
   escalatedAt        DateTime? @map("escalated_at") @db.Timestamptz
   resolvedAt         DateTime? @map("resolved_at") @db.Timestamptz
   closedAt           DateTime? @map("closed_at") @db.Timestamptz
@@ -2213,4 +2460,228 @@ model Reservation {
   @@index([orderId])
   @@map("reservations")
   @@schema("inventory")
+}
+
+// ---------------------------------------------------------------------------
+// Pricing / revenue engine
+// ---------------------------------------------------------------------------
+
+model FeeSchedule {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code          String    @db.VarChar(80)
+  displayName   String    @map("display_name") @db.VarChar(200)
+  version       Int       @default(1)
+  isActive      Boolean   @default(false) @map("is_active")
+  effectiveFrom DateTime  @default(now()) @map("effective_from") @db.Timestamptz
+  effectiveTo   DateTime? @map("effective_to") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  platformFees         PlatformFee?
+  deliveryTariffs      DeliveryTariff[]
+  deliveryCommissions  DeliveryCommission?
+  deliveryQuotes       DeliveryQuote[]
+
+  @@unique([code, version])
+  @@index([isActive])
+  @@map("fee_schedules")
+  @@schema("pricing")
+}
+
+model PlatformFee {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  feeScheduleId String   @unique @map("fee_schedule_id") @db.Uuid
+  buyerFeePct   Decimal  @default(0) @map("buyer_fee_pct") @db.Decimal(8, 4)
+  farmerFeePct  Decimal  @default(0) @map("farmer_fee_pct") @db.Decimal(8, 4)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  feeSchedule   FeeSchedule @relation(fields: [feeScheduleId], references: [id], onDelete: Cascade)
+
+  @@map("platform_fees")
+  @@schema("pricing")
+}
+
+model DeliveryTariff {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  feeScheduleId String   @map("fee_schedule_id") @db.Uuid
+  vehicleType   String   @map("vehicle_type") @db.VarChar(40)
+  baseFareEtb   Decimal  @default(0) @map("base_fare_etb") @db.Decimal(12, 2)
+  perKmEtb      Decimal  @default(0) @map("per_km_etb") @db.Decimal(12, 4)
+  perKgEtb      Decimal  @default(0) @map("per_kg_etb") @db.Decimal(12, 4)
+  perM3Etb      Decimal  @default(0) @map("per_m3_etb") @db.Decimal(12, 4)
+  minFareEtb    Decimal  @default(0) @map("min_fare_etb") @db.Decimal(12, 2)
+  maxFareEtb    Decimal? @map("max_fare_etb") @db.Decimal(12, 2)
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  feeSchedule   FeeSchedule @relation(fields: [feeScheduleId], references: [id], onDelete: Cascade)
+
+  @@unique([feeScheduleId, vehicleType])
+  @@index([feeScheduleId])
+  @@map("delivery_tariffs")
+  @@schema("pricing")
+}
+
+model DeliveryCommission {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  feeScheduleId   String   @unique @map("fee_schedule_id") @db.Uuid
+  commissionType  String   @default("PERCENT") @map("commission_type") @db.VarChar(20)
+  commissionValue Decimal  @default(0) @map("commission_value") @db.Decimal(12, 4)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  feeSchedule     FeeSchedule @relation(fields: [feeScheduleId], references: [id], onDelete: Cascade)
+
+  @@map("delivery_commissions")
+  @@schema("pricing")
+}
+
+model DeliveryQuote {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  feeScheduleId          String    @map("fee_schedule_id") @db.Uuid
+  buyerUserId            String?   @map("buyer_user_id") @db.Uuid
+  vehicleType            String    @map("vehicle_type") @db.VarChar(40)
+  distanceKm             Decimal   @default(0) @map("distance_km") @db.Decimal(12, 3)
+  weightKg               Decimal   @default(0) @map("weight_kg") @db.Decimal(12, 3)
+  volumeM3               Decimal   @default(0) @map("volume_m3") @db.Decimal(12, 4)
+  deliveryFeeEtb         Decimal   @map("delivery_fee_etb") @db.Decimal(12, 2)
+  deliveryCommissionEtb  Decimal   @default(0) @map("delivery_commission_etb") @db.Decimal(12, 2)
+  courierPayoutEtb       Decimal   @default(0) @map("courier_payout_etb") @db.Decimal(12, 2)
+  currency               String    @default("ETB") @db.VarChar(3)
+  expiresAt              DateTime  @map("expires_at") @db.Timestamptz
+  orderId                String?   @map("order_id") @db.Uuid
+  metadataJson           Json?     @map("metadata_json")
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  feeSchedule            FeeSchedule @relation(fields: [feeScheduleId], references: [id], onDelete: Restrict)
+
+  @@index([buyerUserId])
+  @@index([expiresAt])
+  @@index([orderId])
+  @@map("delivery_quotes")
+  @@schema("pricing")
+}
+
+model PaymentIntent {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId           String   @map("order_id") @db.Uuid
+  providerCode      String   @map("provider_code") @db.VarChar(40)
+  intentType        String   @map("intent_type") @db.VarChar(40)
+  amountEtb         Decimal  @map("amount_etb") @db.Decimal(12, 2)
+  currency          String   @default("ETB") @db.VarChar(3)
+  status            String   @default("RECORDED_PENDING_PROVIDER") @db.VarChar(40)
+  externalReference String?  @map("external_reference") @db.VarChar(120)
+  metadataJson      Json?    @map("metadata_json")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@index([orderId])
+  @@index([intentType, status])
+  @@map("payment_intents")
+  @@schema("pricing")
+}
+
+// ─── G9 Payment orchestration (payments schema) ─────────────────────────────
+
+model PaymentCase {
+  id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId                 String    @unique @map("order_id") @db.Uuid
+  providerCode            String    @map("provider_code") @db.VarChar(40)
+  paymentStatus           String    @default("CREATED") @map("payment_status") @db.VarChar(40)
+  escrowStatus            String    @default("NONE") @map("escrow_status") @db.VarChar(40)
+  settlementStatus        String    @default("NOT_STARTED") @map("settlement_status") @db.VarChar(40)
+  refundStatus            String    @default("NONE") @map("refund_status") @db.VarChar(40)
+  currency                String    @default("ETB") @db.VarChar(3)
+  amountEtb               Decimal   @default(0) @map("amount_etb") @db.Decimal(12, 2)
+  goodsSubtotalEtb        Decimal   @default(0) @map("goods_subtotal_etb") @db.Decimal(12, 2)
+  buyerFeeEtb             Decimal   @default(0) @map("buyer_fee_etb") @db.Decimal(12, 2)
+  farmerFeeEtb            Decimal   @default(0) @map("farmer_fee_etb") @db.Decimal(12, 2)
+  farmerPayoutEtb         Decimal   @default(0) @map("farmer_payout_etb") @db.Decimal(12, 2)
+  deliveryFeeEtb          Decimal   @default(0) @map("delivery_fee_etb") @db.Decimal(12, 2)
+  deliveryCommissionEtb   Decimal   @default(0) @map("delivery_commission_etb") @db.Decimal(12, 2)
+  courierPayoutEtb        Decimal   @default(0) @map("courier_payout_etb") @db.Decimal(12, 2)
+  platformRevenueEtb      Decimal   @default(0) @map("platform_revenue_etb") @db.Decimal(12, 2)
+  escrowHeldEtb           Decimal   @default(0) @map("escrow_held_etb") @db.Decimal(12, 2)
+  escrowReleasedEtb       Decimal   @default(0) @map("escrow_released_etb") @db.Decimal(12, 2)
+  escrowRefundedEtb       Decimal   @default(0) @map("escrow_refunded_etb") @db.Decimal(12, 2)
+  externalReference       String?   @map("external_reference") @db.VarChar(120)
+  pendingAt               DateTime? @map("pending_at") @db.Timestamptz
+  authorizedAt            DateTime? @map("authorized_at") @db.Timestamptz
+  capturedAt              DateTime? @map("captured_at") @db.Timestamptz
+  escrowedAt              DateTime? @map("escrowed_at") @db.Timestamptz
+  settledAt               DateTime? @map("settled_at") @db.Timestamptz
+  refundedAt              DateTime? @map("refunded_at") @db.Timestamptz
+  failedAt                DateTime? @map("failed_at") @db.Timestamptz
+  cancelledAt             DateTime? @map("cancelled_at") @db.Timestamptz
+  failureReason           String?   @map("failure_reason")
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  order                   Order              @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  events                  PaymentEvent[]
+  escrowLedger            EscrowLedger[]
+  settlementLines         SettlementLine[]
+
+  @@index([paymentStatus])
+  @@index([providerCode])
+  @@map("payment_cases")
+  @@schema("payments")
+}
+
+model PaymentEvent {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paymentCaseId String   @map("payment_case_id") @db.Uuid
+  eventType     String   @map("event_type") @db.VarChar(60)
+  fromStatus    String?  @map("from_status") @db.VarChar(40)
+  toStatus      String?  @map("to_status") @db.VarChar(40)
+  actorUserId   String?  @map("actor_user_id") @db.Uuid
+  reason        String?
+  message       String?
+  metadataJson  Json?    @map("metadata_json")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  paymentCase   PaymentCase @relation(fields: [paymentCaseId], references: [id], onDelete: Cascade)
+
+  @@index([paymentCaseId])
+  @@map("payment_events")
+  @@schema("payments")
+}
+
+model EscrowLedger {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paymentCaseId String   @map("payment_case_id") @db.Uuid
+  entryType     String   @map("entry_type") @db.VarChar(40)
+  amountEtb     Decimal  @map("amount_etb") @db.Decimal(12, 2)
+  partyCode     String?  @map("party_code") @db.VarChar(40)
+  actorUserId   String?  @map("actor_user_id") @db.Uuid
+  reason        String?
+  metadataJson  Json?    @map("metadata_json")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  paymentCase   PaymentCase @relation(fields: [paymentCaseId], references: [id], onDelete: Cascade)
+
+  @@index([paymentCaseId])
+  @@map("escrow_ledger")
+  @@schema("payments")
+}
+
+model SettlementLine {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paymentCaseId String    @map("payment_case_id") @db.Uuid
+  partyCode     String    @map("party_code") @db.VarChar(40)
+  amountEtb     Decimal   @map("amount_etb") @db.Decimal(12, 2)
+  status        String    @default("PENDING") @db.VarChar(40)
+  intentId      String?   @map("intent_id") @db.Uuid
+  releasedAt    DateTime? @map("released_at") @db.Timestamptz
+  metadataJson  Json?     @map("metadata_json")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  paymentCase   PaymentCase @relation(fields: [paymentCaseId], references: [id], onDelete: Cascade)
+
+  @@index([paymentCaseId])
+  @@map("settlement_lines")
+  @@schema("payments")
 }
