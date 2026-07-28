@@ -25,6 +25,9 @@ import {
   DisputeEvidenceDto,
   DisputeNoteDto,
 } from './dto/dispute-action.dto';
+import { allocateRefund } from '../pricing/pricing.rules';
+import { PaymentRailsService } from '../pricing/payment-rails.service';
+import { PaymentOrchestrationService } from '../payments/payment-orchestration.service';
 
 type RequestMeta = { ip?: string; userAgent?: string; requestId?: string };
 
@@ -43,6 +46,8 @@ export class AdminDisputesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly adminAuth: AdminAuthService,
+    private readonly paymentRails: PaymentRailsService,
+    private readonly paymentOrch: PaymentOrchestrationService,
   ) {}
 
   async countOpen(): Promise<number> {
@@ -209,6 +214,10 @@ export class AdminDisputesService {
       infoRequestMessage: d.infoRequestMessage,
       refundStatus: d.refundStatus,
       refundAmountEtb: d.refundAmountEtb,
+      refundGoodsEtb: d.refundGoodsEtb,
+      refundBuyerFeeEtb: d.refundBuyerFeeEtb,
+      refundDeliveryEtb: d.refundDeliveryEtb,
+      refundPolicyCode: d.refundPolicyCode,
       refundNotes: d.refundNotes,
       escalatedAt: d.escalatedAt,
       resolvedAt: d.resolvedAt,
@@ -219,6 +228,11 @@ export class AdminDisputesService {
         id: d.order.id,
         status: d.order.status,
         totalEtb: d.order.totalEtb,
+        goodsSubtotalEtb: d.order.goodsSubtotalEtb ?? d.order.totalEtb,
+        buyerFeeEtb: d.order.buyerFeeEtb,
+        farmerFeeEtb: d.order.farmerFeeEtb ?? d.order.commissionEtb,
+        deliveryFeeEtb: d.order.deliveryFeeEtb,
+        buyerChargeEtb: d.order.buyerChargeEtb ?? d.order.totalEtb,
         commissionEtb: d.order.commissionEtb,
         farmerPayoutEtb: d.order.farmerPayoutEtb,
         quantityKg: d.order.quantityKg,
@@ -284,9 +298,14 @@ export class AdminDisputesService {
       throw new BadRequestException('reason is required for this action');
     }
     if (action === 'REFUND') {
-      if (dto.refundAmountEtb == null || Number(dto.refundAmountEtb) < 0) {
+      if (
+        dto.refundAmountEtb == null &&
+        dto.refundGoodsEtb == null &&
+        dto.refundBuyerFeeEtb == null &&
+        dto.refundDeliveryEtb == null
+      ) {
         throw new BadRequestException(
-          'refundAmountEtb is required for REFUND (records intent only)',
+          'refundAmountEtb or stream allocation fields are required for REFUND (records intent only)',
         );
       }
     }
@@ -309,7 +328,7 @@ export class AdminDisputesService {
     const toStatus = statusAfterDisputeAction(action, fromStatus);
     const now = new Date();
 
-    await this.prisma.$transaction(async (tx) => {
+    const refundAllocation = await this.prisma.$transaction(async (tx) => {
       const data: Prisma.DisputeCaseUpdateInput = {
         status: toStatus,
         updatedAt: now,
@@ -339,9 +358,25 @@ export class AdminDisputesService {
       if (action === 'ESCALATE') {
         data.escalatedAt = now;
       }
+      let allocation: ReturnType<typeof allocateRefund> | null = null;
       if (action === 'REFUND') {
+        const order = existing.order;
+        allocation = allocateRefund({
+          goodsSubtotalEtb: Number(order.goodsSubtotalEtb ?? order.totalEtb) || 0,
+          buyerFeeEtb: Number(order.buyerFeeEtb) || 0,
+          deliveryFeeEtb: Number(order.deliveryFeeEtb) || 0,
+          refundGoodsEtb: dto.refundGoodsEtb,
+          refundBuyerFeeEtb: dto.refundBuyerFeeEtb,
+          refundDeliveryEtb: dto.refundDeliveryEtb,
+          refundAmountEtb: dto.refundAmountEtb,
+          policyCode: dto.refundPolicyCode || 'manual',
+        });
         data.refundStatus = 'RECORDED_PENDING_PROVIDER';
-        data.refundAmountEtb = dto.refundAmountEtb!;
+        data.refundAmountEtb = allocation.refundAmountEtb;
+        data.refundGoodsEtb = allocation.refundGoodsEtb;
+        data.refundBuyerFeeEtb = allocation.refundBuyerFeeEtb;
+        data.refundDeliveryEtb = allocation.refundDeliveryEtb;
+        data.refundPolicyCode = allocation.refundPolicyCode;
         data.refundNotes = [dto.reason, dto.notes]
           .filter((s) => s?.trim())
           .join('\n')
@@ -360,8 +395,7 @@ export class AdminDisputesService {
           actorUserId: admin.userId,
           metadataJson: {
             resolutionCode: dto.resolutionCode ?? null,
-            refundAmountEtb:
-              action === 'REFUND' ? dto.refundAmountEtb : undefined,
+            refundAllocation: action === 'REFUND' ? allocation : undefined,
           },
         },
       });
@@ -383,7 +417,34 @@ export class AdminDisputesService {
           },
         });
       }
+
+      return allocation;
     });
+
+    if (action === 'REFUND' && refundAllocation && refundAllocation.refundAmountEtb > 0) {
+      await this.paymentRails.recordIntent({
+        orderId: existing.orderId,
+        providerCode: 'INTERNAL_REFUND',
+        intentType: 'BUYER_REFUND',
+        amountEtb: refundAllocation.refundAmountEtb,
+        metadataJson: {
+          simulated: true,
+          disputeId,
+          ...refundAllocation,
+        },
+      });
+
+      // G9 — sync payment case / escrow without double provider call
+      await this.paymentOrch
+        .acknowledgeExternalRefund({
+          orderId: existing.orderId,
+          actorUserId: admin.userId,
+          reason: 'ADMIN_CANCELLATION',
+          amountEtb: refundAllocation.refundAmountEtb,
+          message: dto.reason ?? 'Dispute refund',
+        })
+        .catch(() => undefined);
+    }
 
     await this.audit.appendEvent({
       actorUserId: admin.userId,
@@ -397,7 +458,7 @@ export class AdminDisputesService {
       beforeJson: { status: fromStatus, orderStatus: existing.order.status },
       afterJson: {
         status: toStatus,
-        refundAmountEtb: action === 'REFUND' ? dto.refundAmountEtb : undefined,
+        refundAllocation: action === 'REFUND' ? refundAllocation : undefined,
       },
       ip: meta.ip,
       userAgent: meta.userAgent,

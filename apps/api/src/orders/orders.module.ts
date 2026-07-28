@@ -12,6 +12,7 @@ import { InventoryModule } from '../inventory/inventory.module';
 import { AuditModule } from '../audit/audit.module';
 import { IdentityModule } from '../identity/identity.module';
 import { DeliveryModule } from '../delivery/delivery.module';
+import { PricingModule } from '../pricing/pricing.module';
 import { AdminAuthGuard } from '../common/guards/admin-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 
@@ -23,6 +24,7 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
     AuditModule,
     IdentityModule,
     DeliveryModule,
+    PricingModule,
   ],
   controllers: [
     OrdersController,

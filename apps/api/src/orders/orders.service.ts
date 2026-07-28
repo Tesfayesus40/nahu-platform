@@ -16,8 +16,10 @@ import {
 import { buildCoffeeExtension } from '../marketplace/listing-contract.rules';
 import { isPubliclyVisibleModeration } from '../marketplace/listing-moderation.rules';
 import { BuyerConfirmService } from './buyer-confirm.service';
-
-const COMMISSION_RATE = 0.02; // 2% — matches the existing Nahu Buna Gebaya commission model
+import { PricingService } from '../pricing/pricing.service';
+import { buildOrderMoneySnapshot } from '../pricing/pricing.rules';
+import { FulfillmentOrchestrationService } from '../delivery/fulfillment-orchestration.service';
+import { PaymentOrchestrationService } from '../payments/payment-orchestration.service';
 
 function toNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
@@ -31,6 +33,9 @@ export class OrdersService {
     private readonly payments: PaymentsService,
     private readonly reservations: ReservationsService,
     private readonly buyerConfirm: BuyerConfirmService,
+    private readonly pricing: PricingService,
+    private readonly orchestration: FulfillmentOrchestrationService,
+    private readonly paymentOrch: PaymentOrchestrationService,
   ) {}
 
   async createOrder(buyerId: string, dto: CreateOrderDto) {
@@ -83,7 +88,6 @@ export class OrdersService {
         );
       }
     } else if (!deliveryAddress) {
-      // Dual-write column is NOT NULL — use a light placeholder for pickup / seller delivery.
       deliveryAddress =
         deliveryMethod === DeliveryMethod.CUSTOMER_PICKUP
           ? 'Customer pickup'
@@ -113,13 +117,68 @@ export class OrdersService {
       throw err;
     }
 
-    const totalEtb = resolved.totalEtb;
-    const commissionEtb = totalEtb * COMMISSION_RATE;
-    const farmerPayoutEtb = totalEtb - commissionEtb;
-    const reference = `NBG-${Date.now().toString(16).toUpperCase().slice(-8)}`;
+    const goodsSubtotalEtb = resolved.totalEtb;
+    const market = await this.pricing.resolveMarketplaceSnapshot(goodsSubtotalEtb);
 
+    let deliveryFeeEtb = 0;
+    let deliveryCommissionEtb = 0;
+    let courierPayoutEtb = 0;
+    let deliveryQuoteId: string | null = null;
+    let feeScheduleId: string | null = market.scheduleId || null;
+
+    const dynamicDelivery = await this.pricing.isDynamicDeliveryEnabled();
+    if (deliveryMethod === DeliveryMethod.NAHU_COURIER && dynamicDelivery) {
+      if (!dto.deliveryQuoteId) {
+        throw new BadRequestException(
+          'deliveryQuoteId is required for NAHU_COURIER when dynamic delivery fees are enabled',
+        );
+      }
+      // Bind quote after order id exists — validate expiry/ownership first.
+      const quote = await this.prisma.deliveryQuote.findUnique({
+        where: { id: dto.deliveryQuoteId },
+      });
+      if (!quote) {
+        throw new BadRequestException('Delivery quote not found');
+      }
+      if (quote.buyerUserId && quote.buyerUserId !== buyerId) {
+        throw new BadRequestException('Delivery quote does not belong to this buyer');
+      }
+      if (quote.expiresAt.getTime() < Date.now()) {
+        throw new BadRequestException('Delivery quote has expired; request a new quote');
+      }
+      if (quote.orderId) {
+        throw new BadRequestException('Delivery quote already used');
+      }
+      deliveryFeeEtb = Number(quote.deliveryFeeEtb);
+      deliveryCommissionEtb = Number(quote.deliveryCommissionEtb);
+      courierPayoutEtb = Number(quote.courierPayoutEtb);
+      deliveryQuoteId = quote.id;
+      feeScheduleId = quote.feeScheduleId;
+    }
+
+    const snapshot = buildOrderMoneySnapshot({
+      goodsSubtotalEtb,
+      rates: {
+        buyerFeePct: market.buyerFeePct,
+        farmerFeePct: market.farmerFeePct,
+      },
+      deliveryFeeEtb,
+      deliveryCommissionEtb,
+      courierPayoutEtb,
+    });
+
+    const reference = `NBG-${Date.now().toString(16).toUpperCase().slice(-8)}`;
     const available = Number(listing.quantity ?? listing.quantityKg);
     const remaining = available - resolved.quantity;
+
+    let sellerPartyId = listing.sellerPartyId ?? null;
+    if (!sellerPartyId && listing.farmerId) {
+      const farmer = await this.prisma.farmerProfile.findUnique({
+        where: { id: listing.farmerId },
+        select: { sellerPartyId: true },
+      });
+      sellerPartyId = farmer?.sellerPartyId ?? null;
+    }
 
     const order = await this.prisma.$transaction(async (tx) => {
       const created = await tx.order.create({
@@ -127,13 +186,23 @@ export class OrdersService {
           listingId: listing.id,
           buyerId,
           farmerId: listing.farmerId,
+          sellerPartyId,
           quantity: resolved.quantity,
           unitCode: resolved.unitCode,
           pricePerUnit: resolved.pricePerUnit,
           quantityKg: resolved.quantityKg,
-          totalEtb,
-          commissionEtb,
-          farmerPayoutEtb,
+          totalEtb: snapshot.totalEtb,
+          commissionEtb: snapshot.commissionEtb,
+          farmerPayoutEtb: snapshot.farmerPayoutEtb,
+          goodsSubtotalEtb: snapshot.goodsSubtotalEtb,
+          buyerFeeEtb: snapshot.buyerFeeEtb,
+          farmerFeeEtb: snapshot.farmerFeeEtb,
+          deliveryFeeEtb: snapshot.deliveryFeeEtb,
+          deliveryCommissionEtb: snapshot.deliveryCommissionEtb,
+          courierPayoutEtb: snapshot.courierPayoutEtb,
+          buyerChargeEtb: snapshot.buyerChargeEtb,
+          feeScheduleId,
+          deliveryQuoteId,
           paymentMethod: dto.paymentMethod,
           paymentReference: reference,
           deliveryAddress,
@@ -141,6 +210,13 @@ export class OrdersService {
           deliveryMethod,
         },
       });
+
+      if (deliveryQuoteId) {
+        await tx.deliveryQuote.update({
+          where: { id: deliveryQuoteId },
+          data: { orderId: created.id },
+        });
+      }
 
       await tx.listing.update({
         where: { id: listing.id },
@@ -168,13 +244,30 @@ export class OrdersService {
       return created;
     });
 
+    // G9 — create payment case (CREATED → PENDING)
+    await this.paymentOrch
+      .ensureFromOrder({ orderId: order.id, actorUserId: buyerId, initiate: true })
+      .catch(() => undefined);
+
     return {
       order: this.shapeOrder(order, listing),
       payment: {
         method: dto.paymentMethod,
-        amount: totalEtb,
+        amount: snapshot.buyerChargeEtb,
         reference,
         message: `In production this would redirect to the ${dto.paymentMethod} payment page`,
+      },
+      fees: {
+        goodsSubtotalEtb: snapshot.goodsSubtotalEtb,
+        buyerFeeEtb: snapshot.buyerFeeEtb,
+        farmerFeeEtb: snapshot.farmerFeeEtb,
+        deliveryFeeEtb: snapshot.deliveryFeeEtb,
+        deliveryCommissionEtb: snapshot.deliveryCommissionEtb,
+        courierPayoutEtb: snapshot.courierPayoutEtb,
+        buyerChargeEtb: snapshot.buyerChargeEtb,
+        farmerPayoutEtb: snapshot.farmerPayoutEtb,
+        buyerFeePct: market.buyerFeePct,
+        farmerFeePct: market.farmerFeePct,
       },
     };
   }
@@ -197,6 +290,16 @@ export class OrdersService {
       where: { id: orderId },
       data: { status: 'PAID_ESCROW', paidAt: new Date() },
     });
+
+    // G9 — provider stub + escrow hold (also records BUYER_CAPTURE intent)
+    await this.paymentOrch.syncCaptureToEscrow({
+      orderId,
+      actorUserId: buyerId,
+      externalReference: order.paymentReference,
+    });
+
+    // G8 — advance fulfilment orchestration PLACED → PAID
+    await this.orchestration.syncPaid(orderId, buyerId).catch(() => undefined);
 
     return this.shapeOrder(updated);
   }
@@ -236,6 +339,10 @@ export class OrdersService {
       return tx.order.update({ where: { id: orderId }, data: { status: 'CANCELLED' } });
     });
 
+    await this.paymentOrch
+      .cancelUnpaid(orderId, buyerId, 'BUYER_CANCELLATION')
+      .catch(() => undefined);
+
     return this.shapeOrder(updated);
   }
 
@@ -273,6 +380,10 @@ export class OrdersService {
       });
       return tx.order.update({ where: { id: orderId }, data: { status: 'CANCELLED' } });
     });
+
+    await this.paymentOrch
+      .cancelUnpaid(orderId, userId, 'SELLER_REJECTION')
+      .catch(() => undefined);
 
     return this.shapeOrder(updated);
   }
@@ -464,6 +575,7 @@ export class OrdersService {
       listingId: order.listingId,
       buyerId: order.buyerId,
       farmerId: order.farmerId,
+      sellerPartyId: order.sellerPartyId ?? listing?.sellerPartyId ?? null,
       quantity,
       unitCode,
       pricePerUnit,
@@ -471,6 +583,16 @@ export class OrdersService {
       totalEtb: toNumber(order.totalEtb),
       commissionEtb: toNumber(order.commissionEtb),
       farmerPayoutEtb: toNumber(order.farmerPayoutEtb),
+      goodsSubtotalEtb: toNumber(order.goodsSubtotalEtb) ?? toNumber(order.totalEtb),
+      buyerFeeEtb: toNumber(order.buyerFeeEtb) ?? 0,
+      farmerFeeEtb: toNumber(order.farmerFeeEtb) ?? toNumber(order.commissionEtb),
+      deliveryFeeEtb: toNumber(order.deliveryFeeEtb) ?? 0,
+      deliveryCommissionEtb: toNumber(order.deliveryCommissionEtb) ?? 0,
+      courierPayoutEtb: toNumber(order.courierPayoutEtb) ?? 0,
+      buyerChargeEtb:
+        toNumber(order.buyerChargeEtb) ?? toNumber(order.totalEtb),
+      feeScheduleId: order.feeScheduleId ?? null,
+      deliveryQuoteId: order.deliveryQuoteId ?? null,
       status: order.status,
       paymentMethod: order.paymentMethod,
       paymentReference: order.paymentReference,

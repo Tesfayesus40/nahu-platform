@@ -18,9 +18,11 @@ import {
   type OrderAdminAction,
 } from './order-admin.rules';
 import { fulfillmentStatusForOrder } from '../delivery/fulfillment.rules';
+import { orchestrationFromOrderStatus } from '../delivery/orchestration.rules';
 import { ShipmentAggregateService } from '../delivery/shipment-aggregate.service';
 import { DeliveryEventsPublisher } from '../delivery/delivery-events.publisher';
 import { BuyerConfirmService } from './buyer-confirm.service';
+import { PaymentRailsService } from '../pricing/payment-rails.service';
 import {
   ListOrdersQueryDto,
   OrderAdminActionDto,
@@ -50,6 +52,7 @@ export class AdminOrdersService {
     private readonly shipmentAggregate: ShipmentAggregateService,
     private readonly deliveryEvents: DeliveryEventsPublisher,
     private readonly buyerConfirm: BuyerConfirmService,
+    private readonly paymentRails: PaymentRailsService,
   ) {}
 
   async countByStatus(): Promise<Record<string, number>> {
@@ -176,6 +179,15 @@ export class AdminOrdersService {
       pricePerUnit: o.pricePerUnit,
       commissionEtb: o.commissionEtb,
       farmerPayoutEtb: o.farmerPayoutEtb,
+      goodsSubtotalEtb: o.goodsSubtotalEtb ?? o.totalEtb,
+      buyerFeeEtb: o.buyerFeeEtb,
+      farmerFeeEtb: o.farmerFeeEtb ?? o.commissionEtb,
+      deliveryFeeEtb: o.deliveryFeeEtb,
+      deliveryCommissionEtb: o.deliveryCommissionEtb,
+      courierPayoutEtb: o.courierPayoutEtb,
+      buyerChargeEtb: o.buyerChargeEtb ?? o.totalEtb,
+      feeScheduleId: o.feeScheduleId,
+      deliveryQuoteId: o.deliveryQuoteId,
       paymentReference: o.paymentReference,
       deliveryAddress: o.deliveryAddress,
       paidAt: o.paidAt,
@@ -188,6 +200,7 @@ export class AdminOrdersService {
         providerStatus: methodMeta?.status ?? 'unknown',
         providerLabel: methodMeta?.nameEn ?? o.paymentMethod,
       },
+      paymentIntents: await this.paymentRails.listForOrder(o.id),
       buyer: o.buyer,
       seller: {
         farmerProfileId: o.farmer.id,
@@ -398,6 +411,7 @@ export class AdminOrdersService {
         data: {
           orderId,
           status,
+          orchestrationStatus: orchestrationFromOrderStatus(orderStatus),
           readyAt: status === 'READY' ? now : null,
           shippedAt: status === 'IN_TRANSIT' ? now : null,
           deliveredAt: status === 'DELIVERED' ? now : null,
@@ -415,10 +429,30 @@ export class AdminOrdersService {
       });
       fulfillmentId = created.id;
     } else {
+      const mappedOrch = orchestrationFromOrderStatus(orderStatus);
+      const orchRank = (s: string) =>
+        [
+          'PLACED',
+          'PAID',
+          'SELLER_ACCEPTED',
+          'PREPARING',
+          'READY_FOR_PICKUP',
+          'COURIER_ASSIGNED',
+          'PICKED_UP',
+          'IN_TRANSIT',
+          'DELIVERED',
+          'SETTLED',
+        ].indexOf(s);
+      const nextOrch =
+        orchRank(mappedOrch) > orchRank(existing.orchestrationStatus)
+          ? mappedOrch
+          : existing.orchestrationStatus;
+
       await tx.fulfillmentCase.update({
         where: { id: existing.id },
         data: {
           status,
+          orchestrationStatus: nextOrch,
           readyAt: status === 'READY' ? (existing.readyAt ?? now) : existing.readyAt,
           shippedAt:
             status === 'IN_TRANSIT' ? (existing.shippedAt ?? now) : existing.shippedAt,

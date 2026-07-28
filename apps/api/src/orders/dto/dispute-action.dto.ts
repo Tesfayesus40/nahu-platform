@@ -45,6 +45,28 @@ export class DisputeActionDto {
   @IsNumber()
   @Min(0)
   refundAmountEtb?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  refundGoodsEtb?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  refundBuyerFeeEtb?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  refundDeliveryEtb?: number;
+
+  @IsOptional()
+  @IsString()
+  refundPolicyCode?: string;
 }
 
 export class DisputeAssignDto {

@@ -9,6 +9,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CertificatesService } from '../certificates/certificates.service';
 import { ShipmentAggregateService } from '../delivery/shipment-aggregate.service';
 import { DeliveryEventsPublisher } from '../delivery/delivery-events.publisher';
+import { SettlementService } from '../delivery/settlement.service';
+import { PaymentRailsService } from '../pricing/payment-rails.service';
+import { PaymentOrchestrationService } from '../payments/payment-orchestration.service';
 import {
   ACTIVE_OUTBOUND_STATUSES,
   ShipmentStatus,
@@ -40,6 +43,9 @@ export class BuyerConfirmService {
     private readonly certificates: CertificatesService,
     private readonly aggregate: ShipmentAggregateService,
     private readonly events: DeliveryEventsPublisher,
+    private readonly settlement: SettlementService,
+    private readonly paymentRails: PaymentRailsService,
+    private readonly paymentOrch: PaymentOrchestrationService,
   ) {}
 
   canConfirm(input: {
@@ -205,6 +211,73 @@ export class BuyerConfirmService {
       });
       if (!existing) {
         await this.certificates.issueCertificateForOrder(order.id);
+      }
+
+      // Phase 3/5: accrue courier from order snapshot; record disbursement intents.
+      if (shipmentId) {
+        try {
+          await this.settlement.accrueOnCompleted({
+            shipmentId,
+            actorUserId: input.actor.userId,
+          });
+        } catch {
+          // Accrual may already exist from courier completeDelivery — ignore conflicts.
+        }
+      }
+
+      const fresh = await this.prisma.order.findUniqueOrThrow({
+        where: { id: order.id },
+      });
+
+      // G9 — settle from Revenue Engine snapshot (records disbursement stubs)
+      await this.paymentOrch
+        .settleOrder({
+          orderId: order.id,
+          actorUserId: input.actor.userId,
+          reason: 'Order completed — settlement orchestration',
+        })
+        .catch(() => undefined);
+
+      // RC1 dual-write: keep rails intents if settlement skipped (no payment case)
+      const farmerPayout = Number(fresh.farmerPayoutEtb) || 0;
+      if (farmerPayout > 0) {
+        const existingFarmer = await this.prisma.paymentIntent.findFirst({
+          where: {
+            orderId: order.id,
+            intentType: 'FARMER_DISBURSEMENT',
+          },
+        });
+        if (!existingFarmer) {
+          await this.paymentRails.recordIntent({
+            orderId: order.id,
+            providerCode: 'INTERNAL_DISBURSEMENT',
+            intentType: 'FARMER_DISBURSEMENT',
+            amountEtb: farmerPayout,
+            metadataJson: { simulated: true, trigger: 'order_completed' },
+          });
+        }
+      }
+      const courierPayout = Number(fresh.courierPayoutEtb) || 0;
+      if (courierPayout > 0 && shipmentId) {
+        const existingCourier = await this.prisma.paymentIntent.findFirst({
+          where: {
+            orderId: order.id,
+            intentType: 'COURIER_DISBURSEMENT',
+          },
+        });
+        if (!existingCourier) {
+          await this.paymentRails.recordIntent({
+            orderId: order.id,
+            providerCode: 'INTERNAL_DISBURSEMENT',
+            intentType: 'COURIER_DISBURSEMENT',
+            amountEtb: courierPayout,
+            metadataJson: {
+              simulated: true,
+              trigger: 'order_completed',
+              shipmentId,
+            },
+          });
+        }
       }
     }
 

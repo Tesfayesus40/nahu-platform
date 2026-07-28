@@ -20,6 +20,12 @@ export enum PaymentMethod {
   SANTIMPAY = 'SANTIMPAY',
 }
 
+export enum DeliveryMethod {
+  NAHU_COURIER = 'NAHU_COURIER',
+  SELLER_DELIVERY = 'SELLER_DELIVERY',
+  CUSTOMER_PICKUP = 'CUSTOMER_PICKUP',
+}
+
 export class CreateOrderDto {
   @IsUUID()
   listingId: string;
@@ -48,8 +54,31 @@ export class CreateOrderDto {
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod;
 
+  /**
+   * Required for NAHU_COURIER when deliveryAddressId is omitted.
+   * When deliveryAddressId is set, may be omitted (auto-filled from saved address).
+   */
+  @ValidateIf(
+    (o) =>
+      !o.deliveryAddressId &&
+      (o.deliveryMethod === undefined ||
+        o.deliveryMethod === DeliveryMethod.NAHU_COURIER),
+  )
   @IsString()
   @MinLength(10)
   @MaxLength(500)
-  deliveryAddress: string;
+  deliveryAddress?: string;
+
+  @IsOptional()
+  @IsUUID()
+  deliveryAddressId?: string;
+
+  @IsOptional()
+  @IsEnum(DeliveryMethod)
+  deliveryMethod?: DeliveryMethod;
+
+  /** Required when delivery.dynamic_fee.enabled and deliveryMethod is NAHU_COURIER. */
+  @IsOptional()
+  @IsUUID()
+  deliveryQuoteId?: string;
 }
