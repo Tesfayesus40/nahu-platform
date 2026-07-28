@@ -97,6 +97,8 @@ UAT wipe SQL updated to truncate these tables.
 
 ## RC1 readiness
 
-Courier App CRM surfaces are no longer placeholders and integrate with Nest + Admin Portal. Shipment execution paths are unchanged except additive notification hooks. Staging migration `008` is applied. API `tsc --noEmit` for build config passes.
+See **`docs/08-guides/courier-rc1-final-readiness-report.md`** for the gate result.
 
-**Note:** Redeploy `nahu-api` and `nahu-admin-web` on Railway so new routes are live before UAT. Rebuild courier APK after installing new native deps (`expo-image-picker`).
+**Staging deploy (2026-07-27):** `nahu-api` + `nahu-admin-web` SUCCESS; CRM routes return 401 (not 404); migration `008` verified; authenticated CRM smoke 13/13; APK v7 built.
+
+**Verdict:** CRM implementation is live on staging, but **not** declared Production Ready until device UAT + full delivery E2E complete.

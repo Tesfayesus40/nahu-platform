@@ -180,7 +180,7 @@ Recommend wiring GitHub auto-deploy from `main` or documenting `railway up` as t
 **Ready for continued staging RC:** marketplace moderation/order integrity is validated after `1fd01be` + `railway up`.
 
 **Go-live gate:**
-1. Admin §6 MFA smoke green  
+1. ~~Admin §6 MFA smoke green~~ **Done (API)**  
 2. Farmer + Buyer RC1 merged and APK smoke green  
 3. Staging deploy pipeline verified (no stale images)  
 4. Explicit production promote decision (migrations + CORS + Nest prod URL)
