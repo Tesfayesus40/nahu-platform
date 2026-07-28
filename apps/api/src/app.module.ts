@@ -21,6 +21,8 @@ import { FarmActivitiesModule } from './farms/farm-activities.module';
 import { DeliveryModule } from './delivery/delivery.module';
 import { AuditModule } from './audit/audit.module';
 import { AdminModule } from './admin/admin.module';
+import { PricingModule } from './pricing/pricing.module';
+import { OpsModule } from './ops/ops.module';
 
 @Module({
   imports: [
@@ -35,6 +37,7 @@ import { AdminModule } from './admin/admin.module';
     IdentityModule,
     AuditModule,
     AdminModule,
+    OpsModule,
     CatalogModule,
     FarmsModule,
     InventoryModule,
@@ -46,6 +49,7 @@ import { AdminModule } from './admin/admin.module';
     OrdersModule,
     PaymentsModule,
     DeliveryModule,
+    PricingModule,
     AdvisoryModule,
     UploadsModule,
   ],

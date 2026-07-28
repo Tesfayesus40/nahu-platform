@@ -5,9 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
-  build:
+  api-admin:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,8 +28,39 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @nahu-platform/api prisma:generate
 
-      - name: Lint
+      - name: Lint API
         run: pnpm --filter @nahu-platform/api lint
 
-      - name: Build
+      - name: API rule unit tests
+        run: pnpm --filter @nahu-platform/api test:rules
+
+      - name: Build API + Admin Web
         run: pnpm build
+
+      - name: Lint Admin Web
+        run: pnpm --filter @nahu-platform/admin-web lint
+        continue-on-error: true
+
+  staging-smoke:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: api-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Pilot E2E smoke (secrets-gated)
+        env:
+          PILOT_SMOKE: "1"
+          API_BASE_URL: ${{ secrets.STAGING_API_BASE_URL }}
+          BUYER_TOKEN: ${{ secrets.STAGING_BUYER_TOKEN }}
+          FARMER_TOKEN: ${{ secrets.STAGING_FARMER_TOKEN }}
+          COURIER_TOKEN: ${{ secrets.STAGING_COURIER_TOKEN }}
+          ADMIN_TOKEN: ${{ secrets.STAGING_ADMIN_TOKEN }}
+        run: |
+          if [ -z "$API_BASE_URL" ] || [ -z "$BUYER_TOKEN" ]; then
+            echo "Staging secrets not configured — skip smoke"
+            exit 0
+          fi
+          node apps/api/scripts/pilot-e2e-smoke.cjs

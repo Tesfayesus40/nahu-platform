@@ -67,6 +67,8 @@ In Railway dashboard → **staging** → **nahu-api** → Variables, set:
 | `JWT_EXPIRES_IN` | `7d` |
 | `OTP_EXPIRES_MINUTES` | `10` |
 | `OTP_DEV_BYPASS` | `true` (staging only — enables test code `123456` when SMS is not configured) |
+| `ADMIN_MFA_ENCRYPTION_KEY` | `openssl rand -hex 32` (**required** when `NODE_ENV=production`) |
+| `CORS_ORIGINS` | Admin Web staging origin(s), comma-separated |
 | `PUBLIC_API_URL` | `https://nahu-api-staging.up.railway.app` (no trailing slash; required for listing photo URLs) |
 
 Generate JWT secret:
@@ -94,6 +96,31 @@ node scripts/apply-migrations.mjs
 
 Do **not** rely on recursive filename sort. Prefer the manifest runners above
 over legacy `apply-pending-migrations.sh`.
+
+**Pilot / Production Readiness gate — confirm these are applied** (see
+`database/migrations/manifest.json`):
+
+| Area | Migration |
+|------|-----------|
+| Delivery G8 | `delivery/009_delivery_fulfillment_orchestration.sql` |
+| Payments G9 | `payments/001_payment_orchestration.sql` |
+| Identity G9 | `identity/029_identity_payment_orchestration_permissions.sql` |
+| Ops indexes | `ops/013_ops_query_indexes.sql` (when present) |
+| Pricing RC1 | through `pricing/004` + `ops/011` (dynamic delivery fee OFF) |
+
+Verify:
+
+```bash
+# Ready probe fails if DB is down
+curl -sf "$PUBLIC_API_URL/health/ready"
+```
+
+Optional pilot smoke (requires tokens):
+
+```bash
+PILOT_SMOKE=1 API_BASE_URL=https://.../api/v1 BUYER_TOKEN=... \
+  node apps/api/scripts/pilot-e2e-smoke.cjs
+```
 
 ### 6b. Admin Portal staging service (A1)
 

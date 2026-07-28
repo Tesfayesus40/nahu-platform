@@ -1,5 +1,16 @@
 # Nahu Platform API — Package 001–005 (Backend Foundation, Identity/Auth, Marketplace, Orders & Certificates, Advisory)
 
+## Commercial model (pilot)
+
+Canonical money path is **Nest only** (not gebaya Express):
+
+- **Platform fees** — active `pricing` fee schedule (`buyerFeePct` / `farmerFeePct`); snapped onto orders at create.
+- **Delivery** — dynamic delivery fee flag defaults **OFF**; courier accrual may use `delivery.earning.flat_etb` (set non-zero or accept zero).
+- **Payments** — G9 orchestration + escrow ledger; provider adapters are **stubs** (`isStub` / `settlementNote`). Not live Telebirr/CBE/Chapa cash.
+- **Ops** — G10 `/admin/ops/*`; health: `/health/live` vs `/health/ready`.
+
+See [nest-only-ops.md](../../docs/08-guides/nest-only-ops.md) and [37-production-readiness.md](../../docs/09-platform-evolution/37-production-readiness.md).
+
 ## What this is
 
 A real, running NestJS backend, wired to the Identity schema from

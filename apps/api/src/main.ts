@@ -39,7 +39,9 @@ async function bootstrap() {
   // prefix, which the nahu_buna_farmer mobile app is already built
   // against -- this way the app's endpoint paths need zero changes.
   // /health stays unprefixed, same as the original backend.
-  app.setGlobalPrefix('api/v1', { exclude: ['health'] });
+  app.setGlobalPrefix('api/v1', {
+    exclude: ['health', 'health/live', 'health/ready'],
+  });
 
   // Global validation — every DTO in every module gets this for free.
   app.useGlobalPipes(
