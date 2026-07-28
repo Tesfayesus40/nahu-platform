@@ -95,22 +95,67 @@ function formatPersonName(input) {
 
 function planOutboundStopsFromOrder(input) {
   const farmerUser = input.farmer?.user ?? null;
+  const pickupOverride = input.pickup ?? null;
+  const dropoffOverride = input.dropoff ?? null;
+
+  const pickupAddress =
+    (typeof pickupOverride?.addressText === 'string' &&
+      pickupOverride.addressText.trim()) ||
+    formatFarmerPickupAddress(input.farmer ?? {});
+  const dropoffAddress =
+    (typeof dropoffOverride?.addressText === 'string' &&
+      dropoffOverride.addressText.trim()) ||
+    input.deliveryAddress.trim() ||
+    'Buyer delivery address';
+
+  const toCoord = (value) => {
+    if (value == null) return null;
+    const n = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+
   return {
     pickup: {
       sequence: 1,
       stopType: 'PICKUP',
-      addressText: formatFarmerPickupAddress(input.farmer ?? {}),
-      contactName: formatPersonName(farmerUser ?? {}),
-      contactPhone: farmerUser?.phone ?? null,
-      instructions: input.pickupNotes?.trim() || null,
+      addressText: pickupAddress,
+      contactName:
+        (typeof pickupOverride?.contactName === 'string' &&
+          pickupOverride.contactName.trim()) ||
+        formatPersonName(farmerUser ?? {}),
+      contactPhone:
+        (typeof pickupOverride?.contactPhone === 'string' &&
+          pickupOverride.contactPhone.trim()) ||
+        farmerUser?.phone ||
+        null,
+      instructions:
+        (typeof pickupOverride?.instructions === 'string' &&
+          pickupOverride.instructions.trim()) ||
+        input.pickupNotes?.trim() ||
+        null,
+      lat: toCoord(pickupOverride?.lat),
+      lng: toCoord(pickupOverride?.lng),
     },
     dropoff: {
       sequence: 2,
       stopType: 'DROPOFF',
-      addressText: input.deliveryAddress.trim() || 'Buyer delivery address',
-      contactName: formatPersonName(input.buyer ?? {}),
-      contactPhone: input.buyer?.phone ?? null,
-      instructions: input.deliveryNotes?.trim() || null,
+      addressText: dropoffAddress,
+      contactName:
+        (typeof dropoffOverride?.contactName === 'string' &&
+          dropoffOverride.contactName.trim()) ||
+        formatPersonName(input.buyer ?? {}),
+      contactPhone:
+        (typeof dropoffOverride?.contactPhone === 'string' &&
+          dropoffOverride.contactPhone.trim()) ||
+        input.buyer?.phone ||
+        null,
+      instructions:
+        (typeof dropoffOverride?.instructions === 'string' &&
+          dropoffOverride.instructions.trim()) ||
+        input.deliveryNotes?.trim() ||
+        null,
+      lat: toCoord(dropoffOverride?.lat),
+      lng: toCoord(dropoffOverride?.lng),
     },
   };
 }
@@ -423,9 +468,13 @@ describe('shipment domain (D2/D5)', () => {
     assert.equal(stops.pickup.sequence, 1);
     assert.equal(stops.pickup.addressText, 'Oromia, Jimma, Gomma');
     assert.equal(stops.pickup.contactName, 'Abebe Kebede');
+    assert.equal(stops.pickup.lat, null);
+    assert.equal(stops.pickup.lng, null);
     assert.equal(stops.dropoff.stopType, 'DROPOFF');
     assert.equal(stops.dropoff.sequence, 2);
     assert.equal(stops.dropoff.addressText, 'Bole, Addis Ababa');
+    assert.equal(stops.dropoff.lat, null);
+    assert.equal(stops.dropoff.lng, null);
     assert.equal(
       assertStopsReadyForAssignment([
         { sequence: 1, stopType: 'PICKUP' },
@@ -433,5 +482,74 @@ describe('shipment domain (D2/D5)', () => {
       ]).ok,
       true,
     );
+  });
+
+  it('prefers structured pickup/dropoff overrides when provided', () => {
+    const stops = planOutboundStopsFromOrder({
+      deliveryAddress: 'Legacy free-text address',
+      pickupNotes: 'Fulfillment pickup note',
+      deliveryNotes: 'Fulfillment drop note',
+      farmer: {
+        region: 'Oromia',
+        zone: 'Jimma',
+        woreda: 'Gomma',
+        user: { firstName: 'Abebe', lastName: 'Kebede', phone: '+251911000001' },
+      },
+      buyer: { firstName: 'Sara', lastName: 'Hailu', phone: '+251911000002' },
+      pickup: {
+        addressText: 'Main Farm Gate',
+        contactName: 'Farm Manager',
+        contactPhone: '+251911111111',
+        instructions: 'Ask for warehouse',
+        lat: 7.6661234,
+        lng: 36.8339876,
+      },
+      dropoff: {
+        addressText: 'Bole Atlas, Apt 4',
+        contactName: 'Reception',
+        contactPhone: '+251922222222',
+        instructions: 'Leave with guard',
+        lat: 9.0123456,
+        lng: 38.7654321,
+      },
+    });
+    assert.equal(stops.pickup.addressText, 'Main Farm Gate');
+    assert.equal(stops.pickup.contactName, 'Farm Manager');
+    assert.equal(stops.pickup.contactPhone, '+251911111111');
+    assert.equal(stops.pickup.instructions, 'Ask for warehouse');
+    assert.equal(stops.pickup.lat, 7.6661234);
+    assert.equal(stops.pickup.lng, 36.8339876);
+    assert.equal(stops.dropoff.addressText, 'Bole Atlas, Apt 4');
+    assert.equal(stops.dropoff.contactName, 'Reception');
+    assert.equal(stops.dropoff.contactPhone, '+251922222222');
+    assert.equal(stops.dropoff.instructions, 'Leave with guard');
+    assert.equal(stops.dropoff.lat, 9.0123456);
+    assert.equal(stops.dropoff.lng, 38.7654321);
+  });
+
+  it('falls back to farmer geo / deliveryAddress when overrides omit fields', () => {
+    const stops = planOutboundStopsFromOrder({
+      deliveryAddress: 'Bole, Addis Ababa',
+      pickupNotes: 'Gate 2',
+      farmer: {
+        region: 'Sidama',
+        zone: null,
+        woreda: 'Yirgalem',
+        user: { firstName: 'Abebe', lastName: null, phone: '+251911000001' },
+      },
+      buyer: { firstName: 'Sara', lastName: 'Hailu', phone: '+251911000002' },
+      pickup: { lat: 6.5, lng: 38.4 },
+      dropoff: { instructions: 'Ring bell', lat: null, lng: undefined },
+    });
+    assert.equal(stops.pickup.addressText, 'Sidama, Yirgalem');
+    assert.equal(stops.pickup.contactName, 'Abebe');
+    assert.equal(stops.pickup.instructions, 'Gate 2');
+    assert.equal(stops.pickup.lat, 6.5);
+    assert.equal(stops.pickup.lng, 38.4);
+    assert.equal(stops.dropoff.addressText, 'Bole, Addis Ababa');
+    assert.equal(stops.dropoff.contactName, 'Sara Hailu');
+    assert.equal(stops.dropoff.instructions, 'Ring bell');
+    assert.equal(stops.dropoff.lat, null);
+    assert.equal(stops.dropoff.lng, null);
   });
 });

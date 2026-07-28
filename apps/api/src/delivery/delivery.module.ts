@@ -5,6 +5,11 @@ import { AdminDispatchController } from './admin-dispatch.controller';
 import { CourierDeliveryController } from './courier-delivery.controller';
 import { SellerDeliveryController } from './seller-delivery.controller';
 import { BuyerDeliveryController } from './buyer-delivery.controller';
+import {
+  AdminFulfillmentOrchestrationController,
+  FulfillmentOrchestrationController,
+} from './fulfillment-orchestration.controller';
+import { FulfillmentOrchestrationService } from './fulfillment-orchestration.service';
 import { DeliveryConfigService } from './delivery-config.service';
 import { ShipmentAggregateService } from './shipment-aggregate.service';
 import { DispatchService } from './dispatch.service';
@@ -34,9 +39,11 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
     AdminDispatchController,
     AdminSettlementController,
     AdminCourierVerificationController,
+    AdminFulfillmentOrchestrationController,
     CourierDeliveryController,
     SellerDeliveryController,
     BuyerDeliveryController,
+    FulfillmentOrchestrationController,
   ],
   providers: [
     AdminDeliveryService,
@@ -44,6 +51,7 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
     PartyDeliveryService,
     ProofOfDeliveryService,
     SettlementService,
+    FulfillmentOrchestrationService,
     DeliveryConfigService,
     ShipmentAggregateService,
     DispatchService,
@@ -65,6 +73,7 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
     PartyDeliveryService,
     ProofOfDeliveryService,
     SettlementService,
+    FulfillmentOrchestrationService,
     DeliveryConfigService,
     ShipmentAggregateService,
     DispatchService,

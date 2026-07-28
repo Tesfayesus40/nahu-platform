@@ -359,6 +359,7 @@ export function formatPersonName(input: {
 /**
  * RC1 outbound stop plan from fulfillment/order parties.
  * Status stays CREATED until Admin Release → Assign (DispatchService).
+ * Optional pickup/dropoff overrides enrich from saved locations when present.
  */
 export function planOutboundStopsFromOrder(input: {
   deliveryAddress: string;
@@ -379,6 +380,22 @@ export function planOutboundStopsFromOrder(input: {
     lastName?: string | null;
     phone?: string | null;
   } | null;
+  pickup?: {
+    addressText?: string | null;
+    contactName?: string | null;
+    contactPhone?: string | null;
+    instructions?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+  } | null;
+  dropoff?: {
+    addressText?: string | null;
+    contactName?: string | null;
+    contactPhone?: string | null;
+    instructions?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+  } | null;
 }): {
   pickup: {
     sequence: 1;
@@ -387,6 +404,8 @@ export function planOutboundStopsFromOrder(input: {
     contactName: string | null;
     contactPhone: string | null;
     instructions: string | null;
+    lat: number | null;
+    lng: number | null;
   };
   dropoff: {
     sequence: 2;
@@ -395,27 +414,64 @@ export function planOutboundStopsFromOrder(input: {
     contactName: string | null;
     contactPhone: string | null;
     instructions: string | null;
+    lat: number | null;
+    lng: number | null;
   };
 } {
   const farmerUser = input.farmer?.user ?? null;
+  const pickupOverride = input.pickup ?? null;
+  const dropoffOverride = input.dropoff ?? null;
+
+  const pickupAddress =
+    (typeof pickupOverride?.addressText === 'string' &&
+      pickupOverride.addressText.trim()) ||
+    formatFarmerPickupAddress(input.farmer ?? {});
+  const dropoffAddress =
+    (typeof dropoffOverride?.addressText === 'string' &&
+      dropoffOverride.addressText.trim()) ||
+    input.deliveryAddress.trim() ||
+    'Buyer delivery address';
+
   return {
     pickup: {
       sequence: 1,
       stopType: 'PICKUP',
-      addressText: formatFarmerPickupAddress(input.farmer ?? {}),
-      contactName: formatPersonName(farmerUser ?? {}),
-      contactPhone: farmerUser?.phone ?? null,
-      instructions: input.pickupNotes?.trim() || null,
+      addressText: pickupAddress,
+      contactName:
+        pickupOverride?.contactName?.trim() ||
+        formatPersonName(farmerUser ?? {}),
+      contactPhone:
+        pickupOverride?.contactPhone?.trim() || farmerUser?.phone || null,
+      instructions:
+        pickupOverride?.instructions?.trim() ||
+        input.pickupNotes?.trim() ||
+        null,
+      lat: toOptionalCoord(pickupOverride?.lat),
+      lng: toOptionalCoord(pickupOverride?.lng),
     },
     dropoff: {
       sequence: 2,
       stopType: 'DROPOFF',
-      addressText: input.deliveryAddress.trim() || 'Buyer delivery address',
-      contactName: formatPersonName(input.buyer ?? {}),
-      contactPhone: input.buyer?.phone ?? null,
-      instructions: input.deliveryNotes?.trim() || null,
+      addressText: dropoffAddress,
+      contactName:
+        dropoffOverride?.contactName?.trim() ||
+        formatPersonName(input.buyer ?? {}),
+      contactPhone:
+        dropoffOverride?.contactPhone?.trim() || input.buyer?.phone || null,
+      instructions:
+        dropoffOverride?.instructions?.trim() ||
+        input.deliveryNotes?.trim() ||
+        null,
+      lat: toOptionalCoord(dropoffOverride?.lat),
+      lng: toOptionalCoord(dropoffOverride?.lng),
     },
   };
+}
+
+function toOptionalCoord(value: number | null | undefined): number | null {
+  if (value == null) return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
 /** Shipment may leave CREATED / be offered only with ≥1 stop; RC1 expects PICKUP+DROPOFF. */

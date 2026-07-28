@@ -192,6 +192,8 @@ export class DispatchService {
     courierUserId?: string | null;
     actorUserId: string;
     reason?: string | null;
+    /** G8 — minutes until offer expires (default 15). */
+    offerTimeoutMinutes?: number | null;
     audit?: boolean;
     sessionId?: string | null;
     meta?: { ip?: string; userAgent?: string; requestId?: string };
@@ -226,10 +228,17 @@ export class DispatchService {
 
       await this.loadCourierOrThrow(tx, courierUserId!);
 
+      const timeoutMin = input.offerTimeoutMinutes ?? 15;
+      const offerExpiresAt =
+        timeoutMin > 0
+          ? new Date(Date.now() + timeoutMin * 60_000)
+          : null;
+
       const assignment = await this.aggregate.createActiveAssignment(tx, {
         shipmentId: shipment.id,
         courierUserId: courierUserId!,
         assignedByUserId: input.actorUserId,
+        offerExpiresAt,
       });
 
       const now = new Date();
@@ -339,6 +348,7 @@ export class DispatchService {
         shipmentId: shipment.id,
         courierUserId: courierUserId!,
         assignedByUserId: input.actorUserId,
+        offerExpiresAt: new Date(Date.now() + 15 * 60_000),
       });
 
       const now = new Date();
@@ -515,6 +525,103 @@ export class DispatchService {
     return this.aggregate.getShipmentForDispatch(input.shipmentId);
   }
 
+  /**
+   * G8 — expire an unaccepted assignment offer and return shipment to AWAITING_ASSIGNMENT.
+   */
+  async timeoutAssignment(input: {
+    shipmentId: string;
+    actorUserId: string;
+    reason?: string | null;
+  }) {
+    let publication: DeliveryLifecyclePublication | null = null;
+    await this.prisma.$transaction(async (tx) => {
+      const shipment = await tx.shipment.findFirst({
+        where: { id: input.shipmentId, deletedAt: null },
+      });
+      if (!shipment) {
+        this.throwDomain(
+          new DispatchDomainError('SHIPMENT_NOT_FOUND', 'Shipment not found'),
+        );
+      }
+
+      const active = await this.aggregate.findActiveAssignment(tx, shipment.id);
+      if (!active) {
+        this.throwDomain(
+          new DispatchDomainError(
+            'NO_ACTIVE_ASSIGNMENT',
+            'No active assignment to timeout',
+          ),
+        );
+      }
+      if (active.acceptedAt) {
+        throw new ConflictException('Cannot timeout an accepted assignment');
+      }
+
+      await this.aggregate.deactivateAssignment(tx, {
+        assignmentId: active.id,
+        mode: 'cancel',
+        reason: input.reason?.trim() || 'Assignment offer timed out',
+      });
+
+      if (!isShipmentStatus(shipment.currentStatus)) {
+        throw new BadRequestException('Invalid shipment status');
+      }
+
+      const fromStatus = shipment.currentStatus as ShipmentStatus;
+      if (fromStatus !== 'ASSIGNED' && fromStatus !== 'AWAITING_ASSIGNMENT') {
+        throw new BadRequestException(
+          `Cannot timeout assignment while shipment is ${fromStatus}`,
+        );
+      }
+
+      const now = new Date();
+      if (fromStatus === 'ASSIGNED') {
+        await this.aggregate.transitionStatus(tx, {
+          shipmentId: shipment.id,
+          fromStatus: 'ASSIGNED',
+          toStatus: 'AWAITING_ASSIGNMENT',
+          actorUserId: input.actorUserId,
+          message: input.reason?.trim() || 'Assignment offer timed out',
+          eventTypeOverride: 'delivery.shipment.assignment_timed_out',
+          payload: {
+            priorAssignmentId: active.id,
+            timedOut: true,
+          },
+          timestampFields: { acceptedAt: null },
+          courierUserId: null,
+        });
+      } else {
+        await tx.shipment.update({
+          where: { id: shipment.id },
+          data: { courierUserId: null, assignedAt: null, updatedAt: now },
+        });
+        await this.aggregate.appendDomainEvent(tx, {
+          shipmentId: shipment.id,
+          eventType: 'delivery.shipment.assignment_timed_out',
+          fromStatus: 'AWAITING_ASSIGNMENT',
+          toStatus: 'AWAITING_ASSIGNMENT',
+          actorUserId: input.actorUserId,
+          assignmentId: active.id,
+          message: input.reason?.trim() || 'Assignment offer timed out',
+          payload: { priorAssignmentId: active.id, timedOut: true },
+        });
+      }
+
+      publication = {
+        shipmentId: shipment.id,
+        eventType: 'delivery.shipment.assignment_timed_out',
+        fromStatus,
+        toStatus: 'AWAITING_ASSIGNMENT',
+        actorUserId: input.actorUserId,
+        occurredAt: now,
+        payload: { priorAssignmentId: active.id, timedOut: true },
+      };
+    });
+
+    if (publication) this.events.publish(publication);
+    return this.aggregate.getShipmentForDispatch(input.shipmentId);
+  }
+
   async acceptAssignment(courierUserId: string, shipmentId: string) {
     let publication: DeliveryLifecyclePublication | null = null;
     await this.prisma.$transaction(async (tx) => {
@@ -552,6 +659,16 @@ export class DispatchService {
             'NO_ACTIVE_ASSIGNMENT',
             'No active assignment for this courier',
           ),
+        );
+      }
+
+      if (
+        active.offerExpiresAt &&
+        active.offerExpiresAt.getTime() <= Date.now() &&
+        !active.acceptedAt
+      ) {
+        throw new ConflictException(
+          'Assignment offer has expired — wait for reassignment',
         );
       }
 

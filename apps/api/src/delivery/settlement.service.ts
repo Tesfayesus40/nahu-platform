@@ -150,12 +150,30 @@ export class SettlementService {
         );
       }
 
+      const fulfillment = await tx.fulfillmentCase.findUnique({
+        where: { id: shipment.fulfillmentId },
+        include: { order: true },
+      });
+      const orderPayout =
+        fulfillment?.order?.courierPayoutEtb != null
+          ? Number(fulfillment.order.courierPayoutEtb)
+          : null;
+      const orderDeliveryFee =
+        fulfillment?.order?.deliveryFeeEtb != null
+          ? Number(fulfillment.order.deliveryFeeEtb)
+          : null;
+      const orderDeliveryCommission =
+        fulfillment?.order?.deliveryCommissionEtb != null
+          ? Number(fulfillment.order.deliveryCommissionEtb)
+          : null;
+
       const flatEtb = await this.config.earningFlatEtb();
       const planned = planDeliveryAccrual({
         shipmentId: shipment.id,
         stopId: shipment.stops[0]?.id ?? shipment.pods[0]?.stopId ?? null,
         courierUserId: shipment.courierUserId,
         flatEtb,
+        courierPayoutEtb: orderPayout,
       });
 
       let row;
@@ -174,6 +192,9 @@ export class SettlementService {
           metadataJson: {
             settlement: true,
             flatEtb,
+            courierPayoutEtb: orderPayout,
+            deliveryFeeEtb: orderDeliveryFee,
+            deliveryCommissionEtb: orderDeliveryCommission,
             podId: shipment.pods[0]?.id ?? null,
           },
         });

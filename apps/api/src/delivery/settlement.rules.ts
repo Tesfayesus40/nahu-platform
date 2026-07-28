@@ -104,6 +104,9 @@ export function planDeliveryAccrual(input: {
   stopId: string | null;
   courierUserId: string;
   flatEtb: number;
+  /** When set (from order snapshot), overrides flatEtb. */
+  courierPayoutEtb?: number | null;
+  policyCode?: string;
 }): {
   earningType: EarningType;
   amount: number;
@@ -111,12 +114,24 @@ export function planDeliveryAccrual(input: {
   policyCode: string;
   currency: string;
 } {
-  const amount = Number.isFinite(input.flatEtb) ? input.flatEtb : 0;
+  const fromOrder =
+    input.courierPayoutEtb != null && Number.isFinite(Number(input.courierPayoutEtb))
+      ? Number(input.courierPayoutEtb)
+      : null;
+  const amount = fromOrder != null
+    ? fromOrder
+    : Number.isFinite(input.flatEtb)
+      ? input.flatEtb
+      : 0;
   return {
     earningType: 'DELIVERY_EARNING',
     amount,
     ledgerStatus: 'ELIGIBLE',
-    policyCode: 'delivery.earning.flat_etb',
+    policyCode:
+      input.policyCode ||
+      (fromOrder != null
+        ? 'pricing.delivery.courier_payout'
+        : 'delivery.earning.flat_etb'),
     currency: 'ETB',
   };
 }

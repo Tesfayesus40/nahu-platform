@@ -362,6 +362,8 @@ export class ShipmentAggregateService {
       shipmentId: string;
       courierUserId: string;
       assignedByUserId?: string | null;
+      /** G8 — offer expiry for accept/reject timeout */
+      offerExpiresAt?: Date | null;
     },
   ) {
     return tx.shipmentAssignment.create({
@@ -370,6 +372,7 @@ export class ShipmentAggregateService {
         courierUserId: input.courierUserId,
         assignedByUserId: input.assignedByUserId ?? null,
         assignedAt: new Date(),
+        offerExpiresAt: input.offerExpiresAt ?? null,
         isActive: true,
       },
     });
@@ -685,6 +688,12 @@ export class ShipmentAggregateService {
                 },
               },
             },
+            listing: {
+              include: {
+                pickupLocation: true,
+              },
+            },
+            deliveryAddressRef: true,
           },
         },
       },
@@ -693,12 +702,47 @@ export class ShipmentAggregateService {
       throw new NotFoundException('Fulfillment case not found');
     }
 
+    const savedPickupRaw = fulfillment.order.listing?.pickupLocation ?? null;
+    const savedPickup =
+      savedPickupRaw && !savedPickupRaw.deletedAt ? savedPickupRaw : null;
+    const savedDropoff =
+      fulfillment.order.deliveryAddressRef &&
+      !fulfillment.order.deliveryAddressRef.deletedAt
+        ? fulfillment.order.deliveryAddressRef
+        : null;
+
+    const toCoord = (v: unknown): number | null => {
+      if (v == null) return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+
     const stops = planOutboundStopsFromOrder({
       deliveryAddress: fulfillment.order.deliveryAddress,
       pickupNotes: fulfillment.pickupNotes,
       deliveryNotes: fulfillment.deliveryNotes,
       farmer: fulfillment.order.farmer,
       buyer: fulfillment.order.buyer,
+      pickup: savedPickup
+        ? {
+            addressText: savedPickup.addressText,
+            contactName: savedPickup.contactName,
+            contactPhone: savedPickup.contactPhone,
+            instructions: savedPickup.instructions,
+            lat: toCoord(savedPickup.lat),
+            lng: toCoord(savedPickup.lng),
+          }
+        : null,
+      dropoff: savedDropoff
+        ? {
+            addressText: savedDropoff.addressText,
+            contactName: savedDropoff.recipientName,
+            contactPhone: savedDropoff.recipientPhone,
+            instructions: savedDropoff.instructions,
+            lat: toCoord(savedDropoff.lat),
+            lng: toCoord(savedDropoff.lng),
+          }
+        : null,
     });
 
     const readyCheck = assertStopsReadyForAssignment([
@@ -717,9 +761,14 @@ export class ShipmentAggregateService {
           currentStatus: 'CREATED',
           serviceLevel: 'STANDARD',
           notes: fulfillment.pickupNotes ?? fulfillment.deliveryNotes ?? null,
+          pickupLat: stops.pickup.lat,
+          pickupLng: stops.pickup.lng,
+          dropoffLat: stops.dropoff.lat,
+          dropoffLng: stops.dropoff.lng,
           metadataJson: {
             source: input.source ?? 'fulfillment_ready',
             orderId: fulfillment.orderId,
+            deliveryMethod: fulfillment.order.deliveryMethod ?? 'NAHU_COURIER',
           },
           stops: {
             create: [
@@ -731,6 +780,8 @@ export class ShipmentAggregateService {
                 contactName: stops.pickup.contactName,
                 contactPhone: stops.pickup.contactPhone,
                 instructions: stops.pickup.instructions,
+                lat: stops.pickup.lat,
+                lng: stops.pickup.lng,
               },
               {
                 sequence: stops.dropoff.sequence,
@@ -740,6 +791,8 @@ export class ShipmentAggregateService {
                 contactName: stops.dropoff.contactName,
                 contactPhone: stops.dropoff.contactPhone,
                 instructions: stops.dropoff.instructions,
+                lat: stops.dropoff.lat,
+                lng: stops.dropoff.lng,
               },
             ],
           },
