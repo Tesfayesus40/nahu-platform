@@ -27,6 +27,7 @@ When documents conflict, use this order (most specific wins for its domain):
 ```
 docs/
 ├── README.md                 ← you are here
+├── 00-strategy/              ← adopted strategic roadmap archive
 ├── architecture.md           ← architecture entry point
 ├── engineering-playbook.md   ← how we build (active)
 ├── business/                 ← business model and actors
