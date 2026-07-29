@@ -79,8 +79,10 @@ JOIN (
         ('altitude_m', 'specs', 'Specifications', 'መግለጫዎች', 'number', 'Farm altitude in metres.', NULL, 'RANGE', TRUE),
         ('cup_score', 'specs', 'Specifications', 'መግለጫዎች', 'number', 'Cupping score.', NULL, 'RANGE', TRUE)
 ) AS v(code, section_code, section_name_en, section_name_am, control_type, help_text_en, placeholder_en, search_filter_type, is_sortable)
-  ON c.id = ad.category_id AND ad.code = v.code
-WHERE c.code = 'COFFEE';
+  ON TRUE
+WHERE c.id = ad.category_id
+  AND ad.code = v.code
+  AND c.code = 'COFFEE';
 
 -- Infer sensible defaults for other category attributes
 UPDATE catalog.attribute_definitions
