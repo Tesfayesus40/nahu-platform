@@ -83,8 +83,9 @@ async function main() {
     {
       listingId,
       quantity: qty,
-      paymentMethod: 'telebirr',
-      deliveryMethod: 'CUSTOMER_PICKUP',
+      paymentMethod: 'TELEBIRR',
+      deliveryMethod: 'NAHU_COURIER',
+      deliveryAddress: 'RC1 Pilot Dropoff, Bole, Addis Ababa',
     },
     buyer,
   );
@@ -93,7 +94,10 @@ async function main() {
     console.error(create.data);
     process.exit(1);
   }
-  const orderId = create.data?.id || create.data?.data?.id;
+  const orderId =
+    create.data?.id ||
+    create.data?.data?.id ||
+    create.data?.order?.id;
   if (!orderId) {
     console.error('No order id in response', create.data);
     process.exit(1);
