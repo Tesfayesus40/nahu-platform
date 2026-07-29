@@ -11,6 +11,7 @@ export function ConfirmActionModal({
   requireReason = false,
   onClose,
   onConfirm,
+  children,
 }: {
   open: boolean;
   title: string;
@@ -23,6 +24,7 @@ export function ConfirmActionModal({
     reauthPassword: string;
     reason?: string;
   }) => Promise<void>;
+  children?: React.ReactNode;
 }) {
   const titleId = useId();
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -91,6 +93,7 @@ export function ConfirmActionModal({
         <h2 id={titleId}>{title}</h2>
         {description ? <p className="muted">{description}</p> : null}
         <form onSubmit={handleSubmit}>
+          {children}
           <label className="field">
             Your password (re-authenticate)
             <input

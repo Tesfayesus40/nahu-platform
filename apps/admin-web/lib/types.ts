@@ -516,6 +516,13 @@ export type OrderDetail = OrderListItem & {
   quantity: string | number | null;
   unitCode: string | null;
   pricePerUnit: string | number | null;
+  goodsSubtotalEtb?: string | number;
+  buyerFeeEtb?: string | number;
+  farmerFeeEtb?: string | number;
+  deliveryFeeEtb?: string | number;
+  deliveryCommissionEtb?: string | number;
+  courierPayoutEtb?: string | number;
+  buyerChargeEtb?: string | number;
   commissionEtb: string | number;
   farmerPayoutEtb: string | number;
   paymentReference: string | null;
@@ -529,6 +536,13 @@ export type OrderDetail = OrderListItem & {
     providerStatus: string;
     providerLabel: string;
   };
+  paymentIntents?: Array<{
+    id: string;
+    intentType: string;
+    amountEtb: number;
+    status: string;
+    providerCode: string;
+  }>;
   buyer: {
     id: string;
     email: string | null;
