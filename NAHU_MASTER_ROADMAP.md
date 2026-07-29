@@ -187,6 +187,14 @@ Cursor rule: `.cursor/rules/nahu-roadmap.mdc`
 
 ## 11. Immediate focus (do this next)
 
-**Phase 1:** Run controlled RC1 pilot UAT ([PILOT_GUIDE.md](./docs/releases/v1.0.0-rc1/PILOT_GUIDE.md)).  
+**Phase 1:** Execute **human** RC1 pilot UAT ([PILOT_GUIDE.md](./docs/releases/v1.0.0-rc1/PILOT_GUIDE.md) · [PILOT_PROGRESS.md](./docs/releases/v1.0.0-rc1/PILOT_PROGRESS.md)).  
+
+Current pilot report recommendation: **NO GO** for production until UAT sign-off ([RC1_PILOT_REPORT.md](./docs/releases/v1.0.0-rc1/RC1_PILOT_REPORT.md)).
 
 Do **not** begin Telebirr, Honey, notifications, AI, or Nahu Farms implementation until Phase 1 is approved (and any required maintenance release is handled).
+
+### Decision log addendum (2026-07-29)
+
+| Decision | Why |
+|----------|-----|
+| Phase 1 not closed on engineering validation alone | Exit criteria require signed human UAT; production NO GO until then |

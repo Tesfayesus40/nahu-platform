@@ -16,10 +16,13 @@
 | Frozen migration manifest | [migration-manifest.frozen.json](./migration-manifest.frozen.json) |
 | Tagging procedure | [TAGGING.md](./TAGGING.md) |
 | Staging validation | [RC1_STAGING_VALIDATION.md](./RC1_STAGING_VALIDATION.md) |
-| Release readiness (Phase 3) | [RC1_RELEASE_READINESS.md](./RC1_RELEASE_READINESS.md) |
+| Release readiness (Phase 3 prep) | [RC1_RELEASE_READINESS.md](./RC1_RELEASE_READINESS.md) |
 | Pilot guide + APK distribution | [PILOT_GUIDE.md](./PILOT_GUIDE.md) |
 | UAT checklist | [UAT_CHECKLIST.md](./UAT_CHECKLIST.md) |
 | Bug report template | [BUG_REPORT_TEMPLATE.md](./BUG_REPORT_TEMPLATE.md) |
+| Pilot progress / defects | [PILOT_PROGRESS.md](./PILOT_PROGRESS.md) · [PILOT_DEFECT_REGISTER.md](./PILOT_DEFECT_REGISTER.md) |
+| **Pilot report (Go/No-Go)** | [RC1_PILOT_REPORT.md](./RC1_PILOT_REPORT.md) |
+| Production readiness draft (blocked) | [PRODUCTION_READINESS_v1.0.0.md](./PRODUCTION_READINESS_v1.0.0.md) |
 
 **Companion repos**
 

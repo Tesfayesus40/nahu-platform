@@ -10,15 +10,16 @@
 
 ## Recommendation
 
-### **Ready for Pilot**
+### **Ready for Pilot** (human UAT) — **NOT Ready for Production**
 
 | Option | Status |
 |--------|--------|
-| Ready for Pilot (controlled staging UAT) | **YES — recommended now** |
-| Ready for Production | **NO** |
-| Additional RC required before pilot | **NO** (pilot can proceed; see risks) |
+| Ready for Pilot (controlled staging UAT) | **YES** |
+| Ready for Production | **NO** — see [RC1_PILOT_REPORT.md](./RC1_PILOT_REPORT.md) (**NO GO**) |
+| Phase 1 formally complete | **NO** — human UAT pending |
+| Additional RC required before pilot | **NO** |
 
-Wait for **pilot/UAT results** before choosing the next development cycle (including Telebirr). Do **not** start Honey, notifications, or AI from this gate.
+Current recommendation: **NO GO** for `v1.0.0` until human UAT sign-off. Production remaining work is drafted (blocked) in [PRODUCTION_READINESS_v1.0.0.md](./PRODUCTION_READINESS_v1.0.0.md).
 
 ---
 

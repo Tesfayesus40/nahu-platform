@@ -2,8 +2,9 @@
 
 **Status:** Official strategic direction  
 **Last updated:** 2026-07-29  
-**Current phase:** **Phase 1 – RC1 Pilot & UAT**  
-**Master source of truth:** [NAHU_MASTER_ROADMAP.md](./NAHU_MASTER_ROADMAP.md)
+**Current phase:** **Phase 1 – RC1 Pilot & UAT** (engineering pre-UAT **PASS**; human UAT **not complete** → Phase 1 **not closed**)  
+**Master source of truth:** [NAHU_MASTER_ROADMAP.md](./NAHU_MASTER_ROADMAP.md)  
+**Pilot report:** [docs/releases/v1.0.0-rc1/RC1_PILOT_REPORT.md](./docs/releases/v1.0.0-rc1/RC1_PILOT_REPORT.md) — **NO GO** for production until human UAT sign-off
 
 This file is the **living operational roadmap**. Update it when a phase completes, when a maintenance release is cut, or when progress status changes. Do **not** start work from a future phase until the current phase is completed **and approved**.
 
@@ -32,7 +33,7 @@ Build and validate the **Coffee Marketplace** first, then evolve the same platfo
 | Phase | Milestone | Status |
 |-------|-----------|--------|
 | **0** | Foundation | **Completed** |
-| **1** | RC1 Pilot & UAT | **Current — in progress** |
+| **1** | RC1 Pilot & UAT | **Current — human UAT pending** (eng gate pass; **NO GO** prod) |
 | **2** | Coffee Marketplace Production `v1.0.0` | Not started (blocked on Phase 1 approval) |
 | **3** | Stabilization `v1.0.x` | Not started |
 | **4** | Coffee Enhancement `v1.1` | Not started |
@@ -58,23 +59,27 @@ Evidence: [docs/releases/v1.0.0-rc1/](./docs/releases/v1.0.0-rc1/) · [RC1_STAGI
 
 | Workstream | Status |
 |------------|--------|
-| UAT documents | Done (local/release pack) |
-| Pilot guide + APK distribution | Done |
-| Bug reporting template | Done |
-| Release readiness | Done — **Ready for Pilot** |
-| Staging secured for pilot | Done |
-| **Pilot execution** | **Pending** |
-| Go / No-Go (from UAT) | Pending |
+| UAT documents | **Done** |
+| Pilot guide + APK distribution | **Done** |
+| Bug reporting + defect register | **Done** |
+| Release readiness (pre-pilot) | **Done** — Ready for Pilot |
+| Staging secured for pilot | **Done** |
+| Engineering E2E / ops validation | **Done** — see staging validation + pilot report |
+| Pilot execution management | **Active** — [PILOT_PROGRESS.md](./docs/releases/v1.0.0-rc1/PILOT_PROGRESS.md) |
+| **Named participant device UAT** | **Not started** |
+| Go / No-Go (from UAT) | **NO GO** (production) until human UAT — [RC1_PILOT_REPORT.md](./docs/releases/v1.0.0-rc1/RC1_PILOT_REPORT.md) |
+| Production readiness draft | **Draft blocked** — [PRODUCTION_READINESS_v1.0.0.md](./docs/releases/v1.0.0-rc1/PRODUCTION_READINESS_v1.0.0.md) |
 
 **Rules for Phase 1**
 
 - No new product features  
 - No Telebirr live rails, Honey vertical, notifications platform, or AI  
-- Maintenance / S1 fixes from pilot only if approved  
+- Maintenance / Critical fixes from pilot only if approved  
+- **Do not enter Phase 2** until this phase is formally completed and approved  
 
-**Exit criteria:** UAT sign-off per [UAT_CHECKLIST.md](./docs/releases/v1.0.0-rc1/UAT_CHECKLIST.md); update this board and recommend Phase 2 (or a `v1.0.0-rc1.x` / `v1.0.1` maintenance path if required).
+**Exit criteria:** Human UAT sign-off per [UAT_CHECKLIST.md](./docs/releases/v1.0.0-rc1/UAT_CHECKLIST.md); updated pilot report recommendation **GO** or **GO WITH MINOR FIXES**; Phase 1 marked Completed here after approval.
 
-**Materials:** [PILOT_GUIDE.md](./docs/releases/v1.0.0-rc1/PILOT_GUIDE.md) · [RC1_RELEASE_READINESS.md](./docs/releases/v1.0.0-rc1/RC1_RELEASE_READINESS.md)
+**Materials:** [PILOT_GUIDE.md](./docs/releases/v1.0.0-rc1/PILOT_GUIDE.md) · [RC1_RELEASE_READINESS.md](./docs/releases/v1.0.0-rc1/RC1_RELEASE_READINESS.md) · [RC1_PILOT_REPORT.md](./docs/releases/v1.0.0-rc1/RC1_PILOT_REPORT.md)
 
 ---
 
@@ -144,7 +149,8 @@ Related design history: [docs/09-platform-evolution/](./docs/09-platform-evoluti
 
 ## Next recommended action (as of last update)
 
-**Execute Phase 1 pilot UAT** using the RC1 pilot pack.  
-Do **not** begin Phase 2 production cutover or Phase 4/5 product work until Phase 1 is approved.
+1. **Run human device UAT** (fill roster in [PILOT_PROGRESS.md](./docs/releases/v1.0.0-rc1/PILOT_PROGRESS.md); execute [UAT_CHECKLIST.md](./docs/releases/v1.0.0-rc1/UAT_CHECKLIST.md)).  
+2. Re-issue [RC1_PILOT_REPORT.md](./docs/releases/v1.0.0-rc1/RC1_PILOT_REPORT.md) with final GO / GO WITH MINOR FIXES / NO GO.  
+3. Only after Phase 1 **approval**, use [PRODUCTION_READINESS_v1.0.0.md](./docs/releases/v1.0.0-rc1/PRODUCTION_READINESS_v1.0.0.md) to plan Phase 2 — **do not deploy** until then.
 
-When Phase 1 completes, the logical next phase is **Phase 2 – Coffee Marketplace Production (`v1.0.0`)**, unless UAT requires a maintenance RC first.
+Do **not** begin Phase 2 production cutover or Phase 4/5 product work while Phase 1 is open.
