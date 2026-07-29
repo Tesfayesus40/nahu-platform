@@ -10,6 +10,7 @@ When documents conflict, use this order (most specific wins for its domain):
 
 | Priority | Source | Use for |
 |----------|--------|---------|
+| 0 | [PROJECT_ROADMAP.md](../PROJECT_ROADMAP.md) + [NAHU_MASTER_ROADMAP.md](../NAHU_MASTER_ROADMAP.md) | **Phase sequencing, what not to build yet**, strategic direction |
 | 1 | [Users Entity](03-domain-model/users-entity.md) and other `03-domain-model/` specs | Entity fields and Identity rules |
 | 2 | [API README](../apps/api/README.md) | Endpoint routes, request/response shapes, migration notes |
 | 3 | [Engineering Playbook](engineering-playbook.md) | Conventions, database workflow, mobile API v1 contract |

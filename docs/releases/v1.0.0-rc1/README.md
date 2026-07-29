@@ -15,6 +15,11 @@
 | Backlog (Post-RC1 / RC2) | [BACKLOG.md](./BACKLOG.md) |
 | Frozen migration manifest | [migration-manifest.frozen.json](./migration-manifest.frozen.json) |
 | Tagging procedure | [TAGGING.md](./TAGGING.md) |
+| Staging validation | [RC1_STAGING_VALIDATION.md](./RC1_STAGING_VALIDATION.md) |
+| Release readiness (Phase 3) | [RC1_RELEASE_READINESS.md](./RC1_RELEASE_READINESS.md) |
+| Pilot guide + APK distribution | [PILOT_GUIDE.md](./PILOT_GUIDE.md) |
+| UAT checklist | [UAT_CHECKLIST.md](./UAT_CHECKLIST.md) |
+| Bug report template | [BUG_REPORT_TEMPLATE.md](./BUG_REPORT_TEMPLATE.md) |
 
 **Companion repos**
 

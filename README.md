@@ -11,6 +11,16 @@ Ethiopia's digital agriculture platform — a secure, mobile-first marketplace c
 
 Build the digital infrastructure that enables Ethiopia's agricultural economy to operate more efficiently, transparently, and globally. See [Business Model](docs/business/nahu-platform-business-model.md) for the full enterprise vision.
 
+## Roadmap (official)
+
+| Document | Role |
+|----------|------|
+| **[PROJECT_ROADMAP.md](./PROJECT_ROADMAP.md)** | Living phase status — **start here for current work** |
+| **[NAHU_MASTER_ROADMAP.md](./NAHU_MASTER_ROADMAP.md)** | Master source of truth (vision, architecture, versions, decisions) |
+| [Strategic roadmap archive](./docs/00-strategy/Nahu_Platform_Strategic_Roadmap.md) | Adopted strategic text |
+
+**Current phase:** Phase 1 – RC1 Pilot & UAT. Next major product milestone after coffee maturity: **Nahu Farms v2.0**. Do not start future phases early.
+
 ---
 
 ## Repository map

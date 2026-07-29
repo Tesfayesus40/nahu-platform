@@ -1,0 +1,31 @@
+---
+description: Follow Nahu official roadmap — current phase only
+alwaysApply: true
+---
+
+# Nahu Platform — Roadmap Authority
+
+Strategic direction lives in:
+
+- `NAHU_MASTER_ROADMAP.md` (source of truth)
+- `PROJECT_ROADMAP.md` (living phase status)
+
+## Current phase
+
+**Phase 1 – RC1 Pilot & UAT**
+
+Focus: complete coffee marketplace pilot UAT and production-readiness decision.  
+Next major *product* milestone after coffee maturity: **Nahu Farms v2.0** (Phase 5) — do not implement it now.
+
+## Rules
+
+1. Recommend and implement work for the **current phase** only.
+2. Do **not** start future-phase features (live Telebirr, Honey vertical, notifications platform, AI, Wallet, Nahu Farms multi-category activation) until the current phase is completed and approved.
+3. If pilot/production issues need `v1.0.x` maintenance, **prioritise those** over advancing phases.
+4. Keep the platform **generic and reusable**; coffee is the reference implementation.
+5. When a phase completes, recommend the **next** phase and explain why.
+6. Update `PROJECT_ROADMAP.md` when phase status changes.
+
+## RC1 materials
+
+`docs/releases/v1.0.0-rc1/` — pilot guide, UAT checklist, readiness, staging validation.
