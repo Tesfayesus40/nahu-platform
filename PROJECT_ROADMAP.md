@@ -33,7 +33,7 @@ Build and validate the **Coffee Marketplace** first, then evolve the same platfo
 | Phase | Milestone | Status |
 |-------|-----------|--------|
 | **0** | Foundation | **Completed** |
-| **1** | RC1 Pilot & UAT | **Current — human UAT pending** (eng gate pass; **NO GO** prod) |
+| **1** | RC1 Pilot & UAT | **Current — human UAT execution** (awaiting sessions; **NO GO** prod) |
 | **2** | Coffee Marketplace Production `v1.0.0` | Not started (blocked on Phase 1 approval) |
 | **3** | Stabilization `v1.0.x` | Not started |
 | **4** | Coffee Enhancement `v1.1` | Not started |
@@ -65,9 +65,9 @@ Evidence: [docs/releases/v1.0.0-rc1/](./docs/releases/v1.0.0-rc1/) · [RC1_STAGI
 | Release readiness (pre-pilot) | **Done** — Ready for Pilot |
 | Staging secured for pilot | **Done** |
 | Engineering E2E / ops validation | **Done** — see staging validation + pilot report |
-| Pilot execution management | **Active** — [PILOT_PROGRESS.md](./docs/releases/v1.0.0-rc1/PILOT_PROGRESS.md) |
-| **Named participant device UAT** | **Not started** |
-| Go / No-Go (from UAT) | **NO GO** (production) until human UAT — [RC1_PILOT_REPORT.md](./docs/releases/v1.0.0-rc1/RC1_PILOT_REPORT.md) |
+| Pilot execution management | **Active — human UAT armed** — [PILOT_PROGRESS.md](./docs/releases/v1.0.0-rc1/PILOT_PROGRESS.md) |
+| **Named participant device UAT** | **Awaiting first session** |
+| Go / No-Go (from UAT) | **NO GO** (production) until human UAT + your approval — [RC1_PILOT_REPORT.md](./docs/releases/v1.0.0-rc1/RC1_PILOT_REPORT.md) |
 | Production readiness draft | **Draft blocked** — [PRODUCTION_READINESS_v1.0.0.md](./docs/releases/v1.0.0-rc1/PRODUCTION_READINESS_v1.0.0.md) |
 
 **Rules for Phase 1**
@@ -149,8 +149,8 @@ Related design history: [docs/09-platform-evolution/](./docs/09-platform-evoluti
 
 ## Next recommended action (as of last update)
 
-1. **Run human device UAT** (fill roster in [PILOT_PROGRESS.md](./docs/releases/v1.0.0-rc1/PILOT_PROGRESS.md); execute [UAT_CHECKLIST.md](./docs/releases/v1.0.0-rc1/UAT_CHECKLIST.md)).  
-2. Re-issue [RC1_PILOT_REPORT.md](./docs/releases/v1.0.0-rc1/RC1_PILOT_REPORT.md) with final GO / GO WITH MINOR FIXES / NO GO.  
-3. Only after Phase 1 **approval**, use [PRODUCTION_READINESS_v1.0.0.md](./docs/releases/v1.0.0-rc1/PRODUCTION_READINESS_v1.0.0.md) to plan Phase 2 — **do not deploy** until then.
+1. **Run human device UAT sessions** and report evidence (template in [PILOT_PROGRESS.md](./docs/releases/v1.0.0-rc1/PILOT_PROGRESS.md)).  
+2. After sessions: update progress + defect register; verify fixes; refresh pilot report as needed.  
+3. **Only after** planned scenarios + participants complete, Criticals resolved, pilot report updated, **and your explicit approval** — then choose GO / GO WITH MINOR FIXES / NO GO and consider Phase 2.
 
-Do **not** begin Phase 2 production cutover or Phase 4/5 product work while Phase 1 is open.
+Do **not** begin production deployment or Phase 2+ without approval.
