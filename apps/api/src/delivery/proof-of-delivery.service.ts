@@ -13,7 +13,7 @@ import {
   DeliveryEventsPublisher,
   DeliveryLifecyclePublication,
 } from './delivery-events.publisher';
-import { ShipmentStatus, isShipmentStatus } from './shipment.domain.rules';
+import { ShipmentStatus } from './shipment.domain.rules';
 import {
   assertCourierMayExecute,
   ExecutionDomainError,

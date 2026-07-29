@@ -527,7 +527,7 @@ export class ShipmentAggregateService {
     return this.toCourierShipmentDetail(shipment);
   }
 
-  async acceptShipment(courierUserId: string, shipmentId: string) {
+  async acceptShipment(_courierUserId: string, _shipmentId: string) {
     throw new BadRequestException(
       'Use DispatchService.acceptAssignment — accept is owned by dispatch (D4)',
     );

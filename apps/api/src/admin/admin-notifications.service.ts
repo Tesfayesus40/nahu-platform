@@ -177,7 +177,6 @@ export class AdminNotificationsService {
 
     // Channel stub for future mailer / push (Farms, Delivery, AI).
     if (process.env.NODE_ENV !== 'production') {
-      // eslint-disable-next-line no-console
       console.info(
         `[notifications] published id=${item.id} audience=${item.audience} severity=${item.severity}`,
       );

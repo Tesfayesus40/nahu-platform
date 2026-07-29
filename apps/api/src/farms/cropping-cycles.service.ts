@@ -304,7 +304,7 @@ export class CroppingCyclesService {
     }
 
     let unitCode = dto.unitCode?.toUpperCase() ?? line.unitCode;
-    let plannedQty = dto.plannedQty ?? toNumber(line.plannedQty);
+    const plannedQty = dto.plannedQty ?? toNumber(line.plannedQty);
     if (dto.unitCode || dto.plannedQty !== undefined) {
       // keep qty in the stored unit; if unit changes without conversion path, reject via product default dimension check lightly
       unitCode = unitCode.toUpperCase();
@@ -434,7 +434,7 @@ export class CroppingCyclesService {
     if (!input.croppingCycleId && !input.cycleLineId) return {};
 
     let cycleId = input.croppingCycleId;
-    let lineId = input.cycleLineId;
+    const lineId = input.cycleLineId;
 
     if (lineId && !cycleId) {
       const line = await this.prisma.croppingCycleLine.findUnique({
@@ -463,7 +463,7 @@ export class CroppingCyclesService {
       throw new BadRequestException('Receive plot does not match cycle plot');
     }
 
-    let line = lineId
+    const line = lineId
       ? cycle.lines.find((l) => l.id === lineId)
       : cycle.lines.find((l) => l.productId === input.productId);
 

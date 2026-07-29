@@ -8,7 +8,7 @@ export class AdminSystemService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getHealth() {
-    let database: 'up' | 'down' = 'down';
+    let database: 'up' | 'down';
     try {
       await this.prisma.$queryRaw`SELECT 1`;
       database = 'up';

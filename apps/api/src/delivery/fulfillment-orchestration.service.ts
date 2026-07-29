@@ -239,7 +239,7 @@ export class FulfillmentOrchestrationService {
         ? { buyerDeliveryConfirmedAt: fc.buyerDeliveryConfirmedAt ?? now }
         : { courierDeliveryConfirmedAt: fc.courierDeliveryConfirmedAt ?? now };
 
-    let updated = await this.prisma.fulfillmentCase.update({
+    const updated = await this.prisma.fulfillmentCase.update({
       where: { id: fc.id },
       data: { ...data, updatedAt: now },
     });

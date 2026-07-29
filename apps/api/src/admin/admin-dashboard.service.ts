@@ -428,7 +428,7 @@ export class AdminDashboardService {
   }
 
   private async healthSnapshot() {
-    let database: 'up' | 'down' = 'down';
+    let database: 'up' | 'down';
     try {
       await this.prisma.$queryRaw`SELECT 1`;
       database = 'up';

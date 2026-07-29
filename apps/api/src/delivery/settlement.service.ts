@@ -177,7 +177,7 @@ export class SettlementService {
       });
 
       let row;
-      let created = true;
+      const created = true;
       try {
         row = await this.aggregate.appendEarning(tx, {
           shipmentId: shipment.id,

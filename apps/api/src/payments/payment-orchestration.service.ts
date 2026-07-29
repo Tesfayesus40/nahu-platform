@@ -253,7 +253,7 @@ export class PaymentOrchestrationService {
 
     await this.prisma.$transaction(async (tx) => {
       const now = new Date();
-      let toStatus = pc.paymentStatus;
+      let toStatus: PaymentStatus;
       try {
         toStatus = nextPaymentStatus('REFUND', pc.paymentStatus);
       } catch {

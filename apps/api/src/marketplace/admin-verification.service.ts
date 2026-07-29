@@ -15,7 +15,6 @@ import {
   canDecideSubject,
   canReadVerification,
   decidePermissionForSubject,
-  isPendingVerificationStatus,
   requiresReason,
   statusAfterDecision,
   type VerificationDecisionCode,

@@ -83,12 +83,10 @@ export function computeDeliveryCommission(
   commission: DeliveryCommissionInput,
 ): { deliveryCommissionEtb: number; courierPayoutEtb: number } {
   const fee = roundEtb(Math.max(0, deliveryFeeEtb));
-  let commissionEtb = 0;
-  if (commission.commissionType === 'FIXED') {
-    commissionEtb = roundEtb(Math.min(fee, Math.max(0, Number(commission.commissionValue))));
-  } else {
-    commissionEtb = roundEtb(fee * (Math.max(0, Number(commission.commissionValue)) / 100));
-  }
+  let commissionEtb =
+    commission.commissionType === 'FIXED'
+      ? roundEtb(Math.min(fee, Math.max(0, Number(commission.commissionValue))))
+      : roundEtb(fee * (Math.max(0, Number(commission.commissionValue)) / 100));
   if (commissionEtb > fee) commissionEtb = fee;
   return {
     deliveryCommissionEtb: commissionEtb,
